@@ -1700,8 +1700,10 @@ size_t wpas_mbo_ie_bss_trans_reject(struct wpa_supplicant *wpa_s, u8 *pos,
 				    size_t len,
 				    enum mbo_transition_reject_reason reason);
 void wpas_mbo_update_cell_capa(struct wpa_supplicant *wpa_s, u8 mbo_cell_capa);
+#ifdef CONFIG_GAS
 struct wpabuf * mbo_build_anqp_buf(struct wpa_supplicant *wpa_s,
 				   struct wpa_bss *bss, u32 mbo_subtypes);
+#endif /* CONFIG_GAS */
 void mbo_parse_rx_anqp_resp(struct wpa_supplicant *wpa_s,
 			    struct wpa_bss *bss, const u8 *sa,
 			    const u8 *data, size_t slen);

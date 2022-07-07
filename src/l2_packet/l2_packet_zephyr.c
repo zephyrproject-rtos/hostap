@@ -17,6 +17,7 @@
 #include "eloop.h"
 #include "l2_packet.h"
 #include "common/eapol_common.h"
+
 struct l2_packet_data {
 	char ifname[17];
 	u8 own_addr[ETH_ALEN];
@@ -172,7 +173,8 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	ll.sll_protocol = htons(protocol);
 
 	// FIXME: This should skip bind_default to ETH_P_ALL, but its not.
-	memcpy(ll.sll_addr, l2->own_addr, ETH_ALEN);
+	if (l2->own_addr)
+		memcpy(ll.sll_addr, l2->own_addr, ETH_ALEN);
 
 	ret = bind(l2->fd, (const struct sockaddr *) &ll, sizeof(ll));
 	if (ret < 0) {

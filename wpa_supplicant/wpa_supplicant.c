@@ -908,28 +908,6 @@ void wpa_supplicant_reinit_autoscan(struct wpa_supplicant *wpa_s)
 	}
 }
 
-// TODO: This WAR is needed as we always lose the first frame after association (DHCP),
-// and IP assignment gets delayed (esp. with exponential backoff in Zephyr DHCP client), so
-// we send out a dummy frame that will be lost, and then DHCP will go through smoothly.
-//
-// Remove this once the first frame issue is fixed.
-static void dhcp_war(struct wpa_supplicant *wpa_s)
-{
-       int len = 30, res = -1;
-       char *buf;
-
-       buf = os_malloc(len);
-       if (buf == NULL)
-               return;
-
-       memset(buf, 0xAA, len);
-
-       res = l2_packet_send(wpa_s->l2, wpa_s->bssid, ntohs(0x8989), buf, len);
-       wpa_printf(MSG_DEBUG, "DHCP WAR: TX frame res=%d", res);
-       os_free(buf);
-}
-
-
 /**
  * wpa_supplicant_set_state - Set current connection state
  * @wpa_s: Pointer to wpa_supplicant data
@@ -1036,7 +1014,6 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		wpa_s->after_wps = 0;
 		wpa_s->known_wps_freq = 0;
 		wpas_p2p_completed(wpa_s);
-		dhcp_war(wpa_s);
 
 		sme_sched_obss_scan(wpa_s, 1);
 
@@ -6836,6 +6813,7 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		return -1;
 	wpa_sm_set_eapol(wpa_s->wpa, wpa_s->eapol);
 
+#ifndef CONFIG_ZEPHYR
 	wpa_s->ctrl_iface = wpa_supplicant_ctrl_iface_init(wpa_s);
 	if (wpa_s->ctrl_iface == NULL) {
 		wpa_printf(MSG_ERROR,
@@ -6849,6 +6827,7 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 			   wpa_s->conf->ctrl_interface);
 		return -1;
 	}
+#endif
 
 	wpa_s->gas = gas_query_init(wpa_s);
 	if (wpa_s->gas == NULL) {

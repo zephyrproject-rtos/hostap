@@ -599,7 +599,7 @@ void wpas_mbo_update_cell_capa(struct wpa_supplicant *wpa_s, u8 mbo_cell_capa)
 	wpas_update_mbo_connect_params(wpa_s);
 }
 
-
+#ifdef CONFIG_GAS
 struct wpabuf * mbo_build_anqp_buf(struct wpa_supplicant *wpa_s,
 				   struct wpa_bss *bss, u32 mbo_subtypes)
 {
@@ -635,7 +635,7 @@ struct wpabuf * mbo_build_anqp_buf(struct wpa_supplicant *wpa_s,
 
 	return anqp_buf;
 }
-
+#endif /* CONFIG_GAS */
 
 void mbo_parse_rx_anqp_resp(struct wpa_supplicant *wpa_s,
 			    struct wpa_bss *bss, const u8 *sa,
