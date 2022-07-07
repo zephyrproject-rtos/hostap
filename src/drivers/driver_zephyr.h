@@ -126,7 +126,6 @@ struct zep_drv_if_ctx {
 	size_t ssid_len;
 	unsigned char bssid[6];
 	bool associated;
-
 	void *phy_info_arg;
 	bool get_wiphy_in_progress;
 };
@@ -152,7 +151,6 @@ struct zep_wpa_supp_dev_callbk_fns {
 
 	void (*disassoc)(struct zep_drv_if_ctx *if_ctx,
 			 union wpa_event_data *event);
-
 	void (*mgmt_tx_status)(struct zep_drv_if_ctx *if_ctx,
 			const u8 *frame, size_t len, bool ack);
 

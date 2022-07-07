@@ -64,7 +64,7 @@
 #elif defined(__ZEPHYR__)
 #include <zephyr/net/ethernet.h>
 #elif !defined(__CYGWIN__) && !defined(CONFIG_NATIVE_WINDOWS)
-#include <net/ethernet.h>
+#include <zephyr/net/ethernet.h>
 #endif
 
 static int wpa_supplicant_global_iface_list(struct wpa_global *global,
@@ -11484,6 +11484,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		return NULL;
 	}
 
+	memset(reply, '\0', reply_size);
 	os_memcpy(reply, "OK\n", 3);
 	reply_len = 3;
 

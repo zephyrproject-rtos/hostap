@@ -18,7 +18,6 @@
 
 
 #define COOKIE_LEN 8
-
 /* Per-interface ctrl_iface */
 
 /**

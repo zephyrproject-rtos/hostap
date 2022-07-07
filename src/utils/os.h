@@ -302,6 +302,42 @@ static inline void * os_calloc(size_t nmemb, size_t size)
  * these functions need to be implemented in os_*.c file for the target system.
  */
 
+#ifdef CONFIG_ZEPHYR
+/**
+ * os_strdup - Duplicate a string
+ * @s: Source string
+ * Returns: Allocated buffer with the string copied into it or %NULL on failure
+ *
+ * Caller is responsible for freeing the returned buffer with os_free().
+ */
+char *os_strdup(const char *s);
+
+/**
+ * os_strcasecmp - Compare two strings ignoring case
+ * @s1: First string
+ * @s2: Second string
+ * Returns: An integer less than, equal to, or greater than zero if s1 is
+ * found to be less than, to match, or be greatred than s2
+ */
+int os_strcasecmp(const char *s1, const char *s2);
+
+/**
+ * os_strncasecmp - Compare two strings ignoring case
+ * @s1: First string
+ * @s2: Second string
+ * @n: Maximum numbers of characters to compare
+ * Returns: An integer less than, equal to, or greater than zero if s1 is
+ * found to be less than, to match, or be greater than s2. Only first n
+ * characters will be compared.
+ */
+int os_strncasecmp(const char *s1, const char *s2, size_t n);
+
+#ifndef os_memcmp_const
+#define os_memcmp_const(s1, s2, n) memcmp((s1), (s2), (n))
+#endif
+#endif
+
+
 #ifdef OS_NO_C_LIB_DEFINES
 
 /**
@@ -497,7 +533,7 @@ char * os_strdup(const char *s);
 #ifndef os_strdup
 #ifdef _MSC_VER
 #define os_strdup(s) _strdup(s)
-#else
+#elif !defined(CONFIG_ZEPHYR)
 #define os_strdup(s) strdup(s)
 #endif
 #endif
@@ -522,14 +558,14 @@ char * os_strdup(const char *s);
 #ifndef os_strcasecmp
 #ifdef _MSC_VER
 #define os_strcasecmp(s1, s2) _stricmp((s1), (s2))
-#else
+#elif !defined(CONFIG_ZEPHYR)
 #define os_strcasecmp(s1, s2) strcasecmp((s1), (s2))
 #endif
 #endif
 #ifndef os_strncasecmp
 #ifdef _MSC_VER
 #define os_strncasecmp(s1, s2, n) _strnicmp((s1), (s2), (n))
-#else
+#elif !defined(CONFIG_ZEPHYR)
 #define os_strncasecmp(s1, s2, n) strncasecmp((s1), (s2), (n))
 #endif
 #endif
@@ -601,6 +637,7 @@ static inline void os_remove_in_array(void *ptr, size_t nmemb, size_t size,
  */
 size_t os_strlcpy(char *dest, const char *src, size_t siz);
 
+#ifndef CONFIG_ZEPHYR
 /**
  * os_memcmp_const - Constant time memory comparison
  * @a: First buffer to compare
@@ -618,7 +655,7 @@ size_t os_strlcpy(char *dest, const char *src, size_t siz);
  */
 int os_memcmp_const(const void *a, const void *b, size_t len);
 
-
+#endif
 /**
  * os_memdup - Allocate duplicate of passed memory chunk
  * @src: Source buffer to duplicate
