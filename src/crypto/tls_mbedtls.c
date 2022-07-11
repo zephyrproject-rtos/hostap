@@ -471,7 +471,7 @@ tls_set_ciphersuite(const struct tls_connection_params *cfg, tls_context_t *tls)
 	} else if (
 	    mbedtls_pk_get_bitlen(&tls->clientkey) > 2048 ||
 	    (tls->cacert_ptr &&
-	     mbedtls_pk_get_bitlen(&tls->cacert_ptr->MBEDTLS_PRIVATE(pk)) >
+	     mbedtls_pk_get_bitlen(&tls->cacert_ptr->pk) >
 		 2048)) {
 		mbedtls_ssl_conf_ciphersuites(
 		    &tls->conf, eap_ciphersuite_preference);
