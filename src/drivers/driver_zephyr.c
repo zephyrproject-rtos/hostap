@@ -1248,11 +1248,13 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 				     authorized,
 				     if_ctx->bssid);
 
+#ifdef CONFIG_NET_DHCPV4
 	if (authorized) {
 		net_dhcpv4_stop(iface);
 		k_msleep(500);
 		net_dhcpv4_start(iface);
 	}
+#endif
 
 	return ret;
 }

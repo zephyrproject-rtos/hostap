@@ -221,11 +221,15 @@ void l2_packet_deinit(struct l2_packet_data *l2)
 
 int l2_packet_get_ip_addr(struct l2_packet_data *l2, char *buf, size_t len)
 {
+#ifdef CONFIG_NET_IPV4
 	char addr_buf[NET_IPV4_ADDR_LEN];
 	os_strlcpy(buf, net_addr_ntop(AF_INET,
 				&l2->iface->config.ip.ipv4->unicast[0].address.in_addr.s_addr,
 				addr_buf, sizeof(addr_buf)), len);
 	return 0;
+#else
+	return -1;
+#endif
 }
 
 void l2_packet_notify_auth_start(struct l2_packet_data *l2)
