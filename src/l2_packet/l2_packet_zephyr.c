@@ -102,19 +102,7 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	wpa_printf(MSG_DEBUG, "%s: src=" MACSTR " len=%d",
 		   __func__, MAC2STR(ll.sll_addr), (int) res);
 
-	// FIXME: CONFIG_NET_SOCKETS_PACKET_DGRAM should remove L2 header and fill ll
-	// but, it is not working. For now, remove the L2 header before passing the
-	// packet to the upper layers
-	if (!l2->l2_hdr) {
-		unsigned char l2_hdr_len = sizeof(struct l2_ethhdr);
-		if (res > l2_hdr_len) {
-			l2->rx_callback(l2->rx_callback_ctx, ll.sll_addr, &buf[l2_hdr_len], res-l2_hdr_len);
-		} else {
-			wpa_printf(MSG_WARNING, "RAW : received packet is too short: %d", res);
-		}
-	} else {
-		l2->rx_callback(l2->rx_callback_ctx, ll.sll_addr, buf, res);
-	}
+	l2->rx_callback(l2->rx_callback_ctx, ll.sll_addr, buf, res);
 }
 
 struct l2_packet_data *
