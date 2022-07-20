@@ -80,7 +80,7 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	int res;
 	struct sockaddr_ll ll;
 	socklen_t fromlen;
-	struct l2_ethhdr *ethhdr;
+	const struct ieee802_1x_hdr *hdr;
 
 	os_memset(&ll, 0, sizeof(ll));
 	fromlen = sizeof(ll);
@@ -91,17 +91,19 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		return;
 	}
 
+	// FIXME: sll_addr is not being filled as L2 header is not removed
+	wpa_printf(MSG_DEBUG, "%s: src=" MACSTR " proto=0x%x len=%d",
+		   __func__, MAC2STR(ll.sll_addr), ll.sll_protocol, (int) res);
+
+	hdr = (const struct ieee802_1x_hdr *) buf;
+
+	// FIXME: L2 header is now removed but sll_protocol is not set.
+	// So, as a workaround add this check to drop packets.
+	if (hdr->type != IEEE802_1X_TYPE_EAPOL_KEY)
+		return;
+
 	// FIXME: We should only get registered protcols from networking stack
 	// but for some reason ETH_P_ALL is being set (bind_default)
-	ethhdr = (struct l2_ethhdr *) buf;
-	if (ethhdr->h_proto != htons(l2->protocol)) {
-		return;
-	}
-
-	// FIXME: sll_addr is not being filled as L2 header is not removed
-	wpa_printf(MSG_DEBUG, "%s: src=" MACSTR " len=%d",
-		   __func__, MAC2STR(ll.sll_addr), (int) res);
-
 	l2->rx_callback(l2->rx_callback_ctx, ll.sll_addr, buf, res);
 }
 
