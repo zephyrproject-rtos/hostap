@@ -145,8 +145,9 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 			       sizeof(struct wpa_scan_res *));
 
 	if (!tmp) {
+		wpa_printf(MSG_ERROR, "%s: Failed to realloc scan result array\n", __func__);
 		os_free(r);
-		return;
+		goto err;
 	}
 
 	struct wpa_scan_res *sr = os_zalloc(scan_res_len);
@@ -162,6 +163,13 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 	if_ctx->scan_res2->res = tmp;
 
 	if_ctx->scan_res2_get_in_prog = more_res;
+
+	return;
+err:
+	/* Ignore failures except the last */
+	if (!more_res) {
+		if_ctx->scan_res2_get_in_prog = false;
+	}
 }
 
 
