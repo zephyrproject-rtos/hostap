@@ -31,8 +31,6 @@
 
 #define CMD_BUF_LEN  4096
 
-extern struct wpa_supplicant *wpa_s_0;
-
 static const char *const wpa_cli_version =
 "wpa_cli v" VERSION_STR "\n"
 "Copyright (c) 2004-2022, Jouni Malinen <j@w1.fi> and contributors";
@@ -63,7 +61,11 @@ static int wpa_cli_last_id = 0;
 static const char *ctrl_iface_dir = CONFIG_CTRL_IFACE_DIR;
 static const char *client_socket_dir = NULL;
 static char *ctrl_ifname = NULL;
+#ifndef CONFIG_ZEPHYR
 static const char *global = NULL;
+#else
+extern struct wpa_global *global;
+#endif
 static const char *pid_file = NULL;
 static const char *action_file = NULL;
 static int reconnect = 0;
@@ -294,8 +296,23 @@ static int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
 
 	char * repl_buf;
 	int len = 0; /* len of the reply */
+	char *ifname;
+	struct wpa_supplicant *wpa_s;
 
-    repl_buf = wpa_supplicant_ctrl_iface_process (wpa_s_0, (char *) cmd, &len);
+	if (ifname_prefix) {
+		ifname = ifname_prefix;
+	} else {
+		/* Default */
+		ifname = "wlan0";
+	}
+
+	wpa_s = wpa_supplicant_get_iface(global, ifname);
+	if (!wpa_s) {
+		printf("Unable to find the interface: %s, quitting", ifname);
+		return -1;
+	}
+
+    repl_buf = wpa_supplicant_ctrl_iface_process (wpa_s, (char *) cmd, &len);
     
 	if (len > 0 && os_strcmp(repl_buf, "OK") != 0)
 	   printf ("Reply: %s\n", repl_buf);
@@ -5031,9 +5048,11 @@ int cli_main(int argc, char *argv[])
 		case 'B':
 			daemonize = 1;
 			break;
+#ifndef CONFIG_ZEPHYR
 		case 'g':
 			global = optarg;
 			break;
+#endif
 		case 'G':
 			ping_interval = atoi(optarg);
 			break;
