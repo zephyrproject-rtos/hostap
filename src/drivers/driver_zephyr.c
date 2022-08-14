@@ -148,6 +148,9 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 	struct wpa_scan_res **tmp = NULL;
 	size_t scan_res_len  = sizeof(struct wpa_scan_res) + r->ie_len + r->beacon_ie_len;
 
+	if (!if_ctx->scan_res2)
+		return;
+
 	tmp = os_realloc_array(if_ctx->scan_res2->res,
 			       if_ctx->scan_res2->num + 1,
 			       sizeof(struct wpa_scan_res *));
