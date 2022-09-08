@@ -157,7 +157,6 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 
 	if (!tmp) {
 		wpa_printf(MSG_ERROR, "%s: Failed to realloc scan result array\n", __func__);
-		os_free(r);
 		goto err;
 	}
 
