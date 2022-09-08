@@ -138,9 +138,9 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	l2->ifindex = net_if_get_by_iface(l2->iface);
 
 	if (!l2->ifindex) {
-		os_free(l2);
 		wpa_printf(MSG_ERROR, "Cannot get  interface index for: %s\n",
 			   l2->ifname);
+		os_free(l2);
 		return NULL;
 	}
 
