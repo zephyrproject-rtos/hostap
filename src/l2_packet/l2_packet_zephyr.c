@@ -179,6 +179,8 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 
 	return l2;
 fail:
+	if (l2->fd >= 0)
+		close(l2->fd);
 	os_free(l2);
 	wpa_printf(MSG_ERROR, "Failed to create l2_packet: %d\n", ret);
 	return NULL;
