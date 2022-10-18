@@ -173,8 +173,7 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	ll.sll_protocol = htons(protocol);
 
 	// FIXME: This should skip bind_default to ETH_P_ALL, but its not.
-	if (l2->own_addr)
-		memcpy(ll.sll_addr, l2->own_addr, ETH_ALEN);
+	memcpy(ll.sll_addr, l2->own_addr, ETH_ALEN);
 
 	ret = bind(l2->fd, (const struct sockaddr *) &ll, sizeof(ll));
 	if (ret < 0) {
