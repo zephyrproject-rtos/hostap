@@ -1556,7 +1556,7 @@ int supp_rates_11b_only(struct ieee802_11_elems *elems)
 		return 0;
 
 	for (i = 0; elems->supp_rates && i < elems->supp_rates_len; i++) {
-		if (is_11b(elems->supp_rates[i]))
+		if (is_11b(elems->supp_rates[i] & 0x7f))
 			num_11b++;
 		else
 			num_others++;
@@ -1564,7 +1564,7 @@ int supp_rates_11b_only(struct ieee802_11_elems *elems)
 
 	for (i = 0; elems->ext_supp_rates && i < elems->ext_supp_rates_len;
 	     i++) {
-		if (is_11b(elems->ext_supp_rates[i]))
+		if (is_11b(elems->ext_supp_rates[i] & 0x7f))
 			num_11b++;
 		else
 			num_others++;
