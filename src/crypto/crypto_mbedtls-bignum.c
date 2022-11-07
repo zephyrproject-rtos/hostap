@@ -228,9 +228,16 @@ int crypto_bignum_sqrmod(
     const struct crypto_bignum *a, const struct crypto_bignum *b,
     struct crypto_bignum *c)
 {
-	return mbedtls_mpi_exp_mod(
-	    (mbedtls_mpi *)c, (mbedtls_mpi *)a, (mbedtls_mpi *)a,
-	    (mbedtls_mpi *)b, NULL);
+	struct crypto_bignum *two = crypto_bignum_init_uint(2);
+	int ret;
+
+	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(
+	    (mbedtls_mpi *)c, (mbedtls_mpi *)a, (mbedtls_mpi *)two,
+	    (mbedtls_mpi *)b, NULL));
+
+cleanup:
+	crypto_bignum_deinit(two, 1);
+	return ret;
 }
 
 int crypto_bignum_rshift(
