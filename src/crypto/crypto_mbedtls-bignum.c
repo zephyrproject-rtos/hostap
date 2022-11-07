@@ -185,21 +185,19 @@ int crypto_bignum_mulmod(
     const struct crypto_bignum *a, const struct crypto_bignum *b,
     const struct crypto_bignum *c, struct crypto_bignum *d)
 {
-	int res;
+	int ret;
 
 	mbedtls_mpi temp;
 	mbedtls_mpi_init(&temp);
 
-	res = mbedtls_mpi_mul_mpi(
-	    &temp, (const mbedtls_mpi *)a, (const mbedtls_mpi *)b);
-	if (res) {
-		return -1;
-	}
+	MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi(
+	    &temp, (const mbedtls_mpi *)a, (const mbedtls_mpi *)b));
 
-	res = mbedtls_mpi_mod_mpi((mbedtls_mpi *)d, &temp, (mbedtls_mpi *)c);
+	MBEDTLS_MPI_CHK(mbedtls_mpi_mod_mpi((mbedtls_mpi *)d, &temp, (mbedtls_mpi *)c));
 	mbedtls_mpi_free(&temp);
-#
-	return res ? -1 : 0;
+
+cleanup:
+	return ret;
 }
 
 int crypto_bignum_cmp(
@@ -243,11 +241,13 @@ cleanup:
 int crypto_bignum_rshift(
     const struct crypto_bignum *a, int n, struct crypto_bignum *r)
 {
+	int ret;
 
-	if (mbedtls_mpi_copy((mbedtls_mpi *)r, (const mbedtls_mpi *)a)) {
-		return -1;
-	}
-	return mbedtls_mpi_shift_r((mbedtls_mpi *)r, n);
+	MBEDTLS_MPI_CHK(mbedtls_mpi_copy((mbedtls_mpi *)r, (const mbedtls_mpi *)a));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_shift_r((mbedtls_mpi *)r, n));
+
+cleanup:
+	return ret;
 }
 
 int crypto_bignum_legendre(
