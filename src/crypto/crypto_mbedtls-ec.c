@@ -34,6 +34,8 @@ static int f_rng(void *p_rng, unsigned char *buf, size_t len)
 }
 struct crypto_ec
 {
+	/* To WAR MbedTLS optimization as A is stored 0 but assumed "-3 mod P" internally*/
+	mbedtls_mpi A;
 	mbedtls_ecp_group group;
 };
 
@@ -44,7 +46,19 @@ int crypto_rng_wrapper(void *ctx, unsigned char *buf, size_t len)
 
 const struct crypto_bignum *crypto_ec_get_a(struct crypto_ec *e)
 {
-	return (const struct crypto_bignum *)&e->group.A;
+	int ret;
+	mbedtls_mpi minus_three, one;
+
+	mbedtls_mpi_init(&e->A);
+	mbedtls_mpi_init(&minus_three);
+	mbedtls_mpi_init(&one);
+
+	MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&minus_three, -3));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&one, 1));
+	/* A = -3 mod P*/
+	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&e->A, &minus_three, &one, &e->group.P, NULL));
+cleanup:
+	return (const struct crypto_bignum *)&e->A;
 }
 
 const struct crypto_bignum *crypto_ec_get_b(struct crypto_ec *e)
