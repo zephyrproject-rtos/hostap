@@ -348,9 +348,10 @@ int crypto_ec_point_solve_y_coord(
     struct crypto_ec *e, struct crypto_ec_point *p,
     const struct crypto_bignum *x, int y_bit)
 {
-	mbedtls_mpi temp;
+	mbedtls_mpi temp, temp_no_alias;
 	mbedtls_mpi *y_sqr, *y;
 	mbedtls_mpi_init(&temp);
+	mbedtls_mpi_init(&temp_no_alias);
 	int ret = 0;
 
 	y = &((mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y);
@@ -371,7 +372,8 @@ int crypto_ec_point_solve_y_coord(
 	if (y_sqr) {
 
 		MBEDTLS_MPI_CHK(mbedtls_mpi_add_int(&temp, &e->group.P, 1));
-		MBEDTLS_MPI_CHK(mbedtls_mpi_div_int(&temp, NULL, &temp, 4));
+		MBEDTLS_MPI_CHK(mbedtls_mpi_div_int(&temp_no_alias, NULL, &temp, 4));
+		MBEDTLS_MPI_CHK(mbedtls_mpi_copy(&temp_no_alias, &temp));
 		MBEDTLS_MPI_CHK(
 		    mbedtls_mpi_exp_mod(y, y_sqr, &temp, &e->group.P, NULL));
 

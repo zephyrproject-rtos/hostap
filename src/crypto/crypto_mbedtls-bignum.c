@@ -166,11 +166,19 @@ int crypto_bignum_div(
     const struct crypto_bignum *a, const struct crypto_bignum *b,
     struct crypto_bignum *c)
 {
-	return mbedtls_mpi_div_mpi(
-		   (mbedtls_mpi *)c, NULL, (const mbedtls_mpi *)a,
-		   (const mbedtls_mpi *)b)
-		   ? -1
-		   : 0;
+	int ret;
+
+	mbedtls_mpi res;
+	mbedtls_mpi_init(&res);
+
+	MBEDTLS_MPI_CHK(mbedtls_mpi_div_mpi(
+		   (mbedtls_mpi *)&res, NULL, (const mbedtls_mpi *)a,
+		   (const mbedtls_mpi *)b));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_copy((mbedtls_mpi *)c, (const mbedtls_mpi *)&res));
+
+cleanup:
+	mbedtls_mpi_free(&res);
+	return ret;
 }
 
 int crypto_bignum_mulmod(
