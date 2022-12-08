@@ -124,11 +124,20 @@ int crypto_bignum_exptmod(
     const struct crypto_bignum *a, const struct crypto_bignum *b,
     const struct crypto_bignum *c, struct crypto_bignum *d)
 {
-	return mbedtls_mpi_exp_mod(
-		   (mbedtls_mpi *)d, (const mbedtls_mpi *)a,
-		   (const mbedtls_mpi *)b, (const mbedtls_mpi *)c, NULL)
-		   ? -1
-		   : 0;
+	int ret;
+
+	mbedtls_mpi res;
+
+	mbedtls_mpi_init(&res);
+	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(
+		   (mbedtls_mpi *)&res, (const mbedtls_mpi *)a,
+		   (const mbedtls_mpi *)b, (const mbedtls_mpi *)c, NULL));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_copy((mbedtls_mpi *)d, (const mbedtls_mpi *)&res));
+
+cleanup:
+	mbedtls_mpi_free(&res);
+	return ret;
+
 }
 
 int crypto_bignum_inverse(
