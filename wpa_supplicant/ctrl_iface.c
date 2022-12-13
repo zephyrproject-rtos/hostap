@@ -11451,7 +11451,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 					 char *buf, size_t *resp_len)
 {
 	char *reply;
-	const int reply_size = 4096;
+	const int reply_size = 1024;
 	int reply_len;
 
 	if (os_strncmp(buf, WPA_CTRL_RSP, os_strlen(WPA_CTRL_RSP)) == 0 ||
