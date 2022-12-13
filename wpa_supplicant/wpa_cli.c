@@ -313,14 +313,16 @@ static int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
 	}
 
     repl_buf = wpa_supplicant_ctrl_iface_process (wpa_s, (char *) cmd, &len);
-    
-	if (len > 0 && os_strcmp(repl_buf, "OK") != 0)
-	   printf ("Reply: %s\n", repl_buf);
-	
-	if (len > 0 && repl_buf)
-	    os_free(repl_buf);
 
-       return 0;
+	if (repl_buf) {
+		printf("%s\n", repl_buf);
+	} else {
+		printf("Reply: unknown failure\n");
+	}
+
+	os_free(repl_buf);
+
+    return 0;
 }
 
 
