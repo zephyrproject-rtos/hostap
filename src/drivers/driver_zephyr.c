@@ -552,6 +552,14 @@ static int wpa_drv_mgmt_subscribe_non_ap(struct zep_drv_if_ctx *if_ctx)
 	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x0a\x07", 2) < 0)
 		ret = -1;
 
+	/* Radio Measurement - Neighbor Report Response */
+	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x05\x05", 2) < 0)
+		ret = -1;
+
+	/* Radio Measurement - Radio Measurement Request */
+	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x05\x00", 2) < 0)
+		ret = -1;
+
 	return ret;
 }
 
@@ -1162,7 +1170,6 @@ static int wpa_drv_zep_set_key(void* priv,
 
 static int wpa_drv_zep_get_capa(void *priv, struct wpa_driver_capa *capa)
 {
-
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	int ret = -1;
