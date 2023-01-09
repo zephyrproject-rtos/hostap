@@ -170,6 +170,8 @@ struct zep_wpa_supp_dev_callbk_fns {
 
 	void (*mgmt_rx)(struct zep_drv_if_ctx *if_ctx,
 			char *frame, int frame_len, int frequency, int rx_signal_dbm);
+
+	void (*mac_changed)(struct zep_drv_if_ctx *if_ctx);
 };
 
 

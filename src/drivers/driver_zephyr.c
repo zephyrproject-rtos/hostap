@@ -63,6 +63,13 @@ void wpa_supplicant_event_wrapper(void *ctx,
 	zephyr_wifi_send_event(&msg);
 }
 
+void wpa_drv_zep_event_mac_changed(struct zep_drv_if_ctx *if_ctx)
+{
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
+			EVENT_INTERFACE_MAC_CHANGED,
+			NULL);
+}
+
 static int wpa_drv_zep_abort_scan(void *priv,
 				  u64 scan_cookie)
 {
@@ -808,6 +815,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.unprot_disassoc = wpa_drv_zep_event_proc_unprot_disassoc;
 	callbk_fns.get_wiphy_res = wpa_drv_zep_event_get_wiphy;
 	callbk_fns.mgmt_rx = wpa_drv_zep_event_mgmt_rx;
+	callbk_fns.mac_changed = wpa_drv_zep_event_mac_changed;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
