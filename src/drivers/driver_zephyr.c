@@ -484,7 +484,8 @@ static int phy_info_band_cfg(struct phy_info_arg *phy_info,
 static void wpa_drv_zep_event_get_wiphy(struct zep_drv_if_ctx *if_ctx, void *band_info)
 {
 	if (!band_info) {
-		if_ctx->get_wiphy_in_progress = false;
+		/* Done with all bands */
+		k_sem_give(&if_ctx->drv_resp_sem);
 		return;
 	}
 
@@ -655,7 +656,6 @@ struct hostapd_hw_modes *wpa_drv_get_hw_feature_data(void *priv,
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	int ret = -1;
-	int i=0;
 
 	if_ctx = priv;
 
@@ -675,14 +675,15 @@ struct hostapd_hw_modes *wpa_drv_get_hw_feature_data(void *priv,
 
 	if_ctx->phy_info_arg = &result;
 
-	if_ctx->get_wiphy_in_progress = true;
-
 	ret = dev_ops->get_wiphy(if_ctx->dev_priv);
+	if (ret < 0) {
+		return NULL;
+	}
 
-	while ((if_ctx->get_wiphy_in_progress) && (i < SCAN_TIMEOUT)) {
-		k_yield();
-		os_sleep(1, 0);
-		i++;
+	k_sem_take(&if_ctx->drv_resp_sem, K_SECONDS(GET_WIPHY_TIMEOUT));
+
+	if (!result.modes) {
+		return NULL;
 	}
 
 	struct hostapd_hw_modes *modes;
@@ -795,6 +796,8 @@ static void *wpa_drv_zep_init(void *ctx,
 		if_ctx = NULL;
 		goto out;
 	}
+
+	k_sem_init(&if_ctx->drv_resp_sem, 0, 1);
 
 	wpa_drv_mgmt_subscribe_non_ap(if_ctx);
 
