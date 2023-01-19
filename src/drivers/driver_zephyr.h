@@ -117,6 +117,7 @@ struct zep_drv_if_ctx {
 	struct net_if *iface;
 	const struct device *dev_ctx;
 	void *dev_priv;
+	struct k_sem drv_resp_sem;
 
 	struct wpa_scan_results *scan_res2;
 	bool scan_res2_get_in_prog;
@@ -127,7 +128,6 @@ struct zep_drv_if_ctx {
 	unsigned char bssid[6];
 	bool associated;
 	void *phy_info_arg;
-	bool get_wiphy_in_progress;
 };
 
 
