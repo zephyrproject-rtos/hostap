@@ -11480,13 +11480,12 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 
 	reply = os_malloc(reply_size);
 	if (reply == NULL) {
-		wpa_printf(MSG_ERROR, "ctrl_iface: reply malloc of %d failed %s",
-			reply_size, strerror(errno));
+		wpa_printf(MSG_ERROR, "ctrl_iface: reply malloc of %d failed",
+			reply_size);
 		*resp_len = 1;
 		return NULL;
 	}
 
-	memset(reply, '\0', reply_size);
 	os_memcpy(reply, "OK\n", 3);
 	reply_len = 3;
 

@@ -649,6 +649,7 @@ char * wpa_ctrl_get_remote_ifname(struct wpa_ctrl *ctrl);
 #endif /* CONFIG_CTRL_IFACE_UDP */
 
 int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd);
+int wpa_ctrl_command_interactive(struct wpa_ctrl *ctrl, const char *cmd);
 int wpa_request(struct wpa_ctrl *ctrl, int argc, char *argv[]);
 
 #ifdef  __cplusplus
