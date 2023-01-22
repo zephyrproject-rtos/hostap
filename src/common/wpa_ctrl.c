@@ -593,13 +593,15 @@ struct wpa_ctrl * wpa_ctrl_open(const int sock)
 	struct wpa_ctrl *ctrl;
 
 	if (sock < 0) {
-		wpa_printf(MSG_ERROR, "Invalid socket");
+		wpa_printf(MSG_ERROR, "Invalid socket : %d\n", sock);
 		return NULL;
 	}
 
 	ctrl = os_zalloc(sizeof(*ctrl));
-	if (ctrl == NULL)
+	if (ctrl == NULL) {
+		wpa_printf(MSG_ERROR, "Failed to allocate memory: %d\n", sizeof(*ctrl));
 		return NULL;
+	}
 
 	/* We use one of the socketpair opened in ctrl_iface_zephyr.c */
 	ctrl->s = sock;

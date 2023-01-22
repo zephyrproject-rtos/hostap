@@ -13,6 +13,9 @@
 #include "edit.h"
 
 
+#ifdef CONFIG_ZEPHYR
+#define STDIN_FILENO 1
+#endif
 #define CMD_BUF_LEN 4096
 static char cmdbuf[CMD_BUF_LEN];
 static int cmdbuf_pos = 0;
