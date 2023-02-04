@@ -12,7 +12,12 @@
 #ifdef CONFIG_CTRL_IFACE
 
 #ifndef CTRL_IFACE_MAX_LEN
+#ifdef CONFIG_ZEPHYR
+#define CTRL_IFACE_MAX_LEN 1024
+#else
 #define CTRL_IFACE_MAX_LEN 4096
+#endif /* CONFIG_ZEPHYR */
+
 #endif /* CTRL_IFACE_MAX_LEN */
 
 /* Shared functions from ctrl_iface.c; to be called by ctrl_iface backends */
