@@ -60,7 +60,8 @@ static int wpa_cli_cmd(struct wpa_ctrl *ctrl, const char *cmd, int min_args,
 	}
 	buf = os_zalloc(sizeof(char) * CMD_BUF_LEN);
 	if (!buf){
-		printf ("Failed to allocate mem for command buf\n");
+		wpa_printf(MSG_ERROR, "Failed to allocate mem for command buf - %d\n",
+			CMD_BUF_LEN);
 		return -1;
 	}
 	memset(buf, '\0', CMD_BUF_LEN);
