@@ -128,6 +128,11 @@ struct zep_drv_if_ctx {
 	unsigned char bssid[6];
 	bool associated;
 	void *phy_info_arg;
+	struct wpa_driver_capa capa;
+
+	unsigned char prev_bssid[6];
+	unsigned char auth_bssid[6];
+	unsigned char auth_attempt_bssid[6];
 };
 
 
@@ -147,7 +152,7 @@ struct zep_wpa_supp_dev_callbk_fns {
 			   union wpa_event_data *event, unsigned int status);
 
 	void (*deauth)(struct zep_drv_if_ctx *if_ctx,
-		       union wpa_event_data *event);
+		       union wpa_event_data *event, const struct ieee80211_mgmt *mgmt);
 
 	void (*disassoc)(struct zep_drv_if_ctx *if_ctx,
 			 union wpa_event_data *event);
