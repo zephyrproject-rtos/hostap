@@ -205,8 +205,32 @@ void wpa_drv_zep_event_proc_assoc_resp(struct zep_drv_if_ctx *if_ctx,
 
 
 void wpa_drv_zep_event_proc_deauth(struct zep_drv_if_ctx *if_ctx,
-				   union wpa_event_data *event)
+				union wpa_event_data *event, const struct ieee80211_mgmt *mgmt)
 {
+	const u8 *bssid = NULL;
+
+	bssid = mgmt->bssid;
+
+	if ((if_ctx->capa.flags & WPA_DRIVER_FLAGS_SME) &&
+		!if_ctx->associated &&
+		os_memcmp(bssid, if_ctx->auth_bssid, ETH_ALEN) != 0 &&
+		os_memcmp(bssid, if_ctx->auth_attempt_bssid, ETH_ALEN) != 0 &&
+		os_memcmp(bssid, if_ctx->prev_bssid, ETH_ALEN) == 0)
+	{
+		/*
+		 * Avoid issues with some roaming cases where
+		 * disconnection event for the old AP may show up after
+		 * we have started connection with the new AP.
+		 * In case of locally generated event clear
+		 * ignore_next_local_deauth as well, to avoid next local
+		 * deauth event be wrongly ignored.
+		 */
+		wpa_printf(MSG_DEBUG,
+				   "nl80211: Ignore deauth/disassoc event from old AP " MACSTR " when already authenticating with " MACSTR,
+				   MAC2STR(bssid),
+				   MAC2STR(if_ctx->auth_attempt_bssid));
+		return;
+	}
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_DEAUTH,
 			event);
@@ -1006,6 +1030,16 @@ static int wpa_drv_zep_authenticate(void *priv,
 		goto out;
 	}
 
+	if (params->bssid)
+		os_memcpy(if_ctx->auth_attempt_bssid, params->bssid, ETH_ALEN);
+
+	if (if_ctx->associated)
+		os_memcpy(if_ctx->prev_bssid, if_ctx->bssid, ETH_ALEN);
+
+	os_memset(if_ctx->auth_bssid, 0, ETH_ALEN);
+
+	if_ctx->associated = false;
+
 	ret = dev_ops->authenticate(if_ctx->dev_priv, params, curr_bss);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: authenticate op failed", __func__);
@@ -1149,6 +1183,9 @@ static int wpa_drv_zep_get_capa(void *priv, struct wpa_driver_capa *capa)
 	}
 
 	ret = 0;
+
+	if_ctx->capa = *capa;
+
 out:
 	return ret;
 }
