@@ -205,7 +205,7 @@ void l2_packet_deinit(struct l2_packet_data *l2)
 
 	if (l2->fd >= 0) {
 		eloop_unregister_read_sock(l2->fd);
-		/* TODO: close connection */
+		close(l2->fd);
 	}
 
 	os_free(l2);
