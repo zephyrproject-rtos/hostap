@@ -122,14 +122,14 @@ void wpa_supplicant_ctrl_iface_deinit(struct wpa_supplicant *wpa_s,
 	if (!priv)
 		return;
 
-	if (priv->sock_pair[0] > -1) {
-		eloop_unregister_read_sock(priv->sock_pair[0]);
-		close(priv->sock_pair[0]);
-		priv->sock_pair[0] = -1;
+	if (priv->sock_pair[1] > -1) {
+		eloop_unregister_read_sock(priv->sock_pair[1]);
+		close(priv->sock_pair[1]);
+		priv->sock_pair[1] = -1;
 	}
 
-	if (priv->sock_pair[1] >= 0)
-		close(priv->sock_pair[1]);
+	if (priv->sock_pair[0] >= 0)
+		close(priv->sock_pair[0]);
 
 	os_free(priv);
 }
@@ -231,14 +231,14 @@ wpa_supplicant_global_ctrl_iface_deinit(struct ctrl_iface_global_priv *priv)
 	if (!priv)
 		return;
 
-	if (priv->sock_pair[0] > -1) {
-		eloop_unregister_read_sock(priv->sock_pair[0]);
-		close(priv->sock_pair[0]);
-		priv->sock_pair[0] = -1;
+	if (priv->sock_pair[1] > -1) {
+		eloop_unregister_read_sock(priv->sock_pair[1]);
+		close(priv->sock_pair[1]);
+		priv->sock_pair[1] = -1;
 	}
 
-	if (priv->sock_pair[1] >= 0)
-		close(priv->sock_pair[1]);
+	if (priv->sock_pair[0] >= 0)
+		close(priv->sock_pair[0]);
 
 	os_free(priv);
 }
