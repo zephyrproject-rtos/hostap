@@ -174,7 +174,7 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 		eloop_register_read_sock(l2->fd, l2_packet_receive, l2, NULL);
 	}
 
-	wpa_printf(MSG_INFO, "l2_packet_init: iface %s ifindex %d", l2->ifname,
+	wpa_printf(MSG_DEBUG, "l2_packet_init: iface %s ifindex %d", l2->ifname,
 		   l2->ifindex);
 
 	return l2;
