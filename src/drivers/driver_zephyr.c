@@ -1218,7 +1218,7 @@ static int wpa_drv_zep_get_ssid(void *priv,
 
 	if_ctx = priv;
 
-	wpa_printf(MSG_INFO,
+	wpa_printf(MSG_DEBUG,
 		   "%s: SSID size: %d",
 		   __func__,
 		   if_ctx->ssid_len);
