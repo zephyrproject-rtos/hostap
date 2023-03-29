@@ -233,12 +233,15 @@ static void wnm_sleep_mode_enter_success(struct wpa_supplicant *wpa_s,
 static void wnm_sleep_mode_exit_success(struct wpa_supplicant *wpa_s,
 					const u8 *frm, u16 key_len_total)
 {
+#ifndef CONFIG_NO_WPA
 	u8 *ptr, *end;
 	u8 gtk_len;
+#endif /* CONFIG_NO_WPA */
 
 	wpa_drv_wnm_oper(wpa_s, WNM_SLEEP_EXIT_CONFIRM,  wpa_s->bssid,
 			 NULL, NULL);
 
+#ifndef CONFIG_NO_WPA
 	/* Install GTK/IGTK */
 
 	/* point to key data field */
@@ -301,6 +304,7 @@ static void wnm_sleep_mode_exit_success(struct wpa_supplicant *wpa_s,
 		} else
 			break; /* skip the loop */
 	}
+#endif /* CONFIG_NO_WPA */
 }
 
 
