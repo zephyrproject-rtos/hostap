@@ -20,6 +20,9 @@
 #include "mbedtls/asn1write.h"
 #include "mbedtls/error.h"
 #include "mbedtls/oid.h"
+
+#include <zephyr/random/random.h>
+
 #define IANA_SECP256R1 19
 #define ECP_PRV_DER_MAX_BYTES 29 + 3 * MBEDTLS_ECP_MAX_BYTES
 
@@ -279,27 +282,29 @@ cleanup:
 	return ret ? -1 : 0;
 }
 
+static int tls_ctr_drbg_random(void *ctx, unsigned char *buf, size_t len)
+{
+	ARG_UNUSED(ctx);
+
+#if defined(CONFIG_ENTROPY_HAS_DRIVER)
+	return sys_csrand_get(buf, len);
+#else
+	sys_rand_get(buf, len);
+
+	return 0;
+#endif
+}
+
 int crypto_ec_point_mul(
     struct crypto_ec *e, const struct crypto_ec_point *p,
     const struct crypto_bignum *b, struct crypto_ec_point *res)
 {
 	int ret = 0;
 
-	mbedtls_entropy_context entropy;
-	mbedtls_ctr_drbg_context ctr_drbg;
-
-	mbedtls_entropy_init(&entropy);
-	mbedtls_ctr_drbg_init(&ctr_drbg);
-
-	MBEDTLS_MPI_CHK(mbedtls_ctr_drbg_seed(
-	    &ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0));
-
 	MBEDTLS_MPI_CHK(mbedtls_ecp_mul(
 	    &e->group, (mbedtls_ecp_point *)res, (const mbedtls_mpi *)b,
-	    (const mbedtls_ecp_point *)p, mbedtls_ctr_drbg_random, &ctr_drbg));
+	    (const mbedtls_ecp_point *)p, tls_ctr_drbg_random, NULL));
 cleanup:
-	mbedtls_ctr_drbg_free(&ctr_drbg);
-	mbedtls_entropy_free(&entropy);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: Failed with %d\n", __func__, ret);
 	}
