@@ -21,6 +21,8 @@
 #include <mbedtls/mbedtls_config.h>
 #include <assert.h>
 
+#include <zephyr/random/random.h>
+
 #define TLS_RANDOM_LEN 32
 #define TLS_MASTER_SECRET_LEN 48
 #define MAX_CIPHERSUITE 32
@@ -619,6 +621,19 @@ set_client_config(const struct tls_connection_params *cfg, tls_context_t *tls)
 	return 0;
 }
 
+static int tls_ctr_drbg_random(void *ctx, unsigned char *buf, size_t len)
+{
+	ARG_UNUSED(ctx);
+
+#if defined(CONFIG_ENTROPY_HAS_DRIVER)
+	return sys_csrand_get(buf, len);
+#else
+	sys_rand_get(buf, len);
+
+	return 0;
+#endif
+}
+
 static int tls_create_mbedtls_handle(
     const struct tls_connection_params *params, tls_context_t *tls)
 {
@@ -628,9 +643,7 @@ static int tls_create_mbedtls_handle(
 	assert(tls != NULL);
 
 	mbedtls_ssl_init(&tls->ssl);
-	mbedtls_ctr_drbg_init(&tls->ctr_drbg);
 	mbedtls_ssl_config_init(&tls->conf);
-	mbedtls_entropy_init(&tls->entropy);
 
 	ret = set_client_config(params, tls);
 	if (ret != 0) {
@@ -638,16 +651,9 @@ static int tls_create_mbedtls_handle(
 		goto exit;
 	}
 
-	ret = mbedtls_ctr_drbg_seed(
-	    &tls->ctr_drbg, mbedtls_entropy_func, &tls->entropy, NULL, 0);
-	if (ret != 0) {
-		wpa_printf(
-		    MSG_ERROR, "mbedtls_ctr_drbg_seed returned -0x%x", -ret);
-		goto exit;
-	}
 
 	mbedtls_ssl_conf_rng(
-	    &tls->conf, mbedtls_ctr_drbg_random, &tls->ctr_drbg);
+	    &tls->conf, tls_ctr_drbg_random, NULL);
 
 	ret = mbedtls_ssl_setup(&tls->ssl, &tls->conf);
 	if (ret != 0) {
