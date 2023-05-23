@@ -92,9 +92,6 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	}
 
 	// FIXME: sll_addr is not being filled as L2 header is not removed
-	wpa_printf(MSG_DEBUG, "%s: src=" MACSTR " proto=0x%x len=%d",
-		   __func__, MAC2STR(ll.sll_addr), ll.sll_protocol, (int) res);
-
 	hdr = (const struct ieee802_1x_hdr *) buf;
 
 	// FIXME: L2 header is now removed but sll_protocol is not set.
