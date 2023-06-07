@@ -55,6 +55,7 @@
 #include "hs20.h"
 #include "airtime_policy.h"
 #include "wpa_auth_kay.h"
+#include "hw_features.h"
 #ifdef __ZEPHYR__
 #include <supp_events.h>
 #endif /* __ZEPHYR__ */
@@ -3451,6 +3452,7 @@ static int hostapd_change_config_freq(struct hostapd_data *hapd,
 	if (!channel)
 		return -1;
 
+	hostapd_determine_mode(hapd->iface);
 	mode = hapd->iface->current_mode;
 
 	/* if a pointer to old_params is provided we save previous state */
