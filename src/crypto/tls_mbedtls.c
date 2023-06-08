@@ -16,7 +16,6 @@
 #include <mbedtls/ssl.h>
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/mbedtls_config.h>
 #include <assert.h>
@@ -54,8 +53,6 @@ mbedtls_ssl_export_keys_t tls_connection_export_keys_cb;
 typedef struct tls_context
 {
 	mbedtls_ssl_context ssl; /*!< TLS/SSL context */
-	mbedtls_entropy_context
-	    entropy; /*!< mbedTLS entropy context structure */
 	mbedtls_ctr_drbg_context
 	    ctr_drbg;		 /*!< mbedTLS ctr drbg context structure */
 	mbedtls_ssl_config conf; /*!< TLS/SSL config to be shared structures */
@@ -90,7 +87,6 @@ static void tls_mbedtls_cleanup(tls_context_t *tls)
 	mbedtls_x509_crt_free(&tls->cacert);
 	mbedtls_x509_crt_free(&tls->clientcert);
 	mbedtls_pk_free(&tls->clientkey);
-	mbedtls_entropy_free(&tls->entropy);
 	mbedtls_ssl_config_free(&tls->conf);
 	mbedtls_ctr_drbg_free(&tls->ctr_drbg);
 	mbedtls_ssl_free(&tls->ssl);
