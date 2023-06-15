@@ -10688,7 +10688,7 @@ fail:
 }
 #endif /* CONFIG_FILS */
 
-
+#ifndef CONFIG_NO_STDOUT_DEBUG
 static int wpas_ctrl_cmd_debug_level(const char *cmd)
 {
 	if (os_strcmp(cmd, "PING") == 0 ||
@@ -10700,7 +10700,7 @@ static int wpas_ctrl_cmd_debug_level(const char *cmd)
 		return MSG_EXCESSIVE;
 	return MSG_DEBUG;
 }
-
+#endif
 
 static int wpas_ctrl_iface_configure_mscs(struct wpa_supplicant *wpa_s,
 					  const char *cmd)
@@ -11474,8 +11474,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		wpa_hexdump_ascii_key(MSG_DEBUG, "RX ctrl_iface",
 				      (const u8 *) buf, os_strlen(buf));
 	} else {
-		int level = wpas_ctrl_cmd_debug_level(buf);
-		wpa_dbg(wpa_s, level, "Control interface command '%s'", buf);
+		wpa_dbg(wpa_s, wpas_ctrl_cmd_debug_level(buf), "Control interface command '%s'", buf);
 	}
 
 	reply = os_malloc(reply_size);
