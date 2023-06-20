@@ -18,7 +18,7 @@
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
-#include <mbedtls/mbedtls_config.h>
+#include <mbedtls/build_info.h>
 #include <assert.h>
 
 #include <zephyr/random/random.h>
