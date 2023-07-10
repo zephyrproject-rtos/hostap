@@ -1203,6 +1203,8 @@ struct wpa_driver_associate_params {
 	 * 2 = both hunting-and-pecking loop and hash-to-element enabled
 	 */
 	int sae_pwe;
+
+	unsigned short bss_max_idle_period;
 };
 
 enum hide_ssid {
