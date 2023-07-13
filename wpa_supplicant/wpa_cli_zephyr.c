@@ -20,6 +20,7 @@
 #include "common/ieee802_11_defs.h"
 
 #include "supp_main.h"
+#include "supp_events.h"
 #include "wpa_cli_zephyr.h"
 #include "ctrl_iface_zephyr.h"
 
@@ -110,8 +111,47 @@ static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 	wpa_s->ctrl_iface->mon_sock_pair[1] = -1;
 }
 
+static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl)
+{
+	while (wpa_ctrl_pending(ctrl) > 0) {
+		char buf[sizeof(struct conn_msg)];
+		size_t len = sizeof(buf);
+
+		if (wpa_ctrl_recv(ctrl, buf, &len) == 0) {
+			struct conn_msg *msg = (struct conn_msg *)buf;
+
+			msg->msg[msg->msg_len] = '\0';
+			wpa_printf(MSG_DEBUG, "Received len: %d, msg_len:%d - %s->END\n",
+					   len, msg->msg_len, msg->msg);
+			if (msg->msg_len >= MAX_CTRL_MSG_LEN) {
+				wpa_printf(MSG_INFO, "Too long message received.\n");
+				continue;
+			}
+
+			if (msg->msg_len > 0) {
+				/* Only interested in CTRL-EVENTs */
+				if (strncmp(msg->msg, "CTRL-EVENT", 10) == 0) {
+					supplicant_send_wifi_mgmt_event("wlan0",
+									NET_EVENT_SUPPLICANT_CMD_INT_EVENT,
+									msg->msg, msg->msg_len);
+				}
+			}
+		} else {
+			wpa_printf(MSG_INFO, "Could not read pending message.\n");
+		}
+	}
+}
+
+static void wpa_cli_mon_receive(int sock, void *eloop_ctx,
+					      void *sock_ctx)
+{
+	wpa_cli_recv_pending(mon_conn);
+}
+
 static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 {
+	int ret;
+
 	ctrl_conn = wpa_ctrl_open(wpa_s->ctrl_iface->sock_pair[0]);
 	if (ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to open control connection to %d",
@@ -119,7 +159,24 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 		return -1;
 	}
 
+	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, wpa_s->ctrl_iface->mon_sock_pair);
+	if (ret != 0) {
+		wpa_printf(MSG_ERROR, "Failed to open monitor connection: %s",
+			    strerror(errno));
+		goto fail;
+	}
+	mon_conn = wpa_ctrl_open(wpa_s->ctrl_iface->mon_sock_pair[0]);
+	if (mon_conn) {
+		if (wpa_ctrl_attach(ctrl_conn) == 0) {
+			eloop_register_read_sock(wpa_s->ctrl_iface->mon_sock_pair[0],
+						wpa_cli_mon_receive, NULL, NULL);
+		}
+	}
+
 	return 0;
+fail:
+	wpa_ctrl_close(ctrl_conn);
+	return -1;
 }
 
 static int wpa_cli_open_global_ctrl(void)

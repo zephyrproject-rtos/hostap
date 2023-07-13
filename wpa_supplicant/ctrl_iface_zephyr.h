@@ -47,6 +47,6 @@ struct ctrl_iface_global_priv {
 };
 
 struct conn_msg {
-	char msg[MAX_CTRL_MSG_LEN];
 	int msg_len;
+	char msg[MAX_CTRL_MSG_LEN];
 };
