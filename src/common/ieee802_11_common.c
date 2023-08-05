@@ -1573,6 +1573,7 @@ int supp_rates_11b_only(struct ieee802_11_elems *elems)
 	return num_11b > 0 && num_others == 0;
 }
 
+#ifndef CONFIG_NO_STDOUT_DEBUG
 
 const char * fc2str(u16 fc)
 {
@@ -1812,6 +1813,7 @@ const char * status2str(u16 status)
 #undef S2S
 }
 
+#endif
 
 int mb_ies_info_by_ies(struct mb_ies_info *info, const u8 *ies_buf,
 		       size_t ies_len)
