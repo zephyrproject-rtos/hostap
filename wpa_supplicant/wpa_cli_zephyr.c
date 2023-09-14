@@ -375,7 +375,7 @@ int zephyr_wpa_ctrl_init(void *wpa_s)
 
 void zephyr_wpa_ctrl_deinit(void *wpa_s)
 {
-	wpa_cli_close_connection(wpa_s);
+	wpa_cli_close_connection((struct wpa_supplicant *)wpa_s);
 }
 
 int zephyr_wpa_ctrl_zephyr_cmd(int argc, const char *argv[])
