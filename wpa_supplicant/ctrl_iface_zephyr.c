@@ -256,9 +256,6 @@ void wpa_supplicant_ctrl_iface_deinit(struct wpa_supplicant *wpa_s,
 		priv->sock_pair[1] = -1;
 	}
 
-	if (priv->sock_pair[0] >= 0)
-		close(priv->sock_pair[0]);
-
 	os_free(priv);
 }
 
