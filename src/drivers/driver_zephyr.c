@@ -1105,6 +1105,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
+	struct net_if *iface;
 	int ret = -1;
 
 	if (!priv) {
@@ -1120,6 +1121,16 @@ static int _wpa_drv_zep_set_key(void *priv,
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
+	if (!iface) {
+		wpa_printf(MSG_ERROR, "%s: Failed to get iface\n", __func__);
+		goto out;
+	}
+
+	if (!net_if_is_up(iface)) {
+		goto out;
+	}
 
 	wpa_printf(MSG_DEBUG, "%s: priv:%p alg %d addr %p key_idx %d set_tx %d seq %p "
 		   "seq_len %d key %p key_len %d",
