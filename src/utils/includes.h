@@ -29,11 +29,11 @@
 #endif /* _WIN32_WCE */
 #include <ctype.h>
 
-#ifndef _MSC_VER
+#if !(defined(MSC_VER) || defined(CONFIG_ZEPHYR))
 #include <unistd.h>
 #endif /* _MSC_VER */
 
-#ifndef CONFIG_NATIVE_WINDOWS
+#if !(defined(CONFIG_NATIVE_WINDOWS) || defined(CONFIG_ZEPHYR))
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -42,5 +42,19 @@
 #include <sys/time.h>
 #endif /* __vxworks */
 #endif /* CONFIG_NATIVE_WINDOWS */
+
+#if defined(CONFIG_ZEPHYR)
+#include <strings.h>
+#if defined(CONFIG_POSIX_API)
+#include <zephyr/posix/arpa/inet.h>
+#include <zephyr/posix/sys/select.h>
+#include <zephyr/posix/sys/socket.h>
+#include <zephyr/posix/unistd.h>
+#else /* defined(CONFIG_POSIX_API) */
+#include <sys/select.h>
+#include <zephyr/net/net_ip.h>
+#endif /* defined(CONFIG_POSIX_API) */
+#include <zephyr/shell/shell.h>
+#endif /* defined(CONFIG_ZEPHYR) */
 
 #endif /* INCLUDES_H */

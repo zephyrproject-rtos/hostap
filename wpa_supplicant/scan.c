@@ -2051,7 +2051,9 @@ struct wpabuf * wpa_scan_get_vendor_ie_multi(const struct wpa_scan_res *res,
  * better. */
 static int wpa_scan_result_compar(const void *a, const void *b)
 {
+#ifndef MIN
 #define MIN(a,b) a < b ? a : b
+#endif
 	struct wpa_scan_res **_wa = (void *) a;
 	struct wpa_scan_res **_wb = (void *) b;
 	struct wpa_scan_res *wa = *_wa;
