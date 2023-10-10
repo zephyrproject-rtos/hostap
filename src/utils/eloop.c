@@ -963,7 +963,7 @@ int eloop_replenish_timeout(unsigned int req_secs, unsigned int req_usecs,
 }
 
 
-#ifndef CONFIG_NATIVE_WINDOWS
+#if !(defined(CONFIG_NATIVE_WINDOWS) || defined(CONFIG_ZEPHYR))
 static void eloop_handle_alarm(int sig)
 {
 	wpa_printf(MSG_ERROR, "eloop: could not process SIGINT or SIGTERM in "
@@ -980,7 +980,7 @@ static void eloop_handle_signal(int sig)
 {
 	size_t i;
 
-#ifndef CONFIG_NATIVE_WINDOWS
+#if !(defined(CONFIG_NATIVE_WINDOWS) || defined(CONFIG_ZEPHYR))
 	if ((sig == SIGINT || sig == SIGTERM) && !eloop.pending_terminate) {
 		/* Use SIGALRM to break out from potential busy loops that
 		 * would not allow the program to be killed. */
@@ -1009,7 +1009,7 @@ static void eloop_process_pending_signals(void)
 	eloop.signaled = 0;
 
 	if (eloop.pending_terminate) {
-#ifndef CONFIG_NATIVE_WINDOWS
+#if !(defined(CONFIG_NATIVE_WINDOWS) || defined(CONFIG_ZEPHYR))
 		alarm(0);
 #endif /* CONFIG_NATIVE_WINDOWS */
 		eloop.pending_terminate = 0;
