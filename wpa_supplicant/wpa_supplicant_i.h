@@ -1507,19 +1507,11 @@ struct wpa_supplicant {
 	unsigned int multi_ap_ie:1;
 	unsigned int multi_ap_backhaul:1;
 	unsigned int multi_ap_fronthaul:1;
+#ifdef CONFIG_RRM
 	struct robust_av_data robust_av;
 	bool mscs_setup_done;
-
-#ifdef CONFIG_PASN
-	struct wpas_pasn pasn;
-	struct wpa_radio_work *pasn_auth_work;
-#endif /* CONFIG_PASN */
 	struct scs_robust_av_data scs_robust_av_req;
 	u8 scs_dialog_token;
-#ifdef CONFIG_TESTING_OPTIONS
-	unsigned int disable_scs_support:1;
-	unsigned int disable_mscs_support:1;
-#endif /* CONFIG_TESTING_OPTIONS */
 	struct dl_list active_scs_ids;
 	bool ongoing_scs_req;
 	u8 dscp_req_dialog_token;
@@ -1527,6 +1519,15 @@ struct wpa_supplicant {
 	unsigned int enable_dscp_policy_capa:1;
 	unsigned int connection_dscp:1;
 	unsigned int wait_for_dscp_req:1;
+#endif /* CONFIG_RRM */
+#ifdef CONFIG_PASN
+	struct wpas_pasn pasn;
+	struct wpa_radio_work *pasn_auth_work;
+#endif /* CONFIG_PASN */
+#ifdef CONFIG_TESTING_OPTIONS
+	unsigned int disable_scs_support:1;
+	unsigned int disable_mscs_support:1;
+#endif /* CONFIG_TESTING_OPTIONS */
 };
 
 
@@ -1655,7 +1656,7 @@ int wpas_twt_send_setup(struct wpa_supplicant *wpa_s, u8 dtok, int exponent,
 			bool flow_type, u8 flow_id, bool protection,
 			u8 twt_channel, u8 control);
 int wpas_twt_send_teardown(struct wpa_supplicant *wpa_s, u8 flags);
-
+#ifdef CONFIG_RRM
 void wpas_rrm_reset(struct wpa_supplicant *wpa_s);
 void wpas_rrm_process_neighbor_rep(struct wpa_supplicant *wpa_s,
 				   const u8 *report, size_t report_len);
@@ -1673,6 +1674,7 @@ void wpas_rrm_handle_link_measurement_request(struct wpa_supplicant *wpa_s,
 					      const u8 *frame, size_t len,
 					      int rssi);
 void wpas_rrm_refuse_request(struct wpa_supplicant *wpa_s);
+#endif /* CONFIG_RRM */
 int wpas_beacon_rep_scan_process(struct wpa_supplicant *wpa_s,
 				 struct wpa_scan_results *scan_res,
 				 struct scan_info *info);

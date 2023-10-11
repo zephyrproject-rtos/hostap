@@ -581,7 +581,9 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 	wpa_tdls_deinit(wpa_s->wpa);
 #endif /* CONFIG_TDLS */
 
+#ifdef CONFIG_WMM_AC
 	wmm_ac_clear_saved_tspecs(wpa_s);
+#endif /* CONFIG_WMM_AC */
 	pmksa_candidate_free(wpa_s->wpa);
 	ptksa_cache_deinit(wpa_s->ptksa);
 	wpa_s->ptksa = NULL;
@@ -697,9 +699,9 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 		wpabuf_free(wpa_s->vendor_elem[i]);
 		wpa_s->vendor_elem[i] = NULL;
 	}
-
+#ifdef CONFIG_WMM_AC
 	wmm_ac_notify_disassoc(wpa_s);
-
+#endif /* CONFIG_WMM_AC */
 	wpa_s->sched_scan_plans_num = 0;
 	os_free(wpa_s->sched_scan_plans);
 	wpa_s->sched_scan_plans = NULL;
@@ -714,7 +716,9 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 
 	wpabuf_free(wpa_s->lci);
 	wpa_s->lci = NULL;
+#ifdef CONFIG_RRM
 	wpas_clear_beacon_rep_data(wpa_s);
+#endif /* CONFIG_RRM */
 
 #ifdef CONFIG_PMKSA_CACHE_EXTERNAL
 #ifdef CONFIG_MESH
@@ -746,8 +750,10 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_PASN
 	wpas_pasn_auth_stop(wpa_s);
 #endif /* CONFIG_PASN */
+#ifdef CONFIG_ROBUST_AV
 	wpas_scs_deinit(wpa_s);
 	wpas_dscp_deinit(wpa_s);
+#endif /* CONFIG_ROBUST_AV */
 }
 
 
@@ -1053,9 +1059,10 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 	if (state == WPA_DISCONNECTED || state == WPA_INACTIVE)
 		wpa_supplicant_start_autoscan(wpa_s);
 
+#ifdef CONFIG_WMM_AC
 	if (old_state >= WPA_ASSOCIATED && wpa_s->wpa_state < WPA_ASSOCIATED)
 		wmm_ac_notify_disassoc(wpa_s);
-
+#endif /* CONFIG_WMM_AC */
 	if (wpa_s->wpa_state != old_state) {
 		wpas_notify_state_changed(wpa_s, wpa_s->wpa_state, old_state);
 
@@ -2232,7 +2239,9 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 		rand_style = ssid->mac_addr;
 
 	wpa_s->multi_ap_ie = 0;
+#ifdef CONFIG_WMM_AC
 	wmm_ac_clear_saved_tspecs(wpa_s);
+#endif /* CONFIG_WMM_AC */
 	wpa_s->reassoc_same_bss = 0;
 	wpa_s->reassoc_same_ess = 0;
 #ifdef CONFIG_TESTING_OPTIONS
@@ -2243,7 +2252,9 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 		wpa_dbg(wpa_s, MSG_DEBUG, "Re-association to the same ESS");
 		wpa_s->reassoc_same_ess = 1;
 		if (wpa_s->current_bss && wpa_s->current_bss == bss) {
+#ifdef CONFIG_WMM_AC
 			wmm_ac_save_tspecs(wpa_s);
+#endif /* CONFIG_WMM_AC */
 			wpa_s->reassoc_same_bss = 1;
 		} else if (wpa_s->current_bss && wpa_s->current_bss != bss) {
 			os_get_reltime(&wpa_s->roam_start);
@@ -2876,8 +2887,10 @@ static int wpas_populate_wfa_capa(struct wpa_supplicant *wpa_s,
 	size_t wfa_ie_len, buf_len;
 
 	os_memset(wfa_capa, 0, sizeof(wfa_capa));
+#ifdef CONFIG_ROBUST_AV
 	if (wpa_s->enable_dscp_policy_capa)
 		wfa_capa[0] |= WFA_CAPA_QM_DSCP_POLICY;
+#endif /* CONFIG_ROBUST_AV */
 
 	if (!wfa_capa[0])
 		return wpa_ie_len;
@@ -3128,13 +3141,14 @@ static u8 * wpas_populate_assoc_ies(
 	os_memset(wpa_s->p2p_ip_addr_info, 0, sizeof(wpa_s->p2p_ip_addr_info));
 #endif /* CONFIG_P2P */
 
+#ifdef CONFIG_RRM
 	if (bss) {
 		wpa_ie_len += wpas_supp_op_class_ie(wpa_s, ssid, bss,
 						    wpa_ie + wpa_ie_len,
 						    max_wpa_ie_len -
 						    wpa_ie_len);
 	}
-
+#endif /* CONFIG_RRM */
 	/*
 	 * Workaround: Add Extended Capabilities element only if the AP
 	 * included this element in Beacon/Probe Response frames. Some older
@@ -3360,6 +3374,7 @@ pfs_fail:
 	if (wpa_s->disable_mscs_support)
 		goto mscs_end;
 #endif /* CONFIG_TESTING_OPTIONS */
+#ifdef CONFIG_RRM
 	if (wpa_bss_ext_capab(bss, WLAN_EXT_CAPAB_MSCS) &&
 	    wpa_s->robust_av.valid_config) {
 		struct wpabuf *mscs_ie;
@@ -3390,7 +3405,7 @@ pfs_fail:
 		wpabuf_free(mscs_ie);
 	}
 mscs_end:
-
+#endif /* CONFIG_RRM */
 	wpa_ie_len = wpas_populate_wfa_capa(wpa_s, bss, wpa_ie, wpa_ie_len,
 					    max_wpa_ie_len);
 
@@ -3664,7 +3679,9 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	wpa_sm_set_assoc_wpa_ie(wpa_s->wpa, NULL, 0);
 	wpa_sm_set_assoc_rsnxe(wpa_s->wpa, NULL, 0);
 	wpa_s->rsnxe_len = 0;
+#ifdef CONFIG_ROBUST_AV
 	wpa_s->mscs_setup_done = false;
+#endif /* CONFIG_ROBUST_AV */
 
 	wpa_ie = wpas_populate_assoc_ies(wpa_s, bss, ssid, &params, NULL);
 	if (!wpa_ie) {
@@ -4103,8 +4120,10 @@ static void wpa_supplicant_clear_connection(struct wpa_supplicant *wpa_s,
 	if (old_ssid != wpa_s->current_ssid)
 		wpas_notify_network_changed(wpa_s);
 
+#ifdef CONFIG_ROBUST_AV
 	wpas_scs_deinit(wpa_s);
 	wpas_dscp_deinit(wpa_s);
+#endif /* CONFIG_ROBUST_AV */
 	eloop_cancel_timeout(wpa_supplicant_timeout, wpa_s, NULL);
 }
 
@@ -5379,7 +5398,9 @@ wpa_supplicant_alloc(struct wpa_supplicant *parent)
 #ifdef CONFIG_TESTING_OPTIONS
 	dl_list_init(&wpa_s->drv_signal_override);
 #endif /* CONFIG_TESTING_OPTIONS */
+#ifdef CONFIG_ROBUST_AV
 	dl_list_init(&wpa_s->active_scs_ids);
+#endif /* CONFIG_ROBUST_AV */
 
 	return wpa_s;
 }
@@ -6729,7 +6750,9 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		wpa_s->extended_capa_len = capa.extended_capa_len;
 		wpa_s->num_multichan_concurrent =
 			capa.num_multichan_concurrent;
+#ifdef CONFIG_WMM_AC
 		wpa_s->wmm_ac_supported = capa.wmm_ac_supported;
+#endif /* CONFIG_WMM_AC */
 
 		if (capa.mac_addr_rand_scan_supported)
 			wpa_s->mac_addr_rand_supported |= MAC_ADDR_RAND_SCAN;
@@ -6879,7 +6902,9 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 	if (wpas_init_ext_pw(wpa_s) < 0)
 		return -1;
 
+#ifdef CONFIG_RRM
 	wpas_rrm_reset(wpa_s);
+#endif /* CONFIG_RRM */
 
 	wpas_sched_scan_plans_set(wpa_s, wpa_s->conf->sched_scan_plans);
 
