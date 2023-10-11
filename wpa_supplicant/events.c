@@ -339,7 +339,9 @@ void wpa_supplicant_mark_disassoc(struct wpa_supplicant *wpa_s)
 	eapol_sm_notify_config(wpa_s->eapol, NULL, NULL);
 	wpa_s->key_mgmt = 0;
 
+#ifdef CONFIG_RRM
 	wpas_rrm_reset(wpa_s);
+#endif /* CONFIG_RRM */
 	wpa_s->wnmsleep_used = 0;
 	wnm_clear_coloc_intf_reporting(wpa_s);
 	wpa_s->disable_mbo_oce = 0;
@@ -2184,9 +2186,11 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	if (sme_proc_obss_scan(wpa_s) > 0)
 		goto scan_work_done;
 
+#ifdef CONFIG_RRM
 	if (own_request && data &&
 	    wpas_beacon_rep_scan_process(wpa_s, scan_res, &data->scan_info) > 0)
 		goto scan_work_done;
+#endif /* CONFIG_RRM */
 
 	if ((wpa_s->conf->ap_scan == 2 && !wpas_wps_searching(wpa_s)))
 		goto scan_work_done;
@@ -3144,10 +3148,12 @@ no_pfs:
 			     data->assoc_info.resp_ies_len);
 #endif /* CONFIG_IEEE80211R */
 
+#ifdef CONFIG_ROBUST_AV
 	if (bssid_known)
 		wpas_handle_assoc_resp_mscs(wpa_s, bssid,
 					    data->assoc_info.resp_ies,
 					    data->assoc_info.resp_ies_len);
+#endif /* CONFIG_ROBUST_AV */
 
 	/* WPA/RSN IE from Beacon/ProbeResp */
 	p = data->assoc_info.beacon_ies;
@@ -3202,8 +3208,10 @@ no_pfs:
 
 	wpa_s->assoc_freq = data->assoc_info.freq;
 
+#ifdef CONFIG_ROBUST_AV
 	wpas_handle_assoc_resp_qos_mgmt(wpa_s, data->assoc_info.resp_ies,
 					data->assoc_info.resp_ies_len);
+#endif /* CONFIG_ROBUST_AV */
 
 	return 0;
 }
@@ -3524,6 +3532,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 
 	wpas_wps_notify_assoc(wpa_s, bssid);
 
+#ifdef CONFIG_WMM_AC
 	if (data) {
 		wmm_ac_notify_assoc(wpa_s, data->assoc_info.resp_ies,
 				    data->assoc_info.resp_ies_len,
@@ -3532,6 +3541,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 		if (wpa_s->reassoc_same_bss)
 			wmm_ac_restore_tspecs(wpa_s);
 	}
+#endif /* CONFIG_WMM_AC */
 
 #if defined(CONFIG_FILS) || defined(CONFIG_MBO)
 	bss = wpa_bss_get_bssid(wpa_s, bssid);
@@ -4384,10 +4394,12 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 		" Category=%u DataLen=%d freq=%d MHz",
 		MAC2STR(mgmt->sa), category, (int) plen, freq);
 
+#ifdef CONFIG_WMM_AC
 	if (category == WLAN_ACTION_WMM) {
 		wmm_ac_rx_action(wpa_s, mgmt->da, mgmt->sa, payload, plen);
 		return;
 	}
+#endif /* CONFIG_WMM_AC */
 
 #ifdef CONFIG_IEEE80211R
 	if (category == WLAN_ACTION_FT) {
@@ -4453,6 +4465,7 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_INTERWORKING */
 
+#ifdef CONFIG_RRM
 	if (category == WLAN_ACTION_RADIO_MEASUREMENT &&
 	    payload[0] == WLAN_RRM_RADIO_MEASUREMENT_REQUEST) {
 		wpas_rrm_handle_radio_measurement_request(wpa_s, mgmt->sa,
@@ -4475,6 +4488,7 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 							 rssi);
 		return;
 	}
+#endif /* CONFIG_RRM */
 
 #ifdef CONFIG_FST
 	if (mgmt->u.action.category == WLAN_ACTION_FST && wpa_s->fst) {
@@ -4494,7 +4508,7 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 		return;
 	}
 #endif /* CONFIG_DPP */
-
+#ifdef CONFIG_ROBUST_AV
 	if (category == WLAN_ACTION_ROBUST_AV_STREAMING &&
 	    payload[0] == ROBUST_AV_SCS_RESP) {
 		wpas_handle_robust_av_scs_recv_action(wpa_s, mgmt->sa,
@@ -4515,7 +4529,7 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 						 payload + 4, plen - 4);
 		return;
 	}
-
+#endif /* CONFIG_ROBUST_AV */
 	wpas_p2p_rx_action(wpa_s, mgmt->da, mgmt->sa, mgmt->bssid,
 			   category, payload, plen, freq);
 	if (wpa_s->ifmsh)

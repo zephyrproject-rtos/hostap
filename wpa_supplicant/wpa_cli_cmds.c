@@ -2505,7 +2505,7 @@ static int wpa_cli_cmd_tdls_link_status(struct wpa_ctrl *ctrl, int argc,
 	return wpa_cli_cmd(ctrl, "TDLS_LINK_STATUS", 1, argc, argv);
 }
 
-
+#ifdef CONFIG_WMM_AC
 static int wpa_cli_cmd_wmm_ac_addts(struct wpa_ctrl *ctrl, int argc,
 				    char *argv[])
 {
@@ -2525,7 +2525,7 @@ static int wpa_cli_cmd_wmm_ac_status(struct wpa_ctrl *ctrl, int argc,
 {
 	return wpa_cli_cmd(ctrl, "WMM_AC_STATUS", 0, argc, argv);
 }
-
+#endif /* CONFIG_WMM_AC */
 
 static int wpa_cli_cmd_tdls_chan_switch(struct wpa_ctrl *ctrl, int argc,
 					char *argv[])

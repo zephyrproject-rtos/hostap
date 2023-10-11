@@ -622,11 +622,12 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 
 	sme_auth_handle_rrm(wpa_s, bss);
 
+#ifdef CONFIG_RRM
 	wpa_s->sme.assoc_req_ie_len += wpas_supp_op_class_ie(
 		wpa_s, ssid, bss,
 		wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
 		sizeof(wpa_s->sme.assoc_req_ie) - wpa_s->sme.assoc_req_ie_len);
-
+#endif /* CONFIG_RRM */
 	if (params.p2p)
 		wpa_drv_get_ext_capa(wpa_s, WPA_IF_P2P_CLIENT);
 	else
@@ -1907,7 +1908,7 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 	}
 pfs_fail:
 #endif /* CONFIG_DPP2 */
-
+#ifdef CONFIG_RRM
 	wpa_s->mscs_setup_done = false;
 	if (wpa_bss_ext_capab(wpa_s->current_bss, WLAN_EXT_CAPAB_MSCS) &&
 	    wpa_s->robust_av.valid_config) {
@@ -1941,7 +1942,7 @@ pfs_fail:
 		wpabuf_free(mscs_ie);
 	}
 mscs_fail:
-
+#endif /* CONFIG_RRM */
 	if (ssid && ssid->multi_ap_backhaul_sta) {
 		size_t multi_ap_ie_len;
 

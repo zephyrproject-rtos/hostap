@@ -924,8 +924,10 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 			return -1;
 		wnm_set_coloc_intf_elems(wpa_s, elems);
 #endif /* CONFIG_WNM */
+#ifdef CONFIG_ROBUST_AV
 	} else if (os_strcasecmp(cmd, "enable_dscp_policy_capa") == 0) {
 		wpa_s->enable_dscp_policy_capa = !!atoi(value);
+#endif /* CONFIG_ROBUST_AV */
 	} else {
 		value[-1] = '=';
 		ret = wpa_config_process_global(wpa_s->conf, cmd, -1);
@@ -1252,6 +1254,7 @@ static int wpa_supplicant_ctrl_iface_tdls_link_status(
 #endif /* CONFIG_TDLS */
 
 
+#ifdef CONFIG_WMM_AC
 static int wmm_ac_ctrl_addts(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	char *token, *context = NULL;
@@ -1300,7 +1303,7 @@ static int wmm_ac_ctrl_delts(struct wpa_supplicant *wpa_s, char *cmd)
 
 	return wpas_wmm_ac_delts(wpa_s, tsid);
 }
-
+#endif /* CONFIG_WMM_AC */
 
 #ifdef CONFIG_IEEE80211R
 static int wpa_supplicant_ctrl_iface_ft_ds(
@@ -8003,7 +8006,6 @@ static int wpas_ctrl_iface_wnm_bss_query(struct wpa_supplicant *wpa_s, char *cmd
 						  list);
 }
 
-
 static int wpas_ctrl_iface_coloc_intf_report(struct wpa_supplicant *wpa_s,
 					     char *cmd)
 {
@@ -8557,7 +8559,9 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 	wpa_s->next_scan_bssid_wildcard_ssid = 0;
 	os_free(wpa_s->select_network_scan_freqs);
 	wpa_s->select_network_scan_freqs = NULL;
+#ifdef CONFIG_ROBUST_AV
 	os_memset(&wpa_s->robust_av, 0, sizeof(struct robust_av_data));
+#endif /* CONFIG_ROBUST_AV */
 
 	wpa_bss_flush(wpa_s);
 	if (!dl_list_empty(&wpa_s->bss)) {
@@ -8584,7 +8588,9 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 
 	free_bss_tmp_disallowed(wpa_s);
 
+#ifdef CONFIG_ROBUST_AV
 	os_memset(&wpa_s->robust_av, 0, sizeof(struct robust_av_data));
+#endif /* CONFIG_ROBUST_AV */
 
 #ifdef CONFIG_PASN
 	wpas_pasn_auth_stop(wpa_s);
@@ -10206,7 +10212,7 @@ static int wpas_ctrl_vendor_elem_remove(struct wpa_supplicant *wpa_s, char *cmd)
 	return res;
 }
 
-
+#ifdef CONFIG_RRM
 static void wpas_ctrl_neighbor_rep_cb(void *ctx, struct wpabuf *neighbor_rep)
 {
 	struct wpa_supplicant *wpa_s = ctx;
@@ -10309,7 +10315,6 @@ out:
 	wpabuf_free(neighbor_rep);
 }
 
-
 static int wpas_ctrl_iface_send_neighbor_rep(struct wpa_supplicant *wpa_s,
 					     char *cmd)
 {
@@ -10349,7 +10354,7 @@ static int wpas_ctrl_iface_send_neighbor_rep(struct wpa_supplicant *wpa_s,
 
 	return ret;
 }
-
+#endif /* CONFIG_RRM */
 
 static int wpas_ctrl_iface_erp_flush(struct wpa_supplicant *wpa_s)
 {
@@ -10702,76 +10707,6 @@ static int wpas_ctrl_cmd_debug_level(const char *cmd)
 }
 #endif
 
-static int wpas_ctrl_iface_configure_mscs(struct wpa_supplicant *wpa_s,
-					  const char *cmd)
-{
-	size_t frame_classifier_len;
-	const char *pos, *end;
-	struct robust_av_data *robust_av = &wpa_s->robust_av;
-	int val;
-
-	/*
-	 * format:
-	 * <add|remove|change> [up_bitmap=<hex byte>] [up_limit=<integer>]
-	 * [stream_timeout=<in TUs>] [frame_classifier=<hex bytes>]
-	 */
-	os_memset(robust_av, 0, sizeof(struct robust_av_data));
-	if (os_strncmp(cmd, "add ", 4) == 0) {
-		robust_av->request_type = SCS_REQ_ADD;
-	} else if (os_strcmp(cmd, "remove") == 0) {
-		robust_av->request_type = SCS_REQ_REMOVE;
-		robust_av->valid_config = false;
-		return wpas_send_mscs_req(wpa_s);
-	} else if (os_strncmp(cmd, "change ", 7) == 0) {
-		robust_av->request_type = SCS_REQ_CHANGE;
-	} else {
-		return -1;
-	}
-
-	pos = os_strstr(cmd, "up_bitmap=");
-	if (!pos)
-		return -1;
-
-	val = hex2byte(pos + 10);
-	if (val < 0)
-		return -1;
-	robust_av->up_bitmap = val;
-
-	pos = os_strstr(cmd, "up_limit=");
-	if (!pos)
-		return -1;
-
-	robust_av->up_limit = atoi(pos + 9);
-
-	pos = os_strstr(cmd, "stream_timeout=");
-	if (!pos)
-		return -1;
-
-	robust_av->stream_timeout = atoi(pos + 15);
-	if (robust_av->stream_timeout == 0)
-		return -1;
-
-	pos = os_strstr(cmd, "frame_classifier=");
-	if (!pos)
-		return -1;
-
-	pos += 17;
-	end = os_strchr(pos, ' ');
-	if (!end)
-		end = pos + os_strlen(pos);
-
-	frame_classifier_len = (end - pos) / 2;
-	if (frame_classifier_len > sizeof(robust_av->frame_classifier) ||
-	    hexstr2bin(pos, robust_av->frame_classifier, frame_classifier_len))
-		return -1;
-
-	robust_av->frame_classifier_len = frame_classifier_len;
-	robust_av->valid_config = true;
-
-	return wpas_send_mscs_req(wpa_s);
-}
-
-
 #ifdef CONFIG_PASN
 static int wpas_ctrl_iface_pasn_start(struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -10871,6 +10806,75 @@ static int wpas_ctrl_iface_pasn_deauthenticate(struct wpa_supplicant *wpa_s,
 
 #endif /* CONFIG_PASN */
 
+#ifdef CONFIG_ROBUST_AV
+static int wpas_ctrl_iface_configure_mscs(struct wpa_supplicant *wpa_s,
+					  const char *cmd)
+{
+	size_t frame_classifier_len;
+	const char *pos, *end;
+	struct robust_av_data *robust_av = &wpa_s->robust_av;
+	int val;
+
+	/*
+	 * format:
+	 * <add|remove|change> [up_bitmap=<hex byte>] [up_limit=<integer>]
+	 * [stream_timeout=<in TUs>] [frame_classifier=<hex bytes>]
+	 */
+	os_memset(robust_av, 0, sizeof(struct robust_av_data));
+	if (os_strncmp(cmd, "add ", 4) == 0) {
+		robust_av->request_type = SCS_REQ_ADD;
+	} else if (os_strcmp(cmd, "remove") == 0) {
+		robust_av->request_type = SCS_REQ_REMOVE;
+		robust_av->valid_config = false;
+		return wpas_send_mscs_req(wpa_s);
+	} else if (os_strncmp(cmd, "change ", 7) == 0) {
+		robust_av->request_type = SCS_REQ_CHANGE;
+	} else {
+		return -1;
+	}
+
+	pos = os_strstr(cmd, "up_bitmap=");
+	if (!pos)
+		return -1;
+
+	val = hex2byte(pos + 10);
+	if (val < 0)
+		return -1;
+	robust_av->up_bitmap = val;
+
+	pos = os_strstr(cmd, "up_limit=");
+	if (!pos)
+		return -1;
+
+	robust_av->up_limit = atoi(pos + 9);
+
+	pos = os_strstr(cmd, "stream_timeout=");
+	if (!pos)
+		return -1;
+
+	robust_av->stream_timeout = atoi(pos + 15);
+	if (robust_av->stream_timeout == 0)
+		return -1;
+
+	pos = os_strstr(cmd, "frame_classifier=");
+	if (!pos)
+		return -1;
+
+	pos += 17;
+	end = os_strchr(pos, ' ');
+	if (!end)
+		end = pos + os_strlen(pos);
+
+	frame_classifier_len = (end - pos) / 2;
+	if (frame_classifier_len > sizeof(robust_av->frame_classifier) ||
+	    hexstr2bin(pos, robust_av->frame_classifier, frame_classifier_len))
+		return -1;
+
+	robust_av->frame_classifier_len = frame_classifier_len;
+	robust_av->valid_config = true;
+
+	return wpas_send_mscs_req(wpa_s);
+}
 
 static int set_type4_frame_classifier(const char *cmd,
 				      struct type4_params *param)
@@ -11445,6 +11449,7 @@ static int wpas_ctrl_iface_send_dscp_query(struct wpa_supplicant *wpa_s,
 
 	return wpas_send_dscp_query(wpa_s, pos + 12, os_strlen(pos + 12));
 }
+#endif /* CONFIG_ROBUST_AV */
 
 
 char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
@@ -12067,6 +12072,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		reply_len = wpa_supplicant_ctrl_iface_tdls_link_status(
 			wpa_s, buf + 17, reply, reply_size);
 #endif /* CONFIG_TDLS */
+#ifdef CONFIG_WMM_AC
 	} else if (os_strcmp(buf, "WMM_AC_STATUS") == 0) {
 		reply_len = wpas_wmm_ac_status(wpa_s, reply, reply_size);
 	} else if (os_strncmp(buf, "WMM_AC_ADDTS ", 13) == 0) {
@@ -12075,6 +12081,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "WMM_AC_DELTS ", 13) == 0) {
 		if (wmm_ac_ctrl_delts(wpa_s, buf + 13))
 			reply_len = -1;
+#endif /* CONFIG_WMM_AC */
 	} else if (os_strncmp(buf, "SIGNAL_POLL", 11) == 0) {
 		reply_len = wpa_supplicant_signal_poll(wpa_s, reply,
 						       reply_size);
@@ -12200,9 +12207,11 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "VENDOR_ELEM_REMOVE ", 19) == 0) {
 		if (wpas_ctrl_vendor_elem_remove(wpa_s, buf + 19) < 0)
 			reply_len = -1;
+#ifdef CONFIG_RRM
 	} else if (os_strncmp(buf, "NEIGHBOR_REP_REQUEST", 20) == 0) {
 		if (wpas_ctrl_iface_send_neighbor_rep(wpa_s, buf + 20))
 			reply_len = -1;
+#endif /* CONFIG_RRM */
 	} else if (os_strcmp(buf, "ERP_FLUSH") == 0) {
 		wpas_ctrl_iface_erp_flush(wpa_s);
 	} else if (os_strncmp(buf, "MAC_RAND_SCAN ", 14) == 0) {
@@ -12367,9 +12376,6 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			reply_len = -1;
 #endif /* CONFIG_DPP2 */
 #endif /* CONFIG_DPP */
-	} else if (os_strncmp(buf, "MSCS ", 5) == 0) {
-		if (wpas_ctrl_iface_configure_mscs(wpa_s, buf + 5))
-			reply_len = -1;
 #ifdef CONFIG_PASN
 	} else if (os_strncmp(buf, "PASN_START ", 11) == 0) {
 		if (wpas_ctrl_iface_pasn_start(wpa_s, buf + 11) < 0)
@@ -12382,6 +12388,10 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		if (wpas_ctrl_iface_pasn_deauthenticate(wpa_s, buf + 12) < 0)
 			reply_len = -1;
 #endif /* CONFIG_PASN */
+#ifdef CONFIG_ROBUST_AV
+	} else if (os_strncmp(buf, "MSCS ", 5) == 0) {
+		if (wpas_ctrl_iface_configure_mscs(wpa_s, buf + 5))
+			reply_len = -1;
 	} else if (os_strncmp(buf, "SCS ", 4) == 0) {
 		if (wpas_ctrl_iface_configure_scs(wpa_s, buf + 4))
 			reply_len = -1;
@@ -12391,6 +12401,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "DSCP_QUERY ", 11) == 0) {
 		if (wpas_ctrl_iface_send_dscp_query(wpa_s, buf + 11))
 			reply_len = -1;
+#endif /* CONFIG_ROBUST_AV */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
