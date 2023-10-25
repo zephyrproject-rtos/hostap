@@ -36,8 +36,13 @@ static const char *const wpa_cli_version =
 	"3: Beacon (GO), 4: PD Req, 5: PD Resp, 6: GO Neg Req, " \
 	"7: GO Neg Resp, 8: GO Neg Conf, 9: Inv Req, 10: Inv Resp, " \
 	"11: Assoc Req (P2P), 12: Assoc Resp (P2P)"
-
+#if defined(__ZEPHYR__)
+struct wpa_ctrl *ctrl_conn;
+char *ifname_prefix = NULL;
+#else
 static struct wpa_ctrl *ctrl_conn;
+static char *ifname_prefix = NULL;
+#endif /* __ZEPHYR__ */
 static struct wpa_ctrl *mon_conn;
 static int wpa_cli_quit = 0;
 static int wpa_cli_attached = 0;
@@ -55,7 +60,6 @@ static const char *action_file = NULL;
 static int reconnect = 0;
 static int ping_interval = 5;
 static int interactive = 0;
-static char *ifname_prefix = NULL;
 
 static DEFINE_DL_LIST(bsses); /* struct cli_txt_entry */
 static DEFINE_DL_LIST(p2p_peers); /* struct cli_txt_entry */
@@ -260,8 +264,11 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print)
 	return 0;
 }
 
-
+#if defined(__ZEPHYR__)
+int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
+#else
 static int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
+#endif /* __ZEPHYR__ */
 {
 	return _wpa_ctrl_command(ctrl, cmd, 1);
 }
@@ -282,7 +289,7 @@ static int wpa_cli_cmd(struct wpa_ctrl *ctrl, const char *cmd, int min_args,
 	return wpa_ctrl_command(ctrl, buf);
 }
 
-
+#if !defined(__ZEPHYR__)
 static int wpa_cli_cmd_ifname(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return wpa_ctrl_command(ctrl, "IFNAME");
@@ -3975,6 +3982,7 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ NULL, NULL, NULL, cli_cmd_flag_none, NULL }
 };
 
+#endif /* !__ZEPHYR__ */
 
 /*
  * Prints command usage, lines are padded with the specified string.

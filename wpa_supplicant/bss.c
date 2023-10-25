@@ -182,9 +182,26 @@ static void wpa_bss_anqp_free(struct wpa_bss_anqp *anqp)
 	os_free(anqp);
 }
 
+static bool wpa_bss_check_pending_connect(struct wpa_supplicant *wpa_s,
+					   struct wpa_bss *bss)
+{
+	struct wpa_radio_work *work;
+	struct wpa_connect_work *cwork;
+
+	work = radio_work_pending(wpa_s, "sme-connect");
+	if (!work)
+		work = radio_work_pending(wpa_s, "connect");
+	if (!work)
+		return false;
+
+	cwork = work->ctx;
+	if (cwork->bss != bss)
+		return false;
+
+	return true;
+}
 
 static void wpa_bss_update_pending_connect(struct wpa_supplicant *wpa_s,
-					   struct wpa_bss *old_bss,
 					   struct wpa_bss *new_bss)
 {
 	struct wpa_radio_work *work;
@@ -197,8 +214,6 @@ static void wpa_bss_update_pending_connect(struct wpa_supplicant *wpa_s,
 		return;
 
 	cwork = work->ctx;
-	if (cwork->bss != old_bss)
-		return;
 
 	wpa_printf(MSG_DEBUG,
 		   "Update BSS pointer for the pending connect radio work");
@@ -224,7 +239,8 @@ void wpa_bss_remove(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 			}
 		}
 	}
-	wpa_bss_update_pending_connect(wpa_s, bss, NULL);
+	if (wpa_bss_check_pending_connect(wpa_s, bss))
+		wpa_bss_update_pending_connect(wpa_s, NULL);
 	dl_list_del(&bss->list);
 	dl_list_del(&bss->list_id);
 	wpa_s->num_bss--;
@@ -685,20 +701,24 @@ wpa_bss_update(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 	} else {
 		struct wpa_bss *nbss;
 		struct dl_list *prev = bss->list_id.prev;
+		bool update_pending_connect = wpa_bss_check_pending_connect(
+			wpa_s, bss);
+		unsigned int i;
+		bool update_current_bss = wpa_s->current_bss == bss;
+		for (i = 0; i < wpa_s->last_scan_res_used; i++) {
+			if (wpa_s->last_scan_res[i] == bss)
+				break;
+		}
 		dl_list_del(&bss->list_id);
 		nbss = os_realloc(bss, sizeof(*bss) + res->ie_len +
 				  res->beacon_ie_len);
 		if (nbss) {
-			unsigned int i;
-			for (i = 0; i < wpa_s->last_scan_res_used; i++) {
-				if (wpa_s->last_scan_res[i] == bss) {
-					wpa_s->last_scan_res[i] = nbss;
-					break;
-				}
-			}
-			if (wpa_s->current_bss == bss)
+			if (i != wpa_s->last_scan_res_used)
+				wpa_s->last_scan_res[i] = nbss;
+			if (update_current_bss)
 				wpa_s->current_bss = nbss;
-			wpa_bss_update_pending_connect(wpa_s, bss, nbss);
+			if (update_pending_connect)
+				wpa_bss_update_pending_connect(wpa_s, nbss);
 			bss = nbss;
 			os_memcpy(bss->ies, res + 1,
 				  res->ie_len + res->beacon_ie_len);

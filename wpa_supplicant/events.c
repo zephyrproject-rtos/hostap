@@ -6,6 +6,10 @@
  * See README for more details.
  */
 
+#ifdef __ZEPHYR__
+#include <supp_events.h>
+#endif /* __ZEPHYR__ */
+
 #include "includes.h"
 
 #include "common.h"
@@ -2931,6 +2935,7 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 	wpa_s->connection_set = 0;
 	if (data->assoc_info.req_ies && data->assoc_info.resp_ies) {
 		struct ieee802_11_elems req_elems, resp_elems;
+		memset(&resp_elems, 0, sizeof(struct ieee802_11_elems));
 
 		if (ieee802_11_parse_elems(data->assoc_info.req_ies,
 					   data->assoc_info.req_ies_len,
@@ -2951,6 +2956,22 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 				 BAND_2_4_GHZ);
 			wpa_s->connection_he = req_elems.he_capabilities &&
 				resp_elems.he_capabilities;
+			if (!wpa_s->connection_ht && !wpa_s->connection_vht &&
+			!wpa_s->connection_he) {
+				wpa_s->connection_a = 0;
+				wpa_s->connection_b = 0;
+				wpa_s->connection_g = 0;
+				if (wpas_freq_to_band(data->assoc_info.freq) == BAND_5_GHZ) {
+					wpa_s->connection_a = 1;
+				} else if (wpas_freq_to_band(data->assoc_info.freq) ==
+				BAND_2_4_GHZ) {
+					if (supp_rates_11b_only(&resp_elems)) {
+						wpa_s->connection_b = 1;
+					} else {
+						wpa_s->connection_g = 1;
+					}
+				}
+			}
 		}
 	}
 
@@ -3567,6 +3588,10 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 			" reason=%d%s",
 			MAC2STR(bssid), reason_code,
 			locally_generated ? " locally_generated=1" : "");
+#ifdef __ZEPHYR__
+		int status = 0;
+		send_wifi_mgmt_event(wpa_s->ifname, NET_EVENT_WIFI_CMD_DISCONNECT_RESULT, (void *)&status, sizeof(int));
+#endif /* __ZEPHYR__ */
 	}
 }
 
@@ -5002,7 +5027,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			os_get_reltime(&wpa_s->scan_start_time);
 			os_reltime_sub(&wpa_s->scan_start_time,
 				       &wpa_s->scan_trigger_time, &diff);
-			wpa_dbg(wpa_s, MSG_DEBUG, "Own scan request started a scan in %ld.%06ld seconds",
+			wpa_dbg(wpa_s, MSG_DEBUG, "Own scan request started a scan in %lld.%06lld seconds",
 				diff.sec, diff.usec);
 			wpa_s->own_scan_requested = 0;
 			wpa_s->own_scan_running = 1;
@@ -5037,7 +5062,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			os_reltime_sub(&now, &wpa_s->scan_start_time, &diff);
 			wpa_s->scan_start_time.sec = 0;
 			wpa_s->scan_start_time.usec = 0;
-			wpa_dbg(wpa_s, MSG_DEBUG, "Scan completed in %ld.%06ld seconds",
+			wpa_dbg(wpa_s, MSG_DEBUG, "Scan completed in %lld.%06lld seconds",
 				diff.sec, diff.usec);
 		}
 		if (wpa_supplicant_event_scan_results(wpa_s, data))
