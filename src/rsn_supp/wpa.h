@@ -304,6 +304,19 @@ static inline int wpa_sm_set_ap_rsnxe(struct wpa_sm *sm, const u8 *ie,
 	return -1;
 }
 
+static inline int wpa_sm_set_assoc_rsnxe_default(struct wpa_sm *sm, u8 *rsnxe,
+				   size_t *rsnxe_len)
+{
+	return -1;
+
+}
+
+static inline int wpa_sm_set_assoc_rsnxe(struct wpa_sm *sm, const u8 *rsnxe,
+                                  size_t rsnxe_len)
+{
+       return -1;
+}
+
 static inline int wpa_sm_get_mib(struct wpa_sm *sm, char *buf, size_t buflen)
 {
 	return 0;

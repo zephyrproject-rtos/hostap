@@ -523,6 +523,9 @@ static inline int wpa_drv_signal_monitor(struct wpa_supplicant *wpa_s,
 int wpa_drv_signal_poll(struct wpa_supplicant *wpa_s,
 			struct wpa_signal_info *si);
 
+int wpa_drv_get_conn_info(struct wpa_supplicant *wpa_s,
+			struct wpa_conn_info *conn_info);
+
 static inline int wpa_drv_channel_info(struct wpa_supplicant *wpa_s,
 				       struct wpa_channel_info *ci)
 {

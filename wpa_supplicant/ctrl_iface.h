@@ -12,7 +12,7 @@
 #ifdef CONFIG_CTRL_IFACE
 
 #ifndef CTRL_IFACE_MAX_LEN
-#define CTRL_IFACE_MAX_LEN 8192
+#define CTRL_IFACE_MAX_LEN 4096
 #endif /* CTRL_IFACE_MAX_LEN */
 
 /* Shared functions from ctrl_iface.c; to be called by ctrl_iface backends */

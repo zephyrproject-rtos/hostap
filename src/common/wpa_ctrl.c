@@ -13,7 +13,9 @@
 #ifdef CONFIG_CTRL_IFACE_UNIX
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef __ZEPHYR__
 #include <sys/un.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 #endif /* CONFIG_CTRL_IFACE_UNIX */
@@ -36,7 +38,7 @@
 #include "common.h"
 
 
-#if defined(CONFIG_CTRL_IFACE_UNIX) || defined(CONFIG_CTRL_IFACE_UDP)
+#if defined(CONFIG_CTRL_IFACE_UNIX) || defined(CONFIG_CTRL_IFACE_UDP) || defined(CONFIG_CTRL_IFACE_ZEPHYR)
 #define CTRL_IFACE_SOCKET
 #endif /* CONFIG_CTRL_IFACE_UNIX || CONFIG_CTRL_IFACE_UDP */
 
@@ -72,6 +74,9 @@ struct wpa_ctrl {
 #ifdef CONFIG_CTRL_IFACE_NAMED_PIPE
 	HANDLE pipe;
 #endif /* CONFIG_CTRL_IFACE_NAMED_PIPE */
+#ifdef CONFIG_CTRL_IFACE_ZEPHYR
+	int s;
+#endif /* CONFIG_CTRL_IFACE_ZEPHYR */
 };
 
 
@@ -579,6 +584,32 @@ retry_send:
 }
 #endif /* CTRL_IFACE_SOCKET */
 
+#ifdef CONFIG_CTRL_IFACE_ZEPHYR
+struct wpa_ctrl * wpa_ctrl_open(const int sock)
+{
+	struct wpa_ctrl *ctrl;
+
+	if (sock < 0) {
+		wpa_printf(MSG_ERROR, "Invalid socket");
+		return NULL;
+	}
+
+	ctrl = os_zalloc(sizeof(*ctrl));
+	if (ctrl == NULL)
+		return NULL;
+
+	/* We use one of the socketpair opened in ctrl_iface_zephyr.c */
+	ctrl->s = sock;
+
+	return ctrl;
+}
+
+void wpa_ctrl_close(struct wpa_ctrl *ctrl)
+{
+	close(ctrl->s);
+	os_free(ctrl);
+}
+#endif
 
 static int wpa_ctrl_attach_helper(struct wpa_ctrl *ctrl, int attach)
 {

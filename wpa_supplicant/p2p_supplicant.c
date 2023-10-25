@@ -5210,7 +5210,7 @@ static int wpas_p2p_peer_go(struct wpa_supplicant *wpa_s,
 	updated = os_reltime_before(&wpa_s->p2p_auto_started,
 				    &bss->last_update);
 	wpa_printf(MSG_DEBUG, "P2P: Current BSS entry for peer updated at "
-		   "%ld.%06ld (%supdated in last scan)",
+		   "%lld.%06lld (%supdated in last scan)",
 		   bss->last_update.sec, bss->last_update.usec,
 		   updated ? "": "not ");
 
@@ -5986,7 +5986,7 @@ int wpas_p2p_connect(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 		if (auto_join) {
 			os_get_reltime(&wpa_s->p2p_auto_started);
 			wpa_printf(MSG_DEBUG, "P2P: Auto join started at "
-				   "%ld.%06ld",
+				   "%lld.%06lld",
 				   wpa_s->p2p_auto_started.sec,
 				   wpa_s->p2p_auto_started.usec);
 		}
@@ -7271,7 +7271,7 @@ int wpas_p2p_prov_disc(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 		wpas_p2p_stop_find(wpa_s);
 		wpa_s->p2p_join_scan_count = 0;
 		os_get_reltime(&wpa_s->p2p_auto_started);
-		wpa_printf(MSG_DEBUG, "P2P: Auto PD started at %ld.%06ld",
+		wpa_printf(MSG_DEBUG, "P2P: Auto PD started at %lld.%06lld",
 			   wpa_s->p2p_auto_started.sec,
 			   wpa_s->p2p_auto_started.usec);
 		wpas_p2p_join_scan(wpa_s, NULL);
