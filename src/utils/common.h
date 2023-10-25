@@ -156,7 +156,7 @@ static inline unsigned int wpa_swap_32(unsigned int v)
 
 #endif /* __CYGWIN__ || CONFIG_NATIVE_WINDOWS */
 
-#if defined(CONFIG_ZEPHYR)
+#if defined(__ZEPHYR__)
 #include <zephyr/sys/byteorder.h>
 
 #define le_to_host16(n) sys_le16_to_cpu(n)
@@ -173,7 +173,7 @@ static inline unsigned int wpa_swap_32(unsigned int v)
 #define host_to_be64(n) sys_cpu_to_be64(n)
 
 #define WPA_BYTE_SWAP_DEFINED
-#endif /* CONFIG_ZEPHYR */
+#endif /* __ZEPHYR__ */
 
 #ifndef WPA_BYTE_SWAP_DEFINED
 
@@ -550,7 +550,7 @@ static inline int is_multicast_ether_addr(const u8 *a)
 
 #define broadcast_ether_addr (const u8 *) "\xff\xff\xff\xff\xff\xff"
 
-#if defined(CONFIG_ZEPHYR)
+#if defined(__ZEPHYR__)
 #include "wpa_debug_zephyr.h"
 #else
 #include "wpa_debug.h"
@@ -575,7 +575,7 @@ void int_array_concat(int **res, const int *a);
 void int_array_sort_unique(int *a);
 void int_array_add_unique(int **res, int a);
 
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 char *inet_ntoa(struct in_addr in);
 int inet_pton(sa_family_t family, const char *src, void *dst);
 #endif
