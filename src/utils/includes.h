@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#ifndef _WIN32_WCE
+#if !(defined(_WIN32_WCE) || defined(__ZEPHYR__))
 #include <signal.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -50,11 +50,15 @@
 #include <zephyr/posix/sys/select.h>
 #include <zephyr/posix/sys/socket.h>
 #include <zephyr/posix/unistd.h>
+#include <zephyr/posix/signal.h>
 #else /* defined(CONFIG_POSIX_API) */
-#include <sys/select.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/net/socket_select.h>
 #include <zephyr/net/net_ip.h>
 #endif /* defined(CONFIG_POSIX_API) */
 #include <zephyr/shell/shell.h>
+
+#define signal(a, b) (void)(b)
 #endif /* defined(__ZEPHYR__) */
 
 #endif /* INCLUDES_H */

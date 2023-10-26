@@ -5,7 +5,8 @@
  * See README for more details.
  */
 
-#include <sys/time.h>
+#include <zephyr/posix/time.h>
+#include <zephyr/posix/sys/time.h>
 
 /* The clock_gettime() would be found in <zephyr/posix/time.h> but
  * that will cause conflict with picolib definition.
@@ -206,6 +207,33 @@ void *os_memdup(const void *src, size_t len)
 void *os_zalloc(size_t size)
 {
 	return calloc(1, size);
+}
+
+size_t os_strlcpy(char *dest, const char *src, size_t siz)
+{
+	const char *s = src;
+	size_t left = siz;
+
+	if (left) {
+		/* Copy string up to the maximum size of the dest buffer */
+		while (--left != 0) {
+			if ((*dest++ = *s++) == '\0') {
+				break;
+			}
+		}
+	}
+
+	if (left == 0) {
+		/* Not enough room for the string; force NUL-termination */
+		if (siz != 0) {
+			*dest = '\0';
+		}
+		while (*s++) {
+			; /* determine total src string length */
+		}
+	}
+
+	return s - src - 1;
 }
 
 int os_exec(const char *program, const char *arg, int wait_completion)

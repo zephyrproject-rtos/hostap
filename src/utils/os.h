@@ -9,7 +9,11 @@
 #ifndef OS_H
 #define OS_H
 
+#if defined(__ZEPHYR__)
+typedef long long os_time_t;
+#else
 typedef long os_time_t;
+#endif
 
 /**
  * os_sleep - Sleep (sec, usec)

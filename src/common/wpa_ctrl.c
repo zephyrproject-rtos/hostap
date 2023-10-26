@@ -37,6 +37,9 @@
 #include "wpa_ctrl.h"
 #include "common.h"
 
+#ifdef __ZEPHYR__
+#include <zephyr/net/socket.h>
+#endif
 
 #if defined(CONFIG_CTRL_IFACE_UNIX) || defined(CONFIG_CTRL_IFACE_UDP) || defined(CONFIG_CTRL_IFACE_ZEPHYR)
 #define CTRL_IFACE_SOCKET
