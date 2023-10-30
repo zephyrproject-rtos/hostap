@@ -12,6 +12,7 @@
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/ethernet.h>
 
+#include "utils/includes.h"
 #include "driver.h"
 #include "wpa_supplicant_i.h"
 #include "bss.h"
