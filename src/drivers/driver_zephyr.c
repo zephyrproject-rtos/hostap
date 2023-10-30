@@ -47,7 +47,8 @@ void wpa_supplicant_event_wrapper(void *ctx,
 			}
 		}
 	}
-	z_wpas_send_event(&msg);
+
+	zephyr_wifi_send_event(&msg);
 }
 
 static int wpa_drv_zep_abort_scan(void *priv,

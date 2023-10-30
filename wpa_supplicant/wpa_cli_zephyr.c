@@ -123,10 +123,12 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 
 static int wpa_cli_open_global_ctrl(void)
 {
-	global_ctrl_conn = wpa_ctrl_open(global->ctrl_iface->sock_pair[0]);
+	global_ctrl_conn = wpa_ctrl_open(zephyr_get_default_supplicant_context()->
+					 ctrl_iface->sock_pair[0]);
 	if (global_ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to open global control connection to "
-			   "%d - %s", global->ctrl_iface->sock_pair[0],
+			   "%d - %s",
+			   zephyr_get_default_supplicant_context()->ctrl_iface->sock_pair[0],
 			   strerror(errno));
 		return -1;
 	}
@@ -275,7 +277,7 @@ int wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
 
 /* Public APIs */
 
-int z_global_wpa_ctrl_init(void)
+int zephyr_global_wpa_ctrl_init(void)
 {
 	int ret;
 
@@ -289,12 +291,12 @@ int z_global_wpa_ctrl_init(void)
 }
 
 
-void z_global_wpa_ctrl_deinit(void)
+void zephyr_global_wpa_ctrl_deinit(void)
 {
 	return wpa_cli_close_global_ctrl();
 }
 
-int z_wpa_ctrl_init(void *wpa_s)
+int zephyr_wpa_ctrl_init(void *wpa_s)
 {
 	int ret;
 	struct wpa_supplicant *supp = wpa_s;
@@ -308,17 +310,17 @@ int z_wpa_ctrl_init(void *wpa_s)
 	return ret;
 }
 
-void z_wpa_ctrl_deinit(void *wpa_s)
+void zephyr_wpa_ctrl_deinit(void *wpa_s)
 {
 	wpa_cli_close_connection(wpa_s);
 }
 
-int z_wpa_ctrl_zephyr_cmd(int argc, const char *argv[])
+int zephyr_wpa_ctrl_zephyr_cmd(int argc, const char *argv[])
 {
 	return wpa_request(ctrl_conn, argc , (char **) argv);
 }
 
-int z_wpa_cli_cmd_v(const char *fmt, ...)
+int zephyr_wpa_cli_cmd_v(const char *fmt, ...)
 {
 	va_list cmd_args;
 	int argc;
@@ -335,7 +337,7 @@ int z_wpa_cli_cmd_v(const char *fmt, ...)
 	for (int i = 0; i < argc; i++)
 		wpa_printf(MSG_DEBUG, "argv[%d]: %s\n", i, argv[i]);
 
-	return z_wpa_ctrl_zephyr_cmd(argc, argv);
+	return zephyr_wpa_ctrl_zephyr_cmd(argc, argv);
 }
 
 int z_wpa_ctrl_add_network(struct add_network_resp *resp)
@@ -399,12 +401,12 @@ int z_wpa_ctrl_status(struct status_resp *resp)
 	return 0;
 }
 
-int z_wpa_global_ctrl_zephyr_cmd(int argc, const char *argv[])
+int zephyr_wpa_global_ctrl_zephyr_cmd(int argc, const char *argv[])
 {
 	return wpa_request(global_ctrl_conn, argc , (char **) argv);
 }
 
-int z_wpa_cli_global_cmd_v(const char *fmt, ...)
+int zephyr_wpa_cli_global_cmd_v(const char *fmt, ...)
 {
 	va_list cmd_args;
 	int argc;
@@ -421,5 +423,5 @@ int z_wpa_cli_global_cmd_v(const char *fmt, ...)
 	for (int i = 0; i < argc; i++)
 		wpa_printf(MSG_DEBUG, "argv[%d]: %s\n", i, argv[i]);
 
-	return z_wpa_global_ctrl_zephyr_cmd(argc, argv);
+	return zephyr_wpa_global_ctrl_zephyr_cmd(argc, argv);
 }
