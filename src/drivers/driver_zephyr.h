@@ -111,6 +111,7 @@ struct zep_drv_ctx {
 struct zep_drv_if_ctx {
 	struct zep_drv_ctx *drv_ctx;
 	void *supp_if_ctx;
+	struct net_if *iface;
 	const struct device *dev_ctx;
 	void *dev_priv;
 

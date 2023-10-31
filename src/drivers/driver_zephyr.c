@@ -719,11 +719,13 @@ static void *wpa_drv_zep_init(void *ctx,
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
-	const struct device *device = NULL;
 	struct zep_wpa_supp_dev_callbk_fns callbk_fns;
+	const struct device *device;
+	struct net_if *iface;
 
-	device = device_get_binding(ifname);
+	iface = net_if_get_by_index(net_if_get_by_name(ifname));
 
+	device = net_if_get_device(iface);
 	if (!device) {
 		wpa_printf(MSG_ERROR, "%s: Interface %s not found\n", __func__, ifname);
 		goto out;
@@ -735,6 +737,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	}
 
 	if_ctx->supp_if_ctx = ctx;
+	if_ctx->iface = iface;
 	if_ctx->dev_ctx = device;
 	if_ctx->drv_ctx = global_priv;
 
