@@ -37,7 +37,7 @@ extern struct wpa_global *global;
 
 static void wpa_cli_msg_cb(char *msg, size_t len)
 {
-	wpa_printf(MSG_INFO, "%s\n", msg);
+	wpa_printf(MSG_INFO, "%s", msg);
 }
 
 static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, char *resp)
@@ -47,24 +47,24 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 	int ret;
 
 	if (ctrl_conn == NULL && global_ctrl_conn == NULL) {
-			printf("Not connected to wpa_supplicant - command dropped.\n");
-			return -1;
+		wpa_printf(MSG_ERROR, "Not connected to wpa_supplicant - command dropped.");
+		return -1;
 	}
+
 	if (ifname_prefix) {
-			os_snprintf(buf, sizeof(buf), "IFNAME=%s %s",
-						ifname_prefix, cmd);
-			buf[sizeof(buf) - 1] = '\0';
-			cmd = buf;
+		os_snprintf(buf, sizeof(buf), "IFNAME=%s %s", ifname_prefix, cmd);
+		buf[sizeof(buf) - 1] = '\0';
+		cmd = buf;
 	}
+
 	len = sizeof(buf) - 1;
-	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len,
-							wpa_cli_msg_cb);
+	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len, wpa_cli_msg_cb);
 	if (ret == -2) {
-			printf("'%s' command timed out.\n", cmd);
-			return -2;
+		wpa_printf(MSG_ERROR, "'%s' command timed out.", cmd);
+		return -2;
 	} else if (ret < 0) {
-			printf("'%s' command failed.\n", cmd);
-			return -1;
+		wpa_printf(MSG_ERROR, "'%s' command failed.", cmd);
+		return -1;
 	}
 
 	if (resp) {
@@ -73,9 +73,10 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 	}
 
 	if (print) {
-			buf[len] = '\0';
-			printf("%s", buf);
+		buf[len] = '\0';
+		wpa_printf(MSG_DEBUG, "%s", buf);
 	}
+
 	return 0;
 }
 
@@ -333,9 +334,9 @@ int zephyr_wpa_cli_cmd_v(const char *fmt, ...)
 
 	(void)supp_make_argv(&argc, &argv[0], cmd, MAX_ARGS);
 
-	wpa_printf(MSG_DEBUG, "Calling wpa_cli: %s, argc: %d\n", cmd, argc);
+	wpa_printf(MSG_DEBUG, "Calling wpa_cli: %s, argc: %d", cmd, argc);
 	for (int i = 0; i < argc; i++)
-		wpa_printf(MSG_DEBUG, "argv[%d]: %s\n", i, argv[i]);
+		wpa_printf(MSG_DEBUG, "argv[%d]: %s", i, argv[i]);
 
 	return zephyr_wpa_ctrl_zephyr_cmd(argc, argv);
 }
@@ -419,9 +420,9 @@ int zephyr_wpa_cli_global_cmd_v(const char *fmt, ...)
 
 	(void)supp_make_argv(&argc, &argv[0], cmd, MAX_ARGS);
 
-	wpa_printf(MSG_DEBUG, "Calling wpa_cli: %s, argc: %d\n", cmd, argc);
+	wpa_printf(MSG_DEBUG, "Calling wpa_cli: %s, argc: %d", cmd, argc);
 	for (int i = 0; i < argc; i++)
-		wpa_printf(MSG_DEBUG, "argv[%d]: %s\n", i, argv[i]);
+		wpa_printf(MSG_DEBUG, "argv[%d]: %s", i, argv[i]);
 
 	return zephyr_wpa_global_ctrl_zephyr_cmd(argc, argv);
 }
