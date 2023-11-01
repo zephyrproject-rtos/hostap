@@ -16,6 +16,15 @@
 
 #define SCAN_TIMEOUT 30
 
+const struct zep_wpa_supp_dev_ops *get_dev_ops(const struct device *dev)
+{
+	struct net_wifi_mgmt_offload *api;
+
+	api = (struct net_wifi_mgmt_offload *)dev->api;
+
+	return api->wifi_drv_ops;
+}
+
 void wpa_supplicant_event_wrapper(void *ctx,
 				enum wpa_event_type event,
 				union wpa_event_data *data)
@@ -60,8 +69,7 @@ static int wpa_drv_zep_abort_scan(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
-
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->scan_abort) {
 		wpa_printf(MSG_ERROR,
 			   "%s: No op registered for scan_abort\n",
@@ -478,8 +486,7 @@ static int wpa_drv_register_frame(struct zep_drv_if_ctx *if_ctx,
 {
 	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
 
-	dev_ops = if_ctx->dev_ctx->config;
-
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->register_frame)
 		return -1;
 
@@ -641,7 +648,7 @@ struct hostapd_hw_modes *wpa_drv_get_hw_feature_data(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	struct phy_info_arg result = {
 		.num_modes = num_modes,
@@ -718,7 +725,7 @@ static void *wpa_drv_zep_init(void *ctx,
 			      void *global_priv)
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
-	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
 	struct zep_wpa_supp_dev_callbk_fns callbk_fns;
 	const struct device *device;
 	struct net_if *iface;
@@ -741,7 +748,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	if_ctx->dev_ctx = device;
 	if_ctx->drv_ctx = global_priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->init) {
 		wpa_printf(MSG_ERROR,
 			   "%s: No op registered for init\n",
@@ -792,7 +799,7 @@ static void wpa_drv_zep_deinit(void *priv)
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->deinit) {
 		wpa_printf(MSG_ERROR, "%s: No op registered for deinit\n", __func__);
 		return;
@@ -822,7 +829,7 @@ static int wpa_drv_zep_scan2(void *priv, struct wpa_driver_scan_params *params)
 		goto out;
 	}
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->scan2) {
 		wpa_printf(MSG_ERROR, "%s: No op registered for scan2\n", __func__);
 		goto out;
@@ -881,7 +888,7 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->get_scan_results2) {
 		wpa_printf(MSG_ERROR,
 			   "%s: No op registered for scan2\n",
@@ -943,8 +950,7 @@ static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
-
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	ret = dev_ops->deauthenticate(if_ctx->dev_priv, addr, reason_code);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: deauthenticate op failed\n", __func__);
@@ -972,7 +978,7 @@ static int wpa_drv_zep_authenticate(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	os_memcpy(if_ctx->ssid, params->ssid, params->ssid_len);
 
@@ -1011,7 +1017,7 @@ static int wpa_drv_zep_associate(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	ret = dev_ops->associate(if_ctx->dev_priv, params);
 	if (ret) {
@@ -1052,7 +1058,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 	}
 
 	if_ctx = priv;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	wpa_printf(MSG_DEBUG, "%s: priv:%p alg %d addr %p key_idx %d set_tx %d seq %p "
 		   "seq_len %d key %p key_len %d\n",
@@ -1114,7 +1120,7 @@ static int wpa_drv_zep_get_capa(void *priv, struct wpa_driver_capa *capa)
 	}
 
 	if_ctx = priv;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	if (!dev_ops->get_capa) {
 		wpa_printf(MSG_ERROR, "%s: get_capa op not supported\n", __func__);
@@ -1174,7 +1180,7 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
 
@@ -1209,7 +1215,7 @@ static int wpa_drv_zep_signal_poll(void *priv, struct wpa_signal_info *si)
 	}
 
 	if_ctx = priv;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	os_memset(si, 0, sizeof(*si));
 
@@ -1242,7 +1248,7 @@ static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 	struct ieee80211_hdr *hdr;
 
 	if_ctx = priv;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	wpa_printf(MSG_DEBUG, "wpa_supp: Send Action frame ("
 			"freq=%u MHz wait=%d ms no_cck=%d)",
@@ -1299,7 +1305,7 @@ static int wpa_drv_zep_get_conn_info(void *priv, struct wpa_conn_info *ci)
 	}
 
 	if_ctx = priv;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	if (!dev_ops) {
 		wpa_printf(MSG_ERROR, "%s:Failed to get config handle\n", __func__);
