@@ -130,14 +130,14 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	const struct device *device = device_get_binding(ifname);
 
 	if (!device) {
-		wpa_printf(MSG_ERROR, "Cannot get device for: %s\n", ifname);
+		wpa_printf(MSG_ERROR, "Cannot get device for: %s", ifname);
 		return NULL;
 	}
 
 	iface = net_if_lookup_by_dev(device);
 
 	if (!iface) {
-		wpa_printf(MSG_ERROR, "Cannot get device for: %s\n", ifname);
+		wpa_printf(MSG_ERROR, "Cannot get device for: %s", ifname);
 		return NULL;
 	}
 

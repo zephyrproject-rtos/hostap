@@ -47,7 +47,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 				char *ies = os_zalloc(data->auth.ies_len);
 
 				if (!ies) {
-					wpa_printf(MSG_ERROR, "%s: Failed to alloc ies\n", __func__);
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc ies", __func__);
 					return;
 				}
 
@@ -72,7 +72,7 @@ static int wpa_drv_zep_abort_scan(void *priv,
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->scan_abort) {
 		wpa_printf(MSG_ERROR,
-			   "%s: No op registered for scan_abort\n",
+			   "%s: No op registered for scan_abort",
 			   __func__);
 		goto out;
 	}
@@ -98,7 +98,7 @@ void wpa_drv_zep_scan_timeout(void *eloop_ctx, void *timeout_ctx)
 	if_ctx = eloop_ctx;
 
 	wpa_printf(MSG_ERROR,
-		   "%s: Scan timeout - try to abort it\n",
+		   "%s: Scan timeout - try to abort it",
 		   __func__);
 
 	if (wpa_drv_zep_abort_scan(if_ctx, 0) == 0) {
@@ -148,7 +148,7 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 
 	struct wpa_scan_res *sr = os_zalloc(scan_res_len);
 	if (!sr) {
-		wpa_printf(MSG_ERROR, "%s: Failed to alloc scan results(%d bytes)\n", __func__, scan_res_len);
+		wpa_printf(MSG_ERROR, "%s: Failed to alloc scan results(%d bytes)", __func__, scan_res_len);
 		return;
 	}
 
@@ -734,7 +734,7 @@ static void *wpa_drv_zep_init(void *ctx,
 
 	device = net_if_get_device(iface);
 	if (!device) {
-		wpa_printf(MSG_ERROR, "%s: Interface %s not found\n", __func__, ifname);
+		wpa_printf(MSG_ERROR, "%s: Interface %s not found", __func__, ifname);
 		goto out;
 	}
 
@@ -751,7 +751,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->init) {
 		wpa_printf(MSG_ERROR,
-			   "%s: No op registered for init\n",
+			   "%s: No op registered for init",
 			   __func__);
 		os_free(if_ctx);
 		if_ctx = NULL;
@@ -778,7 +778,7 @@ static void *wpa_drv_zep_init(void *ctx,
 					 &callbk_fns);
 	if (!if_ctx->dev_priv) {
 		wpa_printf(MSG_ERROR,
-			   "%s: Failed to initialize the interface\n",
+			   "%s: Failed to initialize the interface",
 			   __func__);
 		os_free(if_ctx);
 		if_ctx = NULL;
@@ -801,7 +801,7 @@ static void wpa_drv_zep_deinit(void *priv)
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->deinit) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for deinit\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: No op registered for deinit", __func__);
 		return;
 	}
 
@@ -819,25 +819,25 @@ static int wpa_drv_zep_scan2(void *priv, struct wpa_driver_scan_params *params)
 	int ret = -1;
 
 	if (!priv || !params) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
 	if_ctx = priv;
 	if (if_ctx->scan_res2_get_in_prog) {
-		wpa_printf(MSG_ERROR, "%s: Scan is already in progress\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Scan is already in progress", __func__);
 		goto out;
 	}
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->scan2) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for scan2\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: No op registered for scan2", __func__);
 		goto out;
 	}
 
 	ret = dev_ops->scan2(if_ctx->dev_priv, params);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: scan2 op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: scan2 op failed", __func__);
 		goto out;
 	}
 
@@ -848,7 +848,7 @@ static int wpa_drv_zep_scan2(void *priv, struct wpa_driver_scan_params *params)
 	timeout = SCAN_TIMEOUT;
 
 	wpa_printf(MSG_DEBUG,
-		   "%s: Scan requested - scan timeout %d seconds\n",
+		   "%s: Scan requested - scan timeout %d seconds",
 		   __func__,
 		   timeout);
 
@@ -882,7 +882,7 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -891,20 +891,20 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->get_scan_results2) {
 		wpa_printf(MSG_ERROR,
-			   "%s: No op registered for scan2\n",
+			   "%s: No op registered for scan2",
 			   __func__);
 		goto out;
 	}
 
 	if_ctx->scan_res2 = os_zalloc(sizeof(*if_ctx->scan_res2));
 	if (!if_ctx->scan_res2) {
-		wpa_printf(MSG_ERROR, "%s: Failed to alloc memory for scan results\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Failed to alloc memory for scan results", __func__);
 		goto out;
 	}
 
 	ret = dev_ops->get_scan_results2(if_ctx->dev_priv);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: get_scan_results2 op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: get_scan_results2 op failed", __func__);
 		goto out;
 	}
 
@@ -918,7 +918,7 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 	}
 
 	if (i == SCAN_TIMEOUT) {
-		wpa_printf(MSG_ERROR, "%s: Timed out waiting for scan results\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Timed out waiting for scan results", __func__);
 		ret = -1;
 		goto out;
 	}
@@ -944,7 +944,7 @@ static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 	int ret = -1;
 
 	if ((!priv) || (!addr)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -953,7 +953,7 @@ static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	ret = dev_ops->deauthenticate(if_ctx->dev_priv, addr, reason_code);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: deauthenticate op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: deauthenticate op failed", __func__);
 		goto out;
 	}
 
@@ -972,7 +972,7 @@ static int wpa_drv_zep_authenticate(void *priv,
 	int ret = -1;
 
 	if ((!priv) || (!params)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -993,7 +993,7 @@ static int wpa_drv_zep_authenticate(void *priv,
 
 	ret = dev_ops->authenticate(if_ctx->dev_priv, params, curr_bss);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: authenticate op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: authenticate op failed", __func__);
 		goto out;
 	}
 
@@ -1011,7 +1011,7 @@ static int wpa_drv_zep_associate(void *priv,
 	int ret = -1;
 
 	if ((!priv) || (!params)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -1021,7 +1021,7 @@ static int wpa_drv_zep_associate(void *priv,
 
 	ret = dev_ops->associate(if_ctx->dev_priv, params);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: associate op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: associate op failed", __func__);
 		goto out;
 	}
 
@@ -1047,12 +1047,12 @@ static int _wpa_drv_zep_set_key(void *priv,
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
 	if ((alg != WPA_ALG_NONE) && ((!seq) || (!key))) {
 		wpa_printf(MSG_ERROR,
-			   "%s: Missing mandatory params\n",
+			   "%s: Missing mandatory params",
 			   __func__);
 		goto out;
 	}
@@ -1061,7 +1061,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	wpa_printf(MSG_DEBUG, "%s: priv:%p alg %d addr %p key_idx %d set_tx %d seq %p "
-		   "seq_len %d key %p key_len %d\n",
+		   "seq_len %d key %p key_len %d",
 		   __func__,
 		   if_ctx->dev_priv,
 		   alg, addr,
@@ -1083,7 +1083,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 			       key,
 			       key_len);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: set_key op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: set_key op failed", __func__);
 		goto out;
 	}
 out:
@@ -1115,7 +1115,7 @@ static int wpa_drv_zep_get_capa(void *priv, struct wpa_driver_capa *capa)
 	int ret = -1;
 
 	if ((!priv) || (!capa)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -1123,13 +1123,13 @@ static int wpa_drv_zep_get_capa(void *priv, struct wpa_driver_capa *capa)
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	if (!dev_ops->get_capa) {
-		wpa_printf(MSG_ERROR, "%s: get_capa op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: get_capa op not supported", __func__);
 		goto out;
 	}
 
 	ret = dev_ops->get_capa(if_ctx->dev_priv, capa);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: get_capa op failed\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: get_capa op failed", __func__);
 		goto out;
 	}
 
@@ -1159,7 +1159,7 @@ static int wpa_drv_zep_get_ssid(void *priv,
 	if_ctx = priv;
 
 	wpa_printf(MSG_INFO,
-		   "%s: SSID size: %d\n",
+		   "%s: SSID size: %d",
 		   __func__,
 		   if_ctx->ssid_len);
 
@@ -1205,12 +1205,12 @@ static int wpa_drv_zep_signal_poll(void *priv, struct wpa_signal_info *si)
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
 
 	if (!si) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -1222,11 +1222,11 @@ static int wpa_drv_zep_signal_poll(void *priv, struct wpa_signal_info *si)
 	if (dev_ops && dev_ops->signal_poll) {
 		ret = dev_ops->signal_poll(if_ctx->dev_priv, si, if_ctx->bssid);
 		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: Signal polling failed: %d\n", __func__, ret);
+			wpa_printf(MSG_ERROR, "%s: Signal polling failed: %d", __func__, ret);
 			goto out;
 		}
 	} else {
-		wpa_printf(MSG_ERROR, "%s: Signal polling not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Signal polling not supported", __func__);
 		goto out;
 	}
 
@@ -1295,12 +1295,12 @@ static int wpa_drv_zep_get_conn_info(void *priv, struct wpa_conn_info *ci)
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
 
 	if (!ci) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -1308,18 +1308,18 @@ static int wpa_drv_zep_get_conn_info(void *priv, struct wpa_conn_info *ci)
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s:Failed to get config handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s:Failed to get config handle", __func__);
 		goto out;
 	}
 
 	if (dev_ops->get_conn_info) {
 		ret = dev_ops->get_conn_info(if_ctx->dev_priv, ci);
 		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: Failed to get connection info: %d\n", __func__, ret);
+			wpa_printf(MSG_ERROR, "%s: Failed to get connection info: %d", __func__, ret);
 			goto out;
 		}
 	} else {
-		wpa_printf(MSG_ERROR, "%s: Getting connection info is not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Getting connection info is not supported", __func__);
 		goto out;
 	}
 
