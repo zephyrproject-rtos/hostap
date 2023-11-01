@@ -191,7 +191,7 @@ int os_fdatasync(FILE *stream)
 
 char *os_strdup(const char *s)
 {
-	return strdup(s);
+	return os_memdup(s, strlen(s) + 1);
 }
 
 void *os_memdup(const void *src, size_t len)
