@@ -126,18 +126,11 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	struct sockaddr_ll ll;
 	int ret = 0;
 	struct net_linkaddr *link_addr = NULL;
-	struct net_if *iface = NULL;
-	const struct device *device = device_get_binding(ifname);
+	struct net_if *iface;
 
-	if (!device) {
-		wpa_printf(MSG_ERROR, "Cannot get device for: %s", ifname);
-		return NULL;
-	}
-
-	iface = net_if_lookup_by_dev(device);
-
+	iface = net_if_get_by_index(net_if_get_by_name(ifname));
 	if (!iface) {
-		wpa_printf(MSG_ERROR, "Cannot get device for: %s", ifname);
+		wpa_printf(MSG_ERROR, "Cannot get interface for: %s", ifname);
 		return NULL;
 	}
 
@@ -151,7 +144,6 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	l2->l2_hdr = l2_hdr;
 	l2->protocol = protocol;
 	l2->iface = iface;
-
 	l2->ifindex = net_if_get_by_iface(l2->iface);
 
 	if (!l2->ifindex) {
