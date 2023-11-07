@@ -254,6 +254,7 @@ int wpas_mbo_ie(struct wpa_supplicant *wpa_s, u8 *buf, size_t len,
 }
 
 
+#ifdef CONFIG_WNM
 static void wpas_mbo_send_wnm_notification(struct wpa_supplicant *wpa_s,
 					   const u8 *data, size_t len)
 {
@@ -292,6 +293,7 @@ static void wpas_mbo_send_wnm_notification(struct wpa_supplicant *wpa_s,
 
 	wpabuf_free(buf);
 }
+#endif /* CONFIG_WNM */
 
 
 static void wpas_mbo_non_pref_chan_changed(struct wpa_supplicant *wpa_s)
@@ -303,8 +305,10 @@ static void wpas_mbo_non_pref_chan_changed(struct wpa_supplicant *wpa_s)
 		return;
 
 	wpas_mbo_non_pref_chan_attrs(wpa_s, buf, 1);
+#ifdef CONFIG_WNM
 	wpas_mbo_send_wnm_notification(wpa_s, wpabuf_head_u8(buf),
 				       wpabuf_len(buf));
+#endif /* CONFIG_WNM */
 	wpas_update_mbo_connect_params(wpa_s);
 	wpabuf_free(buf);
 }
@@ -495,6 +499,7 @@ void wpas_mbo_ie_trans_req(struct wpa_supplicant *wpa_s, const u8 *mbo_ie,
 				wpa_printf(MSG_DEBUG,
 					   "MBO: Station does not support Cellular data connection");
 			break;
+#ifdef CONFIG_WNM
 		case MBO_ATTR_ID_TRANSITION_REASON:
 			if (elen != 1)
 				goto fail;
@@ -523,6 +528,7 @@ void wpas_mbo_ie_trans_req(struct wpa_supplicant *wpa_s, const u8 *mbo_ie,
 			}
 
 			break;
+#endif /* CONFIG_WNM */
 		case MBO_ATTR_ID_AP_CAPA_IND:
 		case MBO_ATTR_ID_NON_PREF_CHAN_REPORT:
 		case MBO_ATTR_ID_CELL_DATA_CAPA:
@@ -546,9 +552,11 @@ void wpas_mbo_ie_trans_req(struct wpa_supplicant *wpa_s, const u8 *mbo_ie,
 		wpa_msg(wpa_s, MSG_INFO, MBO_CELL_PREFERENCE "preference=%u",
 			*cell_pref);
 
+#ifdef CONFIG_WNM
 	if (wpa_s->wnm_mbo_trans_reason_present)
 		wpa_msg(wpa_s, MSG_INFO, MBO_TRANSITION_REASON "reason=%u",
 			wpa_s->wnm_mbo_transition_reason);
+#endif
 
 	if (disallowed_sec && wpa_s->current_bss)
 		wpa_bss_tmp_disallow(wpa_s, wpa_s->current_bss->bssid,
@@ -594,7 +602,9 @@ void wpas_mbo_update_cell_capa(struct wpa_supplicant *wpa_s, u8 mbo_cell_capa)
 	cell_capa[5] = MBO_ATTR_ID_CELL_DATA_CAPA;
 	cell_capa[6] = mbo_cell_capa;
 
+#ifdef CONFIG_WNM
 	wpas_mbo_send_wnm_notification(wpa_s, cell_capa, 7);
+#endif /* CONFIG_WNM */
 	wpa_supplicant_set_default_scan_ies(wpa_s);
 	wpas_update_mbo_connect_params(wpa_s);
 }
