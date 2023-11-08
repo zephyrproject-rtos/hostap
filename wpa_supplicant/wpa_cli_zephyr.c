@@ -76,7 +76,8 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 
 	if (print) {
 		buf[len] = '\0';
-		wpa_printf(MSG_DEBUG, "%s", buf);
+		if (buf[0] != '\0')
+			wpa_printf(MSG_DEBUG, "%s", buf);
 	}
 
 	return 0;
