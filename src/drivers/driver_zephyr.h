@@ -9,8 +9,11 @@
 #ifndef DRIVER_ZEPHYR_H
 #define DRIVER_ZEPHYR_H
 
+/* Needed when testing sample wifi driver in native_sim board */
+#if !defined(IGNORE_ZEPHYR_INCLUDES)
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/ethernet.h>
+#endif
 
 #include "utils/includes.h"
 #include "driver.h"
