@@ -970,6 +970,8 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 
 	if (if_ctx->scan_res2_get_in_prog) {
 		wpa_printf(MSG_ERROR, "%s: Timed out waiting for scan results\n", __func__);
+		/* If this is a temporary issue, then we can allow subsequent scans */
+		if_ctx->scan_res2_get_in_prog = false;
 		ret = -1;
 		goto out;
 	}
