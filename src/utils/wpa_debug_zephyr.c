@@ -25,6 +25,7 @@ int wpa_debug_timestamp;
 
 void wpa_printf_impl(int level, const char *fmt, ...)
 {
+	int len;
 	va_list ap;
 	char buffer[WPA_DEBUG_MAX_LINE_LENGTH];
 
@@ -34,6 +35,12 @@ void wpa_printf_impl(int level, const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(buffer, sizeof(buffer), fmt, ap);
 	va_end(ap);
+
+	/* Remove all newlines as the logger macros will add one */
+	len = strlen(buffer);
+	if (len > 0 && buffer[len - 1] == '\n') {
+		buffer[len - 1] = '\0';
+	}
 
 	switch (level) {
 	case MSG_ERROR:
