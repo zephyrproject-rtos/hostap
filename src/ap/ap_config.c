@@ -15,7 +15,10 @@
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_1x_defs.h"
 #include "common/eapol_common.h"
+/* No DHCP snooping for Zephyr */
+#if !defined(CONFIG_ZEPHYR)
 #include "common/dhcp.h"
+#endif /* CONFIG_ZEPHYR */
 #include "common/sae.h"
 #include "eap_common/eap_wsc_common.h"
 #include "eap_server/eap.h"
