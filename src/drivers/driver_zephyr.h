@@ -122,7 +122,7 @@ struct zep_drv_if_ctx {
 	struct wpa_scan_results *scan_res2;
 	bool scan_res2_get_in_prog;
 
-	unsigned int assoc_freq;
+	unsigned int freq;
 	unsigned char ssid[SSID_MAX_LEN];
 	size_t ssid_len;
 	unsigned char bssid[6];
@@ -133,6 +133,7 @@ struct zep_drv_if_ctx {
 	unsigned char prev_bssid[6];
 	unsigned char auth_bssid[6];
 	unsigned char auth_attempt_bssid[6];
+	bool beacon_set;
 };
 
 
@@ -224,6 +225,40 @@ struct zep_wpa_supp_dev_ops {
 
 	int (*get_conn_info)(void *if_priv,
 			struct wpa_conn_info *info);
+
+	/* AP mode (shared headers, so, skip compile time flags protection)*/
+	int (*init_ap)(void *if_priv,
+			struct wpa_driver_associate_params *params);
+
+	int (*start_ap)(void *if_priv,
+			struct wpa_driver_ap_params *params);
+
+	int (*change_beacon)(void *if_priv,
+			struct wpa_driver_ap_params *params);
+
+	int (*stop_ap)(void *if_priv);
+
+	int (*deinit_ap)(void *if_priv);
+
+	int (*sta_add)(void *if_priv,
+			struct hostapd_sta_add_params *params);
+
+	int (*sta_remove)(void *if_priv, const u8 *addr);
+
+	int (*sta_set_flags)(void *if_priv, const u8 *addr,
+			unsigned int total_flags, unsigned int flags_or,
+			unsigned int flags_and);
+
+	int (*sta_clear_stats)(void *if_priv, const u8 *addr);
+
+	int (*sta_deauth)(void *if_priv, const u8 *own_addr, const u8 *addr,
+			int reason_code);
+
+	int (*sta_disassoc)(void *if_priv, const u8 *own_addr, const u8 *addr,
+			int reason_code);
+
+	int (*register_mgmt_frame)(void *if_priv, u16 frame_type,
+			size_t match_len, const u8 *match);
 };
 
 #endif /* DRIVER_ZEPHYR_H */
