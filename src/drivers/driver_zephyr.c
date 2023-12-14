@@ -1125,7 +1125,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
-	if ((alg != WPA_ALG_NONE) && ((!seq) || (!key))) {
+	if ((alg != WPA_ALG_NONE) && !key) {
 		wpa_printf(MSG_ERROR,
 			   "%s: Missing mandatory params",
 			   __func__);
