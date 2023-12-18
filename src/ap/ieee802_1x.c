@@ -2606,7 +2606,7 @@ int ieee802_1x_eapol_tx_status(struct hostapd_data *hapd, struct sta_info *sta,
 			       HOSTAPD_LEVEL_DEBUG,
 			       "did not Ack EAPOL-Key frame (%scast index=%d)",
 			       key->key_index & BIT(7) ? "uni" : "broad",
-			       key->key_index & ~BIT(7));
+			       key->key_index & ~BIT_U8(7));
 		/* TODO: re-send EAPOL-Key couple of times (with short delay
 		 * between them?). If all attempt fail, report error and
 		 * deauthenticate STA so that it will get new keys when
