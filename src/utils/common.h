@@ -447,6 +447,10 @@ void perror(const char *s);
 #define BIT(x) (1U << (x))
 #endif
 
+#ifndef BIT_U8
+#define BIT_U8(n) (1U << (n))
+#endif
+
 /*
  * Definitions for sparse validation
  * (http://kernel.org/pub/linux/kernel/people/josh/sparse/)
