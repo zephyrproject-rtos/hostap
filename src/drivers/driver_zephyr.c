@@ -43,6 +43,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 			return;
 		}
 		os_memcpy(msg.data, data, sizeof(*data));
+		/* Handle deep copy for some event data */
 		if (event == EVENT_AUTH) {
 			union wpa_event_data *data_tmp = msg.data;
 
@@ -56,6 +57,21 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				os_memcpy(ies, data->auth.ies, data->auth.ies_len);
 				data_tmp->auth.ies = ies;
+			}
+		} else if (event == EVENT_RX_MGMT) {
+			union wpa_event_data *data_tmp = msg.data;
+
+			if (data->rx_mgmt.frame) {
+				char *frame = os_zalloc(data->rx_mgmt.frame_len);
+
+				if (!frame) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc frame\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(frame, data->rx_mgmt.frame, data->rx_mgmt.frame_len);
+				data_tmp->rx_mgmt.frame = frame;
 			}
 		}
 	}
