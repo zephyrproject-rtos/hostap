@@ -14,6 +14,10 @@
 #include "supp_main.h"
 #include "common/ieee802_11_common.h"
 
+#ifdef CONFIG_AP
+#include "l2_packet/l2_packet.h"
+#endif /* CONFIG_AP */
+
 /* Zephyr drivers have a timeout of 30s wait for them to handle the cleanup */
 /* TODO: The timeout should be retrieved from the driver to keep it generic */
 #define SCAN_TIMEOUT 35
@@ -1762,6 +1766,36 @@ int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack
 out:
 	return ret;
 }
+
+int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t data_len,
+	int encrypt, const u8 *own_addr, u32 flags)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+	struct wpa_supplicant *wpa_s = NULL;
+
+	/* TODO: Unused for now, but might need for rekeying */
+	(void)own_addr;
+	(void)flags;
+	(void)encrypt;
+
+	wpa_s = if_ctx->supp_if_ctx;
+	dev_ops = if_ctx->dev_ctx->config;
+
+	wpa_printf(MSG_DEBUG, "wpa_supp: Send EAPOL frame (encrypt=%d)", encrypt);
+
+	ret = l2_packet_send(wpa_s->l2, addr, ETH_P_EAPOL, data, data_len);
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d\n", __func__, ret);
+		goto out;
+	}
+
+	ret = 0;
+out:
+	return ret;
+}
+
 #endif /* CONFIG_AP */
 
 const struct wpa_driver_ops wpa_driver_zep_ops = {
@@ -1788,6 +1822,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_ext_capab = nl80211_get_ext_capab,
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 #ifdef CONFIG_AP
+	.hapd_send_eapol = wpa_drv_hapd_send_eapol,
 	.send_mlme = wpa_drv_zep_send_mlme,
 	.set_ap = wpa_drv_zep_set_ap,
 	.stop_ap = wpa_drv_zep_stop_ap,
