@@ -24,6 +24,10 @@
 #include "beacon.h"
 #include "hw_features.h"
 
+#ifdef CONFIG_ZEPHYR
+#include <supp_events.h>
+#endif /* CONFIG_ZEPHYR */
+
 
 void hostapd_free_hw_features(struct hostapd_hw_modes *hw_features,
 			      size_t num_hw_features)
@@ -986,10 +990,16 @@ hostapd_check_chans(struct hostapd_iface *iface)
 {
 	if (iface->freq) {
 		hostapd_determine_mode(iface);
-		if (hostapd_is_usable_chans(iface))
+		if (hostapd_is_usable_chans(iface)) {
 			return HOSTAPD_CHAN_VALID;
-		else
+		} else {
+#ifdef CONFIG_ZEPHYR
+			supplicant_send_wifi_mgmt_ap_status(iface->owner,
+				NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+				WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+#endif /* CONFIG_ZEPHYR */
 			return HOSTAPD_CHAN_INVALID;
+		}
 	}
 
 	/*
@@ -1003,6 +1013,11 @@ hostapd_check_chans(struct hostapd_iface *iface)
 	case HOSTAPD_CHAN_VALID:
 	case HOSTAPD_CHAN_INVALID:
 	default:
+#ifdef CONFIG_ZEPHYR
+		supplicant_send_wifi_mgmt_ap_status(iface->owner,
+			NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+			WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+#endif /* CONFIG_ZEPHYR */
 		return HOSTAPD_CHAN_INVALID;
 	}
 }
@@ -1128,6 +1143,11 @@ int hostapd_select_hw_mode(struct hostapd_iface *iface)
 				       HOSTAPD_LEVEL_WARNING,
 				       "Hardware does not support configured mode (%d) (hw_mode in hostapd.conf)",
 				       (int) iface->conf->hw_mode);
+#ifdef CONFIG_ZEPHYR
+			supplicant_send_wifi_mgmt_ap_status(iface->owner,
+				NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+				WIFI_STATUS_AP_CHANNEL_NOT_SUPPORTED);
+#endif /* CONFIG_ZEPHYR */
 			return -2;
 		}
 	}
