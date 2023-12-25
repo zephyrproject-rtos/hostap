@@ -1024,8 +1024,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		sme_sched_obss_scan(wpa_s, 1);
 
 #ifdef __ZEPHYR__
-		int status = 0;
-		supplicant_send_wifi_mgmt_event(wpa_s->ifname, NET_EVENT_WIFI_CMD_CONNECT_RESULT, (void *)&status, sizeof(int));
+		supplicant_send_wifi_mgmt_conn_event(wpa_s, 0);
 #endif /* __ZEPHYR__ */
 #if defined(CONFIG_FILS) && defined(IEEE8021X_EAPOL)
 		if (!fils_hlp_sent && ssid && ssid->eap.erp)
