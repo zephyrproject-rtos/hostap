@@ -251,12 +251,6 @@ struct zep_wpa_supp_dev_ops {
 
 	int (*sta_clear_stats)(void *if_priv, const u8 *addr);
 
-	int (*sta_deauth)(void *if_priv, const u8 *own_addr, const u8 *addr,
-			int reason_code);
-
-	int (*sta_disassoc)(void *if_priv, const u8 *own_addr, const u8 *addr,
-			int reason_code);
-
 	int (*register_mgmt_frame)(void *if_priv, u16 frame_type,
 			size_t match_len, const u8 *match);
 };
