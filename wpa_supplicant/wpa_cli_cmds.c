@@ -350,13 +350,170 @@ static int wpa_cli_cmd_interface_list(struct wpa_ctrl *ctrl, int argc,
 	return wpa_cli_cmd(ctrl, "INTERFACE_LIST", 0, argc, argv);
 }
 
-
-#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
+#if CONFIG_AP || CONFIG_P2P || \
+	!defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 static void wpa_cli_msg_cb(char *msg, size_t len)
 {
 	wpa_printf(MSG_INFO, "%s\n", msg);
 }
+#endif
 
+#ifdef CONFIG_AP
+static int wpa_cli_cmd_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "STA", 1, argc, argv);
+}
+
+
+static char **wpa_cli_complete_sta(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	char **res = NULL;
+
+	switch (arg) {
+	case 1:
+		res = cli_txt_list_array(&stations);
+		break;
+	}
+
+	return res;
+}
+
+
+static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, const char *cmd,
+				char *addr, size_t addr_len, int print)
+{
+	char buf[CMD_BUF_LEN], *pos;
+	size_t len;
+	int ret;
+
+	if (ctrl_conn == NULL) {
+		wpa_printf(MSG_INFO, "Not connected to hostapd - command dropped.\n");
+		return -1;
+	}
+	if (ifname_prefix) {
+		os_snprintf(buf, sizeof(buf), "IFNAME=%s %s",
+			    ifname_prefix, cmd);
+		buf[sizeof(buf) - 1] = '\0';
+		cmd = buf;
+	}
+	len = sizeof(buf) - 1;
+	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len,
+			       wpa_cli_msg_cb);
+	if (ret == -2) {
+		wpa_printf(MSG_INFO, "'%s' command timed out.\n", cmd);
+		return -2;
+	} else if (ret < 0) {
+		wpa_printf(MSG_INFO, "'%s' command failed.\n", cmd);
+		return -1;
+	}
+
+	buf[len] = '\0';
+	if (os_memcmp(buf, "FAIL", 4) == 0 ||
+	    os_memcmp(buf, "UNKNOWN COMMAND", 15) == 0)
+		return -1;
+	if (print)
+		wpa_printf(MSG_INFO, "%s", buf);
+
+	pos = buf;
+	while (*pos != '\0' && *pos != '\n')
+		pos++;
+	*pos = '\0';
+	os_strlcpy(addr, buf, addr_len);
+	return 0;
+}
+
+
+static int wpa_cli_cmd_all_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	char addr[32], cmd[64];
+
+	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 1))
+		return 0;
+	do {
+		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
+	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 1) == 0);
+
+	return -1;
+}
+
+
+static int wpa_cli_cmd_list_sta(struct wpa_ctrl *ctrl, int argc,
+				char *argv[])
+{
+	char addr[32], cmd[64];
+
+	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 0))
+		return 0;
+	do {
+		if (os_strcmp(addr, "") != 0)
+			wpa_printf(MSG_INFO, "%s\n", addr);
+		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
+	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 0) == 0);
+
+	return 0;
+}
+
+
+static int wpa_cli_cmd_deauthenticate(struct wpa_ctrl *ctrl, int argc,
+				      char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "DEAUTHENTICATE", 1, argc, argv);
+}
+
+
+static char **wpa_cli_complete_deauthenticate(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	char **res = NULL;
+
+	switch (arg) {
+	case 1:
+		res = cli_txt_list_array(&stations);
+		break;
+	}
+
+	return res;
+}
+
+
+static int wpa_cli_cmd_disassociate(struct wpa_ctrl *ctrl, int argc,
+				    char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "DISASSOCIATE", 1, argc, argv);
+}
+
+
+static char **wpa_cli_complete_disassociate(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	char **res = NULL;
+
+	switch (arg) {
+	case 1:
+		res = cli_txt_list_array(&stations);
+		break;
+	}
+
+	return res;
+}
+
+
+static int wpa_cli_cmd_chanswitch(struct wpa_ctrl *ctrl, int argc,
+				    char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "CHAN_SWITCH", 2, argc, argv);
+}
+
+
+static int wpa_cli_cmd_update_beacon(struct wpa_ctrl *ctrl, int argc,
+				     char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "UPDATE_BEACON", 0, argc, argv);
+}
+#endif /* CONFIG_AP */
+
+#if !defined(CONFIG_ZEPHYR) || (defined(CONFIG_ZEPHYR) && defined(CONFIG_WPA_CLI))
 static int wpa_cli_cmd_ifname(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "IFNAME", 0, argc, argv);
@@ -1594,163 +1751,6 @@ static int wpa_cli_cmd_terminate(struct wpa_ctrl *ctrl, int argc,
 {
 	return wpa_cli_cmd(ctrl, "TERMINATE", 0, argc, argv);
 }
-
-
-#ifdef CONFIG_AP
-static int wpa_cli_cmd_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
-{
-	return wpa_cli_cmd(ctrl, "STA", 1, argc, argv);
-}
-
-
-static char ** wpa_cli_complete_sta(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
-
-static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, const char *cmd,
-				char *addr, size_t addr_len, int print)
-{
-	char buf[CMD_BUF_LEN], *pos;
-	size_t len;
-	int ret;
-
-	if (ctrl_conn == NULL) {
-		wpa_printf(MSG_INFO, "Not connected to hostapd - command dropped.\n");
-		return -1;
-	}
-	if (ifname_prefix) {
-		os_snprintf(buf, sizeof(buf), "IFNAME=%s %s",
-			    ifname_prefix, cmd);
-		buf[sizeof(buf) - 1] = '\0';
-		cmd = buf;
-	}
-	len = sizeof(buf) - 1;
-	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len,
-			       wpa_cli_msg_cb);
-	if (ret == -2) {
-		wpa_printf(MSG_INFO, "'%s' command timed out.\n", cmd);
-		return -2;
-	} else if (ret < 0) {
-		wpa_printf(MSG_INFO, "'%s' command failed.\n", cmd);
-		return -1;
-	}
-
-	buf[len] = '\0';
-	if (os_memcmp(buf, "FAIL", 4) == 0 ||
-	    os_memcmp(buf, "UNKNOWN COMMAND", 15) == 0)
-		return -1;
-	if (print)
-		wpa_printf(MSG_INFO, "%s", buf);
-
-	pos = buf;
-	while (*pos != '\0' && *pos != '\n')
-		pos++;
-	*pos = '\0';
-	os_strlcpy(addr, buf, addr_len);
-	return 0;
-}
-
-
-static int wpa_cli_cmd_all_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
-{
-	char addr[32], cmd[64];
-
-	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 1))
-		return 0;
-	do {
-		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
-	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 1) == 0);
-
-	return -1;
-}
-
-
-static int wpa_cli_cmd_list_sta(struct wpa_ctrl *ctrl, int argc,
-				char *argv[])
-{
-	char addr[32], cmd[64];
-
-	if (wpa_ctrl_command_sta(ctrl, "STA-FIRST", addr, sizeof(addr), 0))
-		return 0;
-	do {
-		if (os_strcmp(addr, "") != 0)
-			wpa_printf(MSG_INFO, "%s\n", addr);
-		os_snprintf(cmd, sizeof(cmd), "STA-NEXT %s", addr);
-	} while (wpa_ctrl_command_sta(ctrl, cmd, addr, sizeof(addr), 0) == 0);
-
-	return 0;
-}
-
-
-static int wpa_cli_cmd_deauthenticate(struct wpa_ctrl *ctrl, int argc,
-				      char *argv[])
-{
-	return wpa_cli_cmd(ctrl, "DEAUTHENTICATE", 1, argc, argv);
-}
-
-
-static char ** wpa_cli_complete_deauthenticate(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
-
-static int wpa_cli_cmd_disassociate(struct wpa_ctrl *ctrl, int argc,
-				    char *argv[])
-{
-	return wpa_cli_cmd(ctrl, "DISASSOCIATE", 1, argc, argv);
-}
-
-
-static char ** wpa_cli_complete_disassociate(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	char **res = NULL;
-
-	switch (arg) {
-	case 1:
-		res = cli_txt_list_array(&stations);
-		break;
-	}
-
-	return res;
-}
-
-
-static int wpa_cli_cmd_chanswitch(struct wpa_ctrl *ctrl, int argc,
-				    char *argv[])
-{
-	return wpa_cli_cmd(ctrl, "CHAN_SWITCH", 2, argc, argv);
-}
-
-
-static int wpa_cli_cmd_update_beacon(struct wpa_ctrl *ctrl, int argc,
-				     char *argv[])
-{
-	return wpa_cli_cmd(ctrl, "UPDATE_BEACON", 0, argc, argv);
-}
-
-#endif /* CONFIG_AP */
 
 
 static int wpa_cli_cmd_suspend(struct wpa_ctrl *ctrl, int argc, char *argv[])
@@ -3013,6 +3013,31 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "interface_list", wpa_cli_cmd_interface_list, NULL,
 	  cli_cmd_flag_none,
 	  "= list available interfaces" },
+#ifdef CONFIG_AP
+	{ "sta", wpa_cli_cmd_sta, wpa_cli_complete_sta,
+	  cli_cmd_flag_none,
+	  "<addr> = get information about an associated station (AP)" },
+	{ "all_sta", wpa_cli_cmd_all_sta, NULL,
+	  cli_cmd_flag_none,
+	  "= get information about all associated stations (AP)" },
+	{ "list_sta", wpa_cli_cmd_list_sta, NULL,
+	  cli_cmd_flag_none,
+	  "= list all stations (AP)" },
+	{ "deauthenticate", wpa_cli_cmd_deauthenticate,
+	  wpa_cli_complete_deauthenticate, cli_cmd_flag_none,
+	  "<addr> = deauthenticate a station" },
+	{ "disassociate", wpa_cli_cmd_disassociate,
+	  wpa_cli_complete_disassociate, cli_cmd_flag_none,
+	  "<addr> = disassociate a station" },
+	{ "chan_switch", wpa_cli_cmd_chanswitch, NULL,
+	  cli_cmd_flag_none,
+	  "<cs_count> <freq> [sec_channel_offset=] [center_freq1=]"
+	  " [center_freq2=] [bandwidth=] [blocktx] [ht|vht]"
+	  " = CSA parameters" },
+	{ "update_beacon", wpa_cli_cmd_update_beacon, NULL,
+	  cli_cmd_flag_none,
+	  "= update Beacon frame contents"},
+#endif /* CONFIG_AP */
 #if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 	{ "ifname", wpa_cli_cmd_ifname, NULL,
 	  cli_cmd_flag_none,
@@ -3258,31 +3283,6 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "ibss_rsn", wpa_cli_cmd_ibss_rsn, NULL,
 	  cli_cmd_flag_none,
 	  "<addr> = request RSN authentication with <addr> in IBSS" },
-#ifdef CONFIG_AP
-	{ "sta", wpa_cli_cmd_sta, wpa_cli_complete_sta,
-	  cli_cmd_flag_none,
-	  "<addr> = get information about an associated station (AP)" },
-	{ "all_sta", wpa_cli_cmd_all_sta, NULL,
-	  cli_cmd_flag_none,
-	  "= get information about all associated stations (AP)" },
-	{ "list_sta", wpa_cli_cmd_list_sta, NULL,
-	  cli_cmd_flag_none,
-	  "= list all stations (AP)" },
-	{ "deauthenticate", wpa_cli_cmd_deauthenticate,
-	  wpa_cli_complete_deauthenticate, cli_cmd_flag_none,
-	  "<addr> = deauthenticate a station" },
-	{ "disassociate", wpa_cli_cmd_disassociate,
-	  wpa_cli_complete_disassociate, cli_cmd_flag_none,
-	  "<addr> = disassociate a station" },
-	{ "chan_switch", wpa_cli_cmd_chanswitch, NULL,
-	  cli_cmd_flag_none,
-	  "<cs_count> <freq> [sec_channel_offset=] [center_freq1=]"
-	  " [center_freq2=] [bandwidth=] [blocktx] [ht|vht]"
-	  " = CSA parameters" },
-	{ "update_beacon", wpa_cli_cmd_update_beacon, NULL,
-	  cli_cmd_flag_none,
-	  "= update Beacon frame contents"},
-#endif /* CONFIG_AP */
 	{ "suspend", wpa_cli_cmd_suspend, NULL, cli_cmd_flag_none,
 	  "= notification of suspend/hibernate" },
 	{ "resume", wpa_cli_cmd_resume, NULL, cli_cmd_flag_none,
