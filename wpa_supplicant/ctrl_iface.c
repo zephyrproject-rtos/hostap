@@ -11453,9 +11453,11 @@ static int wpas_ctrl_iface_send_dscp_query(struct wpa_supplicant *wpa_s,
 char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 					 char *buf, size_t *resp_len)
 {
-	char *reply;
-	const int reply_size = 1024;
+	static char reply[1024];
+	const int reply_size = sizeof(reply);
 	int reply_len;
+
+	os_memset(reply, 0, reply_size);
 
 	if (os_strncmp(buf, WPA_CTRL_RSP, os_strlen(WPA_CTRL_RSP)) == 0 ||
 	    os_strncmp(buf, "SET_NETWORK ", 12) == 0 ||
@@ -11478,14 +11480,6 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 				      (const u8 *) buf, os_strlen(buf));
 	} else {
 		wpa_dbg(wpa_s, wpas_ctrl_cmd_debug_level(buf), "Control interface command '%s'", buf);
-	}
-
-	reply = os_malloc(reply_size);
-	if (reply == NULL) {
-		wpa_printf(MSG_ERROR, "ctrl_iface: reply malloc of %d failed",
-			reply_size);
-		*resp_len = 1;
-		return NULL;
 	}
 
 	os_memcpy(reply, "OK\n", 3);
@@ -13009,10 +13003,13 @@ static int wpas_global_ctrl_iface_fst_detach(struct wpa_global *global,
 char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 						char *buf, size_t *resp_len)
 {
-	char *reply;
-	const int reply_size = 2048;
+	static char reply[2048];
+	const int reply_size = sizeof(reply);
 	int reply_len;
 	int level = MSG_DEBUG;
+	char *reply_redir;
+
+	os_memset(reply, 0, reply_size);
 
 	if (os_strncmp(buf, "IFNAME=", 7) == 0) {
 		char *pos = os_strchr(buf + 7, ' ');
@@ -13024,20 +13021,14 @@ char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 		}
 	}
 
-	reply = wpas_global_ctrl_iface_redir(global, buf, resp_len);
-	if (reply)
-		return reply;
+	reply_redir = wpas_global_ctrl_iface_redir(global, buf, resp_len);
+	if (reply_redir)
+		return reply_redir;
 
 	if (os_strcmp(buf, "PING") == 0)
 		level = MSG_EXCESSIVE;
 	wpa_hexdump_ascii(level, "RX global ctrl_iface",
 			  (const u8 *) buf, os_strlen(buf));
-
-	reply = os_malloc(reply_size);
-	if (reply == NULL) {
-		*resp_len = 1;
-		return NULL;
-	}
 
 	os_memcpy(reply, "OK\n", 3);
 	reply_len = 3;
