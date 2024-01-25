@@ -277,18 +277,37 @@ static void wpa_supplicant_global_ctrl_iface_receive(int sock, void *eloop_ctx,
 	size_t reply_len = 0;
 
 	buf = os_zalloc(CTRL_IFACE_MAX_LEN + 1);
-	if (!buf)
+	if (!buf) {
+		/* Do a dummy read to drain the data from the socket */
+		static unsigned char dummy[512];
+
+		/* This is expected in OOM conditions, so, do not spam the log */
+		wpa_printf(MSG_DEBUG, "Failed to allocate memory for g_ctrl_iface receive buffer");
+
+		do {
+			res = recv(sock, dummy, sizeof(dummy),
+				   MSG_TRUNC | MSG_DONTWAIT);
+		} while (res > 0);
 		return;
+	}
 	res = recv(sock, buf, CTRL_IFACE_MAX_LEN, 0);
 	if (res < 0) {
-		wpa_printf(MSG_ERROR, "recvfrom(ctrl_iface): %s",
+		wpa_printf(MSG_ERROR, "recvfrom(g_ctrl_iface): %s",
 			   strerror(errno));
 		os_free(buf);
 		return;
 	}
 
+	if (!res) {
+		eloop_unregister_sock(sock, EVENT_TYPE_READ);
+		wpa_printf(MSG_DEBUG, "g_ctrl_iface: Peer unexpectedly shut down "
+			   "socket");
+		os_free(buf);
+		return;
+	}
+
 	if ((size_t) res > CTRL_IFACE_MAX_LEN) {
-		wpa_printf(MSG_ERROR, "recvform(ctrl_iface): input truncated");
+		wpa_printf(MSG_ERROR, "recvform(g_ctrl_iface): input truncated");
 		os_free(buf);
 		return;
 	}
