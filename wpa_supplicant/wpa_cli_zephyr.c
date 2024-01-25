@@ -72,6 +72,8 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 		/* Remove the LF */
 		os_memcpy(resp, buf, len - 1);
 		resp[len - 1] = '\0';
+		if (strncmp(resp, "FAIL", 4) == 0)
+			return -3;
 	}
 
 	if (print) {
