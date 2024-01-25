@@ -13003,7 +13003,7 @@ static int wpas_global_ctrl_iface_fst_detach(struct wpa_global *global,
 char * wpa_supplicant_global_ctrl_iface_process(struct wpa_global *global,
 						char *buf, size_t *resp_len)
 {
-	static char reply[2048];
+	static char reply[1024];
 	const int reply_size = sizeof(reply);
 	int reply_len;
 	int level = MSG_DEBUG;
