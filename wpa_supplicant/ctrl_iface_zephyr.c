@@ -148,6 +148,7 @@ static void wpa_supplicant_ctrl_iface_receive(int sock, void *eloop_ctx,
 		return;
 	}
 	if (!res) {
+		eloop_unregister_sock(sock, EVENT_TYPE_READ);
 		wpa_printf(MSG_DEBUG, "ctrl_iface: Peer unexpectedly shut down "
 			   "socket");
 		os_free(buf);
