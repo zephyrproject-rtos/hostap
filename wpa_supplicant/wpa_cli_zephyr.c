@@ -114,7 +114,7 @@ static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 	wpa_s->ctrl_iface->mon_sock_pair[1] = -1;
 }
 
-static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl)
+static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *wpa_s)
 {
 	while (wpa_ctrl_pending(ctrl) > 0) {
 		char buf[sizeof(struct conn_msg)];
@@ -134,7 +134,7 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl)
 			if (msg->msg_len > 0) {
 				/* Only interested in CTRL-EVENTs */
 				if (strncmp(msg->msg, "CTRL-EVENT", 10) == 0) {
-					supplicant_send_wifi_mgmt_event("wlan0",
+					supplicant_send_wifi_mgmt_event(wpa_s->ifname,
 									NET_EVENT_SUPPLICANT_CMD_INT_EVENT,
 									msg->msg, msg->msg_len);
 				}
@@ -148,7 +148,9 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl)
 static void wpa_cli_mon_receive(int sock, void *eloop_ctx,
 					      void *sock_ctx)
 {
-	wpa_cli_recv_pending(mon_conn);
+	struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)eloop_ctx;
+
+	wpa_cli_recv_pending(mon_conn, wpa_s);
 }
 
 static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
@@ -172,7 +174,7 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 	if (mon_conn) {
 		if (wpa_ctrl_attach(ctrl_conn) == 0) {
 			eloop_register_read_sock(wpa_s->ctrl_iface->mon_sock_pair[0],
-						wpa_cli_mon_receive, NULL, NULL);
+						wpa_cli_mon_receive, wpa_s, NULL);
 		}
 	}
 
