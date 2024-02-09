@@ -12,11 +12,11 @@
 #ifdef CONFIG_CTRL_IFACE
 
 #ifndef CTRL_IFACE_MAX_LEN
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 #define CTRL_IFACE_MAX_LEN 1024
 #else
 #define CTRL_IFACE_MAX_LEN 4096
-#endif /* CONFIG_ZEPHYR */
+#endif /* __ZEPHYR__ */
 
 #endif /* CTRL_IFACE_MAX_LEN */
 

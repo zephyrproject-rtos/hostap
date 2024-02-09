@@ -13,7 +13,7 @@
 #include "edit.h"
 
 
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 #define STDIN_FILENO 1
 #endif
 #define CMD_BUF_LEN 4096

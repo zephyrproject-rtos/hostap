@@ -63,8 +63,6 @@
 #include <net/if_ether.h>
 #elif defined(__ZEPHYR__)
 #include <zephyr/net/ethernet.h>
-#elif !defined(__CYGWIN__) && !defined(CONFIG_NATIVE_WINDOWS)
-#include <zephyr/net/ethernet.h>
 #endif
 
 static int wpa_supplicant_global_iface_list(struct wpa_global *global,

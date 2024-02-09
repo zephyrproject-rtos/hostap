@@ -117,7 +117,9 @@ struct zep_drv_if_ctx {
 	struct net_if *iface;
 	const struct device *dev_ctx;
 	void *dev_priv;
+#if defined(__ZEPHYR__)
 	struct k_sem drv_resp_sem;
+#endif
 
 	struct wpa_scan_results *scan_res2;
 	bool scan_res2_get_in_prog;

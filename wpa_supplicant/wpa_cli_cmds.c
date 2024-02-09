@@ -513,7 +513,7 @@ static int wpa_cli_cmd_update_beacon(struct wpa_ctrl *ctrl, int argc,
 }
 #endif /* CONFIG_AP */
 
-#if !defined(CONFIG_ZEPHYR) || (defined(CONFIG_ZEPHYR) && defined(CONFIG_WPA_CLI))
+#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 static int wpa_cli_cmd_ifname(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "IFNAME", 0, argc, argv);

@@ -302,7 +302,7 @@ static inline void * os_calloc(size_t nmemb, size_t size)
  * these functions need to be implemented in os_*.c file for the target system.
  */
 
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 /**
  * os_strdup - Duplicate a string
  * @s: Source string
@@ -533,7 +533,7 @@ char * os_strdup(const char *s);
 #ifndef os_strdup
 #ifdef _MSC_VER
 #define os_strdup(s) _strdup(s)
-#elif !defined(CONFIG_ZEPHYR)
+#elif !defined(__ZEPHYR__)
 #define os_strdup(s) strdup(s)
 #endif
 #endif
@@ -558,14 +558,14 @@ char * os_strdup(const char *s);
 #ifndef os_strcasecmp
 #ifdef _MSC_VER
 #define os_strcasecmp(s1, s2) _stricmp((s1), (s2))
-#elif !defined(CONFIG_ZEPHYR)
+#elif !defined(__ZEPHYR__)
 #define os_strcasecmp(s1, s2) strcasecmp((s1), (s2))
 #endif
 #endif
 #ifndef os_strncasecmp
 #ifdef _MSC_VER
 #define os_strncasecmp(s1, s2, n) _strnicmp((s1), (s2), (n))
-#elif !defined(CONFIG_ZEPHYR)
+#elif !defined(__ZEPHYR__)
 #define os_strncasecmp(s1, s2, n) strncasecmp((s1), (s2), (n))
 #endif
 #endif
@@ -637,7 +637,7 @@ static inline void os_remove_in_array(void *ptr, size_t nmemb, size_t size,
  */
 size_t os_strlcpy(char *dest, const char *src, size_t siz);
 
-#ifndef CONFIG_ZEPHYR
+#ifndef __ZEPHYR__
 /**
  * os_memcmp_const - Constant time memory comparison
  * @a: First buffer to compare

@@ -129,7 +129,7 @@ typedef int8_t s8;
 
 /* Define platform specific byte swapping macros */
 
-#if defined(__CYGWIN__) || defined(CONFIG_NATIVE_WINDOWS) || defined (CONFIG_ZEPHYR)
+#if defined(__CYGWIN__) || defined(CONFIG_NATIVE_WINDOWS) || defined (__ZEPHYR__)
 
 static inline unsigned short wpa_swap_16(unsigned short v)
 {
