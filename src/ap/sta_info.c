@@ -40,9 +40,9 @@
 #include "vlan.h"
 #include "wps_hostapd.h"
 
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 #include <supp_events.h>
-#endif /* CONFIG_ZEPHYR */
+#endif /* __ZEPHYR__ */
 
 static void ap_sta_remove_in_other_bss(struct hostapd_data *hapd,
 				       struct sta_info *sta);
@@ -1272,11 +1272,11 @@ void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
 	u8 addr[ETH_ALEN];
 	u8 ip_addr_buf[4];
 #endif /* CONFIG_P2P */
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 	enum net_event_wifi_cmd event = authorized ?
 		NET_EVENT_WIFI_CMD_AP_STA_CONNECTED :
 		NET_EVENT_WIFI_CMD_AP_STA_DISCONNECTED;
-#endif /* CONFIG_ZEPHYR */
+#endif /* __ZEPHYR__ */
 
 	if (!!authorized == !!(sta->flags & WLAN_STA_AUTHORIZED))
 		return;
@@ -1344,11 +1344,11 @@ void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
 					  AP_STA_DISCONNECTED "%s", buf);
 	}
 
-#ifdef CONFIG_ZEPHYR
+#ifdef __ZEPHYR__
 		supplicant_send_wifi_mgmt_ap_sta_event(hapd->iface->owner,
 						       event,
 						       sta);
-#endif /* CONFIG_ZEPHYR */
+#endif /* __ZEPHYR__ */
 
 #ifdef CONFIG_FST
 	if (hapd->iface->fst) {
