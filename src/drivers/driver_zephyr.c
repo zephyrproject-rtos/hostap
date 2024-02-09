@@ -73,7 +73,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 				char *frame = os_zalloc(data->rx_mgmt.frame_len);
 
 				if (!frame) {
-					wpa_printf(MSG_ERROR, "%s: Failed to alloc frame\n",
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc frame",
 					  __func__);
 					return;
 				}
@@ -180,7 +180,7 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 			       sizeof(struct wpa_scan_res *));
 
 	if (!tmp) {
-		wpa_printf(MSG_ERROR, "%s: Failed to realloc scan result array\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Failed to realloc scan result array", __func__);
 		goto err;
 	}
 
@@ -993,7 +993,7 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 	k_sem_take(&if_ctx->drv_resp_sem, K_SECONDS(SCAN_TIMEOUT));
 
 	if (if_ctx->scan_res2_get_in_prog) {
-		wpa_printf(MSG_ERROR, "%s: Timed out waiting for scan results\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Timed out waiting for scan results", __func__);
 		/* If this is a temporary issue, then we can allow subsequent scans */
 		if_ctx->scan_res2_get_in_prog = false;
 		ret = -1;
@@ -1161,7 +1161,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 
 	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
 	if (!iface) {
-		wpa_printf(MSG_ERROR, "%s: Failed to get iface\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Failed to get iface", __func__);
 		goto out;
 	}
 
@@ -1453,14 +1453,14 @@ static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
 	int i, ret = -1;
 
 	if (!if_ctx) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
 
 	dev_ops = if_ctx->dev_ctx->config;
 
 	if (!dev_ops->register_mgmt_frame) {
-		wpa_printf(MSG_ERROR, "%s: register_mgmt_frame op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: register_mgmt_frame op not supported", __func__);
 		goto out;
 	}
 
@@ -1470,7 +1470,7 @@ static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
 						   0,
 						   NULL);
 		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: register_mgmt_frame op failed\n", __func__);
+			wpa_printf(MSG_ERROR, "%s: register_mgmt_frame op failed", __func__);
 			goto out;
 		}
 	}
@@ -1487,7 +1487,7 @@ static int wpa_drv_zep_set_ap(void *priv,
 	int ret = -1;
 
 	if ((!priv) || (!params)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
@@ -1496,30 +1496,30 @@ static int wpa_drv_zep_set_ap(void *priv,
 	dev_ops = if_ctx->dev_ctx->config;
 
 	if (!if_ctx->beacon_set && !dev_ops->start_ap) {
-		wpa_printf(MSG_ERROR, "%s: start_ap op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: start_ap op not supported", __func__);
 		goto out;
 	} else if (if_ctx->beacon_set && !dev_ops->change_beacon) {
-		wpa_printf(MSG_ERROR, "%s: change_beacon op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: change_beacon op not supported", __func__);
 		goto out;
 	}
 
 	if (!if_ctx->beacon_set) {
 		ret = register_mgmt_frames_ap(if_ctx);
 		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: register_mgmt_frames_ap failed\n", __func__);
+			wpa_printf(MSG_ERROR, "%s: register_mgmt_frames_ap failed", __func__);
 			goto out;
 		}
 		ret = dev_ops->start_ap(if_ctx->dev_priv,
 					params);
 		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: start_ap op failed: %d\n", __func__, ret);
+			wpa_printf(MSG_ERROR, "%s: start_ap op failed: %d", __func__, ret);
 			goto out;
 		}
 	} else {
 		ret = dev_ops->change_beacon(if_ctx->dev_priv,
 					     params);
 		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: change_beacon op failed: %d\n", __func__, ret);
+			wpa_printf(MSG_ERROR, "%s: change_beacon op failed: %d", __func__, ret);
 			goto out;
 		}
 	}
@@ -1540,7 +1540,7 @@ int wpa_drv_zep_stop_ap(void *priv)
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
 
@@ -1549,14 +1549,14 @@ int wpa_drv_zep_stop_ap(void *priv)
 	dev_ops = if_ctx->dev_ctx->config;
 
 	if (!dev_ops->stop_ap) {
-		wpa_printf(MSG_ERROR, "%s: stop_ap op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: stop_ap op not supported", __func__);
 		goto out;
 	}
 
 	ret = dev_ops->stop_ap(if_ctx->dev_priv);
 
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: stop_ap op failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: stop_ap op failed: %d", __func__, ret);
 		goto out;
 	}
 
@@ -1575,7 +1575,7 @@ int wpa_drv_zep_deinit_ap(void *priv)
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
 		goto out;
 	}
 
@@ -1584,14 +1584,14 @@ int wpa_drv_zep_deinit_ap(void *priv)
 	dev_ops = if_ctx->dev_ctx->config;
 
 	if (!dev_ops->deinit_ap) {
-		wpa_printf(MSG_ERROR, "%s: deinit_ap op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: deinit_ap op not supported", __func__);
 		goto out;
 	}
 
 	ret = dev_ops->deinit_ap(if_ctx->dev_priv);
 
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: deinit_ap op failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: deinit_ap op failed: %d", __func__, ret);
 		goto out;
 	}
 
@@ -1609,19 +1609,19 @@ int wpa_drv_zep_sta_add(void *priv, struct hostapd_sta_add_params *params)
 	int ret = -1;
 
 	if ((!priv) || (!params)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
 	dev_ops = if_ctx->dev_ctx->config;
 	if (!dev_ops->sta_add) {
-		wpa_printf(MSG_ERROR, "%s: sta_add op not supported\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: sta_add op not supported", __func__);
 		goto out;
 	}
 
 	ret = dev_ops->sta_add(if_ctx->dev_priv, params);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: sta_add op failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: sta_add op failed: %d", __func__, ret);
 		goto out;
 	}
 
@@ -1637,20 +1637,20 @@ int wpa_drv_zep_sta_set_flags(void *priv, const u8 *addr, u32 total_flags,
 	int ret = -1;
 
 	if ((!priv) || (!addr)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
 	dev_ops = if_ctx->dev_ctx->config;
 	if (!dev_ops->sta_set_flags) {
-		wpa_printf(MSG_ERROR, "%s: sta_set_flags op not supported\n",
+		wpa_printf(MSG_ERROR, "%s: sta_set_flags op not supported",
 			   __func__);
 		goto out;
 	}
 
 	ret = dev_ops->sta_set_flags(if_ctx->dev_priv, addr, total_flags, flags_or, flags_and);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: sta_set_flags op failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: sta_set_flags op failed: %d", __func__, ret);
 		goto out;
 	}
 
@@ -1666,13 +1666,13 @@ int wpa_drv_zep_sta_deauth(void *priv, const u8 *own_addr, const u8 *addr, u16 r
 	struct ieee80211_mgmt mgmt;
 
 	if ((!priv) || (!addr)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
 	dev_ops = if_ctx->dev_ctx->config;
 
-	wpa_printf(MSG_DEBUG, "%s: addr %p reason_code %d\n",
+	wpa_printf(MSG_DEBUG, "%s: addr %p reason_code %d",
 		   __func__, addr, reason_code);
 
 	memset(&mgmt, 0, sizeof(mgmt));
@@ -1699,13 +1699,13 @@ int wpa_drv_zep_sta_disassoc(void *priv, const u8 *own_addr, const u8 *addr, u16
 	struct ieee80211_mgmt mgmt;
 
 	if ((!priv) || (!addr)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
 	dev_ops = if_ctx->dev_ctx->config;
 
-	wpa_printf(MSG_DEBUG, "%s: addr %p reason_code %d\n",
+	wpa_printf(MSG_DEBUG, "%s: addr %p reason_code %d",
 		   __func__, addr, reason_code);
 
 	memset(&mgmt, 0, sizeof(mgmt));
@@ -1731,20 +1731,20 @@ int wpa_drv_zep_sta_remove(void *priv, const u8 *addr)
 	int ret = -1;
 
 	if ((!priv) || (!addr)) {
-		wpa_printf(MSG_ERROR, "%s: Invalid params\n", __func__);
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
 		goto out;
 	}
 
 	dev_ops = if_ctx->dev_ctx->config;
 	if (!dev_ops->sta_remove) {
-		wpa_printf(MSG_ERROR, "%s: sta_remove op not supported\n",
+		wpa_printf(MSG_ERROR, "%s: sta_remove op not supported",
 			   __func__);
 		goto out;
 	}
 
 	ret = dev_ops->sta_remove(if_ctx->dev_priv, addr);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: sta_remove op failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: sta_remove op failed: %d", __func__, ret);
 		goto out;
 	}
 
@@ -1762,7 +1762,7 @@ int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack
 
 	dev_ops = if_ctx->dev_ctx->config;
 	if (!dev_ops->send_mlme) {
-		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported\n",
+		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported",
 			   __func__);
 		goto out;
 	}
@@ -1773,7 +1773,7 @@ int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack
 
 	ret = dev_ops->send_mlme(if_ctx->dev_priv, data, data_len, noack, freq, 0, 0, wait, 0);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: send_mlme op failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: send_mlme op failed: %d", __func__, ret);
 		goto out;
 	}
 	ret = 0;
@@ -1801,7 +1801,7 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 
 	ret = l2_packet_send(wpa_s->l2, addr, ETH_P_EAPOL, data, data_len);
 	if (ret < 0) {
-		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d\n", __func__, ret);
+		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
 		goto out;
 	}
 
