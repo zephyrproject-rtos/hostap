@@ -81,6 +81,24 @@ void wpa_supplicant_event_wrapper(void *ctx,
 				os_memcpy(frame, data->rx_mgmt.frame, data->rx_mgmt.frame_len);
 				data_tmp->rx_mgmt.frame = frame;
 			}
+		} else if (event == EVENT_TX_STATUS) {
+			union wpa_event_data *data_tmp = msg.data;
+			const struct ieee80211_hdr *hdr;
+
+			if (data->tx_status.data) {
+				char *frame = os_zalloc(data->tx_status.data_len);
+
+				if (!frame) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc frame\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(frame, data->tx_status.data, data->tx_status.data_len);
+				data_tmp->tx_status.data = frame;
+				hdr = (const struct ieee80211_hdr *) frame;
+				data_tmp->tx_status.dst = hdr->addr1;
+			}
 		}
 	}
 
