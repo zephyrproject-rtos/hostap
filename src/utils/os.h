@@ -332,9 +332,7 @@ int os_strcasecmp(const char *s1, const char *s2);
  */
 int os_strncasecmp(const char *s1, const char *s2, size_t n);
 
-#ifndef os_memcmp_const
-#define os_memcmp_const(s1, s2, n) memcmp((s1), (s2), (n))
-#endif
+#define CONFIG_BSS_MAX_IDLE_TIME CONFIG_WIFI_NM_WPA_SUPPLICANT_BSS_MAX_IDLE_TIME
 #endif
 
 
@@ -637,7 +635,6 @@ static inline void os_remove_in_array(void *ptr, size_t nmemb, size_t size,
  */
 size_t os_strlcpy(char *dest, const char *src, size_t siz);
 
-#ifndef __ZEPHYR__
 /**
  * os_memcmp_const - Constant time memory comparison
  * @a: First buffer to compare
@@ -655,7 +652,6 @@ size_t os_strlcpy(char *dest, const char *src, size_t siz);
  */
 int os_memcmp_const(const void *a, const void *b, size_t len);
 
-#endif
 /**
  * os_memdup - Allocate duplicate of passed memory chunk
  * @src: Source buffer to duplicate
