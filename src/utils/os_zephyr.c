@@ -245,3 +245,21 @@ int os_memcmp_const(const void *a, const void *b, size_t len)
 {
 	return memcmp(a, b, len);
 }
+
+int os_strcasecmp(const char *s1, const char *s2)
+{
+	/*
+	 * Ignoring case is not required for main functionality, so just use
+	 * the case sensitive version of the function.
+	 */
+	return os_strcmp(s1, s2);
+}
+
+int os_strncasecmp(const char *s1, const char *s2, size_t n)
+{
+	/*
+	 * Ignoring case is not required for main functionality, so just use
+	 * the case sensitive version of the function.
+	 */
+	return os_strncmp(s1, s2, n);
+}
