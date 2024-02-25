@@ -99,6 +99,55 @@ void wpa_supplicant_event_wrapper(void *ctx,
 				hdr = (const struct ieee80211_hdr *) frame;
 				data_tmp->tx_status.dst = hdr->addr1;
 			}
+		} else if (event == EVENT_ASSOC) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *addr = os_zalloc(ETH_ALEN);
+
+			if (!addr) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc addr\n",
+					__func__);
+				return;
+			}
+
+			os_memcpy(addr, data->assoc_info.addr, ETH_ALEN);
+			data_tmp->assoc_info.addr = addr;
+
+			if (data->assoc_info.req_ies) {
+				char *req_ies = os_zalloc(data->assoc_info.req_ies_len);
+
+				if (!req_ies) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc req_ies\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(req_ies, data->assoc_info.req_ies, data->assoc_info.req_ies_len);
+				data_tmp->assoc_info.req_ies = req_ies;
+			}
+			if (data->assoc_info.resp_ies) {
+				char *resp_ies = os_zalloc(data->assoc_info.resp_ies_len);
+
+				if (!resp_ies) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc resp_ies\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(resp_ies, data->assoc_info.resp_ies, data->assoc_info.resp_ies_len);
+				data_tmp->assoc_info.resp_ies = resp_ies;
+			}
+			if (data->assoc_info.resp_frame) {
+				char *resp_frame = os_zalloc(data->assoc_info.resp_frame_len);
+
+				if (!resp_frame) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc resp_frame\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(resp_frame, data->assoc_info.resp_frame, data->assoc_info.resp_frame_len);
+				data_tmp->assoc_info.resp_frame = resp_frame;
+			}
 		}
 	}
 
