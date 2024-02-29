@@ -981,6 +981,7 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 	}
 
 	if_ctx->scan_res2_get_in_prog = true;
+	k_sem_reset(&if_ctx->drv_resp_sem);
 
 	ret = dev_ops->get_scan_results2(if_ctx->dev_priv);
 	if (ret) {
@@ -989,7 +990,6 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 		goto out;
 	}
 
-	k_sem_reset(&if_ctx->drv_resp_sem);
 	k_sem_take(&if_ctx->drv_resp_sem, K_SECONDS(SCAN_TIMEOUT));
 
 	if (if_ctx->scan_res2_get_in_prog) {
