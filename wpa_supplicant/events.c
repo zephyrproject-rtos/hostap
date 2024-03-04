@@ -3599,7 +3599,7 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 			MAC2STR(bssid), reason_code,
 			locally_generated ? " locally_generated=1" : "");
 #ifdef __ZEPHYR__
-		supplicant_send_wifi_mgmt_disc_event(wpa_s, reason_code);
+		supplicant_send_wifi_mgmt_disc_event(wpa_s, locally_generated ? 0 : reason_code);
 #endif /* __ZEPHYR__ */
 	}
 }
