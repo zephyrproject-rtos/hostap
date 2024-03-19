@@ -633,3 +633,14 @@ CONFIG_DPP2=y
 # design is still subject to change. As such, this should not yet be enabled in
 # production use.
 #CONFIG_PASN=y
+
+# When selecting a network, prefer networks with a better signal strength
+# without any cap a.k.a "Great SNR".
+#
+# If this is enabled then higher SNR is preferred without any cap over higher band
+# (higher throughput) to achieve better reliability.
+#
+# If this is disabled then for networks with capped SNR, the preference is given
+# to the network with higher band (5GHz or 6GHz) and then to the network with
+# higher SNR.
+#CONFIG_NW_SEL_RELIABILITY=y
