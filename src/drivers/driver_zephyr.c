@@ -81,6 +81,190 @@ void wpa_supplicant_event_wrapper(void *ctx,
 				os_memcpy(frame, data->rx_mgmt.frame, data->rx_mgmt.frame_len);
 				data_tmp->rx_mgmt.frame = frame;
 			}
+		} else if (event == EVENT_TX_STATUS) {
+			union wpa_event_data *data_tmp = msg.data;
+			const struct ieee80211_hdr *hdr;
+
+			if (data->tx_status.data) {
+				char *frame = os_zalloc(data->tx_status.data_len);
+
+				if (!frame) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc frame\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(frame, data->tx_status.data, data->tx_status.data_len);
+				data_tmp->tx_status.data = frame;
+				hdr = (const struct ieee80211_hdr *) frame;
+				data_tmp->tx_status.dst = hdr->addr1;
+			}
+		} else if (event == EVENT_ASSOC) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *addr = os_zalloc(ETH_ALEN);
+
+			if (!addr) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc addr\n",
+					__func__);
+				return;
+			}
+
+			os_memcpy(addr, data->assoc_info.addr, ETH_ALEN);
+			data_tmp->assoc_info.addr = addr;
+
+			if (data->assoc_info.req_ies) {
+				char *req_ies = os_zalloc(data->assoc_info.req_ies_len);
+
+				if (!req_ies) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc req_ies\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(req_ies, data->assoc_info.req_ies,
+						  data->assoc_info.req_ies_len);
+				data_tmp->assoc_info.req_ies = req_ies;
+			}
+			if (data->assoc_info.resp_ies) {
+				char *resp_ies = os_zalloc(data->assoc_info.resp_ies_len);
+
+				if (!resp_ies) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc resp_ies\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(resp_ies, data->assoc_info.resp_ies,
+						  data->assoc_info.resp_ies_len);
+				data_tmp->assoc_info.resp_ies = resp_ies;
+			}
+			if (data->assoc_info.resp_frame) {
+				char *resp_frame = os_zalloc(data->assoc_info.resp_frame_len);
+
+				if (!resp_frame) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc resp_frame\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(resp_frame, data->assoc_info.resp_frame,
+						  data->assoc_info.resp_frame_len);
+				data_tmp->assoc_info.resp_frame = resp_frame;
+			}
+		} else if (event == EVENT_ASSOC_REJECT) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *bssid = os_zalloc(ETH_ALEN);
+
+			if (!bssid) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc bssid\n",
+					__func__);
+				return;
+			}
+
+			os_memcpy(bssid, data->assoc_reject.bssid, ETH_ALEN);
+			data_tmp->assoc_reject.bssid = bssid;
+
+			if (data->assoc_reject.resp_ies) {
+				char *resp_ies = os_zalloc(data->assoc_reject.resp_ies_len);
+
+				if (!resp_ies) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc resp_ies\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(resp_ies, data->assoc_reject.resp_ies,
+						  data->assoc_reject.resp_ies_len);
+				data_tmp->assoc_reject.resp_ies = resp_ies;
+			}
+		} else if (event == EVENT_DEAUTH) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *sa = os_zalloc(ETH_ALEN);
+
+			if (!sa) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc SA\n",
+					__func__);
+				return;
+			}
+
+			os_memcpy(sa, data->deauth_info.addr, ETH_ALEN);
+			data_tmp->deauth_info.addr = sa;
+			if (data->deauth_info.ie) {
+				char *ie = os_zalloc(data->deauth_info.ie_len);
+
+				if (!ie) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc ie\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(ie, data->deauth_info.ie, data->deauth_info.ie_len);
+				data_tmp->deauth_info.ie = ie;
+			}
+		} else if (event == EVENT_DISASSOC) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *sa = os_zalloc(ETH_ALEN);
+
+			if (!sa) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc SA\n",
+					__func__);
+				return;
+			}
+
+			os_memcpy(sa, data->disassoc_info.addr, ETH_ALEN);
+			data_tmp->disassoc_info.addr = sa;
+			if (data->disassoc_info.ie) {
+				char *ie = os_zalloc(data->disassoc_info.ie_len);
+
+				if (!ie) {
+					wpa_printf(MSG_ERROR, "%s: Failed to alloc ie\n",
+					  __func__);
+					return;
+				}
+
+				os_memcpy(ie, data->disassoc_info.ie, data->disassoc_info.ie_len);
+				data_tmp->disassoc_info.ie = ie;
+			}
+		} else if (event == EVENT_UNPROT_DEAUTH) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *sa = os_zalloc(ETH_ALEN);
+			char *da = os_zalloc(ETH_ALEN);
+
+			if (!sa) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc sa\n",
+					__func__);
+				return;
+			}
+
+			if (!da) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc da\n",
+					__func__);
+				return;
+			}
+			os_memcpy(sa, data->unprot_deauth.sa, ETH_ALEN);
+			data_tmp->unprot_deauth.sa = sa;
+			os_memcpy(da, data->unprot_deauth.da, ETH_ALEN);
+			data_tmp->unprot_deauth.da = da;
+		}  else if (event == EVENT_UNPROT_DISASSOC) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *sa = os_zalloc(ETH_ALEN);
+			char *da = os_zalloc(ETH_ALEN);
+
+			if (!sa) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc sa\n",
+					__func__);
+				return;
+			}
+
+			if (!da) {
+				wpa_printf(MSG_ERROR, "%s: Failed to alloc da\n",
+					__func__);
+				return;
+			}
+			os_memcpy(sa, data->unprot_disassoc.sa, ETH_ALEN);
+			data_tmp->unprot_disassoc.sa = sa;
+			os_memcpy(da, data->unprot_disassoc.da, ETH_ALEN);
+			data_tmp->unprot_disassoc.da = da;
 		}
 	}
 

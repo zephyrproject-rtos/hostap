@@ -39,7 +39,7 @@ static DEFINE_DL_LIST(stations); /* struct cli_txt_entry */
 static int wpa_cli_cmd(struct wpa_ctrl *ctrl, const char *cmd, int min_args,
 		       int argc, char *argv[])
 {
-	char * buf = NULL;
+	char buf[CMD_BUF_LEN] = {0};
 	int ret = 0;
 	bool interactive = 0;
 
@@ -58,13 +58,7 @@ static int wpa_cli_cmd(struct wpa_ctrl *ctrl, const char *cmd, int min_args,
 		       min_args > 1 ? "s are" : " is");
 		return -1;
 	}
-	buf = os_zalloc(sizeof(char) * CMD_BUF_LEN);
-	if (!buf){
-		wpa_printf(MSG_ERROR, "Failed to allocate mem for command buf - %d\n",
-			CMD_BUF_LEN);
-		return -1;
-	}
-	memset(buf, '\0', CMD_BUF_LEN);
+
 	if (write_cmd(buf, CMD_BUF_LEN, cmd, argc, argv) < 0){
 		ret = -1;
 		goto out;
@@ -76,9 +70,6 @@ static int wpa_cli_cmd(struct wpa_ctrl *ctrl, const char *cmd, int min_args,
 		ret = wpa_ctrl_command(ctrl, buf);
 
 out:
-	if (buf)
-		os_free(buf);
-
 	return ret;
 }
 

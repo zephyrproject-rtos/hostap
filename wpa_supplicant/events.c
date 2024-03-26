@@ -3599,7 +3599,7 @@ static void wpa_supplicant_event_disassoc(struct wpa_supplicant *wpa_s,
 			MAC2STR(bssid), reason_code,
 			locally_generated ? " locally_generated=1" : "");
 #ifdef __ZEPHYR__
-		supplicant_send_wifi_mgmt_disc_event(wpa_s, reason_code);
+		supplicant_send_wifi_mgmt_disc_event(wpa_s, locally_generated ? 0 : reason_code);
 #endif /* __ZEPHYR__ */
 	}
 }
@@ -3674,6 +3674,9 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 		if (wpas_p2p_4way_hs_failed(wpa_s) > 0)
 			return; /* P2P group removed */
 		wpas_auth_failed(wpa_s, "WRONG_KEY");
+#ifdef __ZEPHYR__
+		supplicant_send_wifi_mgmt_conn_event(wpa_s, WLAN_REASON_4WAY_HANDSHAKE_TIMEOUT);
+#endif /* __ZEPHYR__ */
 #ifdef CONFIG_DPP2
 		wpas_dpp_send_conn_status_result(wpa_s,
 						 DPP_STATUS_AUTH_FAILURE);

@@ -213,7 +213,7 @@ int l2_packet_get_ip_addr(struct l2_packet_data *l2, char *buf, size_t len)
 #ifdef CONFIG_NET_IPV4
 	char addr_buf[NET_IPV4_ADDR_LEN];
 	os_strlcpy(buf, net_addr_ntop(AF_INET,
-				&l2->iface->config.ip.ipv4->unicast[0].address.in_addr.s_addr,
+				&l2->iface->config.ip.ipv4->unicast[0].ipv4.address.in_addr.s_addr,
 				addr_buf, sizeof(addr_buf)), len);
 	return 0;
 #else

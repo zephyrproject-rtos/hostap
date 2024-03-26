@@ -18,6 +18,15 @@
 #define DEFAULT_NOISE_FLOOR_5GHZ (-92)
 #define DEFAULT_NOISE_FLOOR_6GHZ (-92)
 
+#ifdef CONFIG_NW_SEL_RELIABILITY
+/*
+ * This basically disables capping the SNR when choosing the best BSS. This
+ * means that the BSS with the highest SNR will be chosen, independent of the
+ * band. This is useful for scenarios where reliability is more important than
+ * throughput.
+ */
+#define GREAT_SNR 999
+#else
 /*
  * Channels with a great SNR can operate at full rate. What is a great SNR?
  * This doc https://supportforums.cisco.com/docs/DOC-12954 says, "the general
@@ -29,6 +38,7 @@
  * somewhat conservative value here.
  */
 #define GREAT_SNR 25
+#endif /* CONFIG_NW_SEL_RELIABILITY */
 
 #define IS_2P4GHZ(n) (n >= 2412 && n <= 2484)
 #define IS_5GHZ(n) (n > 4000 && n < 5895)
