@@ -1302,13 +1302,3 @@ void forced_memzero(void *ptr, size_t len)
 	if (len)
 		forced_memzero_val = ((u8 *) ptr)[0];
 }
-
-#ifdef __ZEPHYR__
-#include <zephyr/net/net_ip.h>
-extern char *inet_ntoa(struct in_addr in)
-{
-	static char addr[NET_IPV4_ADDR_LEN];
-
-	return net_addr_ntop(AF_INET, (const void *)&in, addr, NET_IPV4_ADDR_LEN);
-}
-#endif
