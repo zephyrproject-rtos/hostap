@@ -2063,6 +2063,29 @@ out:
 	return ret;
 }
 
+
+int wpa_drv_zep_get_inact_sec(void *priv, const u8 *addr)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	dev_ops = if_ctx->dev_ctx->config;
+	if (!dev_ops->get_inact_sec) {
+		wpa_printf(MSG_ERROR, "%s: get_inact_sec op not supported\n",
+			   __func__);
+		goto out;
+	}
+
+	ret = dev_ops->get_inact_sec(if_ctx->dev_priv, addr);
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR, "%s: get_inact_sec op failed: %d\n", __func__, ret);
+		goto out;
+	}
+
+out:
+	return ret;
+}
 #endif /* CONFIG_AP */
 
 int wpa_drv_zep_dpp_listen(void *priv, bool enable)
@@ -2189,6 +2212,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.sta_deauth = wpa_drv_zep_sta_deauth,
 	.sta_disassoc = wpa_drv_zep_sta_disassoc,
 	.sta_remove = wpa_drv_zep_sta_remove,
+	.get_inact_sec = wpa_drv_zep_get_inact_sec,
 #endif /* CONFIG_AP */
 	.dpp_listen = wpa_drv_zep_dpp_listen,
 	.remain_on_channel = wpa_drv_zep_remain_on_channel,

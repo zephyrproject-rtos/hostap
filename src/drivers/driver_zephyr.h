@@ -260,6 +260,7 @@ struct zep_wpa_supp_dev_ops {
 	int (*dpp_listen)(void *priv, bool enable);
 	int (*remain_on_channel)(void *priv, unsigned int freq, unsigned int duration);
 	int (*cancel_remain_on_channel)(void *priv);
+	int (*get_inact_sec)(void *if_priv, const u8 *addr);
 };
 
 #endif /* DRIVER_ZEPHYR_H */
