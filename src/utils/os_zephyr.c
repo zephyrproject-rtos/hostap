@@ -191,7 +191,17 @@ int os_fdatasync(FILE *stream)
 
 char *os_strdup(const char *s)
 {
-	return os_memdup(s, strlen(s) + 1);
+	size_t len;
+	char *d;
+
+	len = os_strlen(s);
+	d   = os_malloc(len + 1);
+	if (d == NULL) {
+		return NULL;
+	}
+	os_memcpy(d, s, len);
+	d[len] = '\0';
+	return d;
 }
 
 void *os_memdup(const void *src, size_t len)
@@ -204,9 +214,49 @@ void *os_memdup(const void *src, size_t len)
 	return r;
 }
 
+void *os_malloc(size_t size)
+{
+	return k_malloc(size);
+}
+
+void os_free(void *ptr)
+{
+	k_free(ptr);
+}
+
+void *os_realloc(void *ptr, size_t newsize)
+{
+	void *p;
+
+	if (newsize == 0) {
+		os_free(ptr);
+		return NULL;
+	}
+
+	if (ptr == NULL) {
+		return os_malloc(newsize);
+	}
+
+	p = os_zalloc(newsize);
+
+	if (p) {
+		if (ptr != NULL) {
+			memcpy(p, ptr, newsize);
+			os_free(ptr);
+		}
+	}
+
+	return p;
+}
+
 void *os_zalloc(size_t size)
 {
-	return calloc(1, size);
+	void *p = k_malloc(size);
+
+	if (p != NULL) {
+		(void)memset(p, 0, size);
+	}
+	return p;
 }
 
 size_t os_strlcpy(char *dest, const char *src, size_t siz)

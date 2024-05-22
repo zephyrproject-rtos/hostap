@@ -256,6 +256,34 @@ int os_file_exists(const char *fname);
  * Returns: 0 if the operation succeeded or -1 on failure
  */
 int os_fdatasync(FILE *stream);
+#if defined(__ZEPHYR__)
+/**
+ * os_malloc - Allocate dynamic memory
+ * @size: Size of the buffer to allocate
+ * Returns: Allocated buffer or %NULL on failure
+ *
+ * Caller is responsible for freeing the returned buffer with os_free().
+ */
+void *os_malloc(size_t size);
+
+/**
+ * os_realloc - Re-allocate dynamic memory
+ * @ptr: Old buffer from os_malloc() or os_realloc()
+ * @size: Size of the new buffer
+ * Returns: Allocated buffer or %NULL on failure
+ *
+ * Caller is responsible for freeing the returned buffer with os_free().
+ * If re-allocation fails, %NULL is returned and the original buffer (ptr) is
+ * not freed and caller is still responsible for freeing it.
+ */
+void *os_realloc(void *ptr, size_t size);
+
+/**
+ * os_free - Free dynamic memory
+ * @ptr: Old buffer from os_malloc() or os_realloc(); can be %NULL
+ */
+void os_free(void *ptr);
+#endif
 
 /**
  * os_zalloc - Allocate and zero memory
@@ -520,13 +548,19 @@ void os_free(void *ptr);
 char * os_strdup(const char *s);
 #else /* WPA_TRACE */
 #ifndef os_malloc
+#if !defined(__ZEPHYR__)
 #define os_malloc(s) malloc((s))
 #endif
+#endif
 #ifndef os_realloc
+#if !defined(__ZEPHYR__)
 #define os_realloc(p, s) realloc((p), (s))
 #endif
+#endif
 #ifndef os_free
+#if !defined(__ZEPHYR__)
 #define os_free(p) free((p))
+#endif
 #endif
 #ifndef os_strdup
 #ifdef _MSC_VER
