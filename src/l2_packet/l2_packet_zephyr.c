@@ -94,10 +94,9 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	// FIXME: sll_addr is not being filled as L2 header is not removed
 	hdr = (const struct ieee802_1x_hdr *) buf;
 
-	// FIXME: L2 header is now removed but sll_protocol is not set.
-	// So, as a workaround add this check to drop packets.
-	if (hdr->type != IEEE802_1X_TYPE_EAPOL_KEY)
+	if (ll.sll_protocol != ETH_P_EAPOL) {
 		return;
+	}
 
 	// FIXME: We should only get registered protcols from networking stack
 	// but for some reason ETH_P_ALL is being set (bind_default)
