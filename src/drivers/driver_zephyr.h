@@ -204,7 +204,8 @@ struct zep_wpa_supp_dev_ops {
 		       const unsigned char *seq,
 		       size_t seq_len,
 		       const unsigned char *key,
-		       size_t key_len);
+		       size_t key_len,
+		       enum key_flag key_flag);
 	int (*set_supp_port)(void *if_priv,
 			     int authorized,
 			     char *bssid);
