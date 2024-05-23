@@ -1329,7 +1329,6 @@ static int wpa_drv_zep_associate(void *priv,
 		goto out;
 	}
 
-	ret = dev_ops->associate(if_ctx->dev_priv, params);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: associate op failed", __func__);
 		goto out;
