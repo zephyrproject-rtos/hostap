@@ -914,17 +914,27 @@ wpa_driver_wpa_supp_postprocess_modes(struct hostapd_hw_modes *modes,
 	return modes;
 }
 
-struct hostapd_hw_modes *wpa_drv_get_hw_feature_data(void *priv,
+struct hostapd_hw_modes *wpa_drv_zep_get_hw_feature_data(void *priv,
 		u16 *num_modes,
 		u16 *flags, u8 *dfs_domain)
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
+	struct hostapd_hw_modes *modes = NULL;
 	int ret = -1;
 
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s:Failed to get dev_ops handle", __func__);
+		goto out;
+	}
+
+	if (!dev_ops->get_wiphy) {
+		wpa_printf(MSG_ERROR, "%s: No op registered for get_wiphy", __func__);
+		goto out;
+	}
 
 	struct phy_info_arg result = {
 		.num_modes = num_modes,
@@ -940,25 +950,25 @@ struct hostapd_hw_modes *wpa_drv_get_hw_feature_data(void *priv,
 
 	if_ctx->phy_info_arg = &result;
 
+	k_sem_reset(&if_ctx->drv_resp_sem);
+
 	ret = dev_ops->get_wiphy(if_ctx->dev_priv);
 	if (ret < 0) {
 		return NULL;
 	}
 
-	k_sem_reset(&if_ctx->drv_resp_sem);
 	k_sem_take(&if_ctx->drv_resp_sem, K_SECONDS(GET_WIPHY_TIMEOUT));
 
 	if (!result.modes) {
 		return NULL;
 	}
 
-	struct hostapd_hw_modes *modes;
-
 	*dfs_domain = result.dfs_domain;
 
 	modes = wpa_driver_wpa_supp_postprocess_modes(result.modes,
 			num_modes);
 
+out:
 	return modes;
 }
 
@@ -1585,7 +1595,7 @@ static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 			wait_time, 0);
 }
 
-static int nl80211_get_ext_capab(void *priv, enum wpa_driver_if_type type,
+static int wpa_drv_zep_get_ext_capab(void *priv, enum wpa_driver_if_type type,
 			const u8 **ext_capa, const u8 **ext_capa_mask,
 			unsigned int *ext_capa_len)
 {
@@ -1621,7 +1631,7 @@ static int wpa_drv_zep_get_conn_info(void *priv, struct wpa_conn_info *ci)
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s:Failed to get config handle", __func__);
+		wpa_printf(MSG_ERROR, "%s:Failed to get dev_ops handle", __func__);
 		goto out;
 	}
 
@@ -2034,8 +2044,8 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.set_key = wpa_drv_zep_set_key,
 	.signal_poll = wpa_drv_zep_signal_poll,
 	.send_action = wpa_drv_zep_send_action,
-	.get_hw_feature_data = wpa_drv_get_hw_feature_data,
-	.get_ext_capab = nl80211_get_ext_capab,
+	.get_hw_feature_data = wpa_drv_zep_get_hw_feature_data,
+	.get_ext_capab = wpa_drv_zep_get_ext_capab,
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 #ifdef CONFIG_AP
 	.hapd_send_eapol = wpa_drv_hapd_send_eapol,
