@@ -1349,7 +1349,8 @@ static int _wpa_drv_zep_set_key(void *priv,
 				const u8 *seq,
 				size_t seq_len,
 				const u8 *key,
-				size_t key_len)
+				size_t key_len,
+				enum key_flag key_flag)
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
@@ -1381,7 +1382,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 	}
 
 	wpa_printf(MSG_DEBUG, "%s: priv:%p alg %d addr %p key_idx %d set_tx %d seq %p "
-		   "seq_len %d key %p key_len %d",
+		   "seq_len %d key %p key_len %d key_flag %x",
 		   __func__,
 		   if_ctx->dev_priv,
 		   alg, addr,
@@ -1390,7 +1391,8 @@ static int _wpa_drv_zep_set_key(void *priv,
 		   seq,
 		   seq_len,
 		   key,
-		   key_len);
+		   key_len,
+		   key_flag);
 
 	ret = dev_ops->set_key(if_ctx->dev_priv,
 			       ifname,
@@ -1401,7 +1403,8 @@ static int _wpa_drv_zep_set_key(void *priv,
 			       seq,
 			       seq_len,
 			       key,
-			       key_len);
+			       key_len,
+			       key_flag);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: set_key op failed", __func__);
 		goto out;
@@ -1423,7 +1426,8 @@ static int wpa_drv_zep_set_key(void* priv,
 				    params->seq,
 				    params->seq_len,
 				    params->key,
-				    params->key_len);
+				    params->key_len,
+				    params->key_flag);
 }
 
 
