@@ -144,8 +144,8 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	link_addr = &iface->if_dev->link_addr;
 	os_memcpy(l2->own_addr, link_addr->addr, link_addr->len);
 
-	l2->fd = socket(AF_PACKET, l2_hdr ? SOCK_RAW : SOCK_DGRAM,
-			htons(protocol));
+	/* zephyr socket protocol is implemented in little-endian */
+	l2->fd = socket(AF_PACKET, l2_hdr ? SOCK_RAW : SOCK_DGRAM, protocol);
 	if (l2->fd < 0) {
 		wpa_printf(MSG_ERROR,
 			   "Failed to open socket: %s, proto: %d, af: %d",
