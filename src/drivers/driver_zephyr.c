@@ -1889,9 +1889,16 @@ static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 	os_memcpy(hdr->addr2, src, ETH_ALEN);
 	os_memcpy(hdr->addr3, bssid, ETH_ALEN);
 
-	return dev_ops->send_mlme(if_ctx->dev_priv, buf, 24 + data_len,
+	ret = dev_ops->send_mlme(if_ctx->dev_priv, buf, 24 + data_len,
 			0, freq, no_cck, 1,
 			wait_time, 0);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "wpa_supp: Failed to send Action frame: %d", ret);
+	}
+
+	os_free(buf);
+
+	return ret;
 }
 
 static int wpa_drv_zep_get_ext_capab(void *priv, enum wpa_driver_if_type type,
