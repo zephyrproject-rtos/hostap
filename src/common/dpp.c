@@ -3290,7 +3290,7 @@ enum dpp_status_error dpp_conf_result_rx(struct dpp_authentication *auth,
 	size_t len[2];
 	u8 *unwrapped = NULL;
 	size_t unwrapped_len = 0;
-	enum dpp_status_error ret = 256;
+	enum dpp_status_error ret = 255;
 
 	wrapped_data = dpp_get_attr(attr_start, attr_len, DPP_ATTR_WRAPPED_DATA,
 				    &wrapped_data_len);
@@ -3444,7 +3444,7 @@ enum dpp_status_error dpp_conn_status_result_rx(struct dpp_authentication *auth,
 	size_t len[2];
 	u8 *unwrapped = NULL;
 	size_t unwrapped_len = 0;
-	enum dpp_status_error ret = 256;
+	enum dpp_status_error ret = 255;
 	struct json_token *root = NULL, *token;
 	struct wpabuf *ssid64;
 
