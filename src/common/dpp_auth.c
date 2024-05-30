@@ -875,7 +875,7 @@ dpp_auth_req_rx(struct dpp_global *dpp, void *msg_ctx, u8 dpp_allowed_roles,
 		wpa_printf(MSG_DEBUG, "DPP: Unexpected role in I-capabilities");
 		wpa_msg(auth->msg_ctx, MSG_INFO,
 			DPP_EVENT_FAIL "Invalid role in I-capabilities 0x%02x",
-			auth->i_capab & DPP_CAPAB_ROLE_MASK);
+			(u8)(auth->i_capab & DPP_CAPAB_ROLE_MASK));
 		goto fail;
 	}
 
