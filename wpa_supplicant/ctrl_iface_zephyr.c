@@ -73,7 +73,7 @@ static void wpa_supplicant_ctrl_iface_send(struct wpa_supplicant *wpa_s,
 		if (level >= dst->debug_level) {
 			memcpy(&msg.msg, buf, len);
 			msg.msg_len = len;
-			if (send(dst->sock, &msg, sizeof(msg), 0) < 0) {
+			if (send(dst->sock, &msg, len + 4, 0) < 0) {
 				wpa_printf(MSG_ERROR,
 					   "sendto(CTRL_IFACE monitor): %s",
 					   strerror(errno));
