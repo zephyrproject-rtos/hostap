@@ -10,13 +10,11 @@
 #define OS_H
 
 #if defined(__ZEPHYR__)
-typedef long long os_time_t;
 #ifndef FILE
 typedef __FILE FILE;
 #endif
-#else
-typedef long os_time_t;
 #endif
+typedef long os_time_t;
 
 /**
  * os_sleep - Sleep (sec, usec)
