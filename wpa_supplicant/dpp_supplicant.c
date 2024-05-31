@@ -534,8 +534,13 @@ static void wpas_dpp_tx_status(struct wpa_supplicant *wpa_s,
 		 * allow new authentication exchanges to be started. */
 		eloop_cancel_timeout(wpas_dpp_auth_conf_wait_timeout, wpa_s,
 				     NULL);
+#ifdef __ZEPHYR__
+		eloop_register_timeout(5, 0, wpas_dpp_auth_conf_wait_timeout,
+				       wpa_s, NULL);
+#else
 		eloop_register_timeout(1, 0, wpas_dpp_auth_conf_wait_timeout,
 				       wpa_s, NULL);
+#endif
 	}
 
 	if (!is_broadcast_ether_addr(dst) && auth->waiting_auth_resp &&
@@ -4005,8 +4010,13 @@ static void wpas_dpp_chirp_tx_status(struct wpa_supplicant *wpa_s,
 	}
 
 	wpa_printf(MSG_DEBUG, "DPP: Chirp send completed - wait for response");
+#ifdef __ZEPHYR__
+	if (eloop_register_timeout(5, 0, wpas_dpp_chirp_timeout,
+				   wpa_s, NULL) < 0)
+#else
 	if (eloop_register_timeout(2, 0, wpas_dpp_chirp_timeout,
 				   wpa_s, NULL) < 0)
+#endif
 		wpas_dpp_chirp_stop(wpa_s);
 }
 
