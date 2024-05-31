@@ -118,9 +118,19 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 {
 	while (wpa_ctrl_pending(ctrl) > 0) {
 		char buf[sizeof(struct conn_msg)];
-		size_t len = sizeof(buf);
+		size_t hlen = sizeof(int);
+		size_t plen = MAX_CTRL_MSG_LEN;
+		int need_flush = 0;
 
-		if (wpa_ctrl_recv(ctrl, buf, &len) == 0) {
+		if (wpa_ctrl_recv(ctrl, buf, &hlen) == 0 &&
+		    hlen == sizeof(int)) {
+			plen = *((int *)buf);
+		} else {
+			wpa_printf(MSG_ERROR, "Could not read pending message header len %d.\n", hlen);
+			continue;
+		}
+
+		if (wpa_ctrl_recv(ctrl, buf + sizeof(int), &plen) == 0) {
 			struct conn_msg *msg = (struct conn_msg *)buf;
 
 			msg->msg[msg->msg_len] = '\0';
