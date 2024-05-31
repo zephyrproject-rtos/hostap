@@ -2014,6 +2014,96 @@ out:
 
 #endif /* CONFIG_AP */
 
+int wpa_drv_zep_dpp_listen(void *priv, bool enable)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	if ((!priv)) {
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->dpp_listen) {
+		wpa_printf(MSG_ERROR, "%s: dpp_listen op not supported", __func__);
+		goto out;
+	}
+
+	ret = dev_ops->dpp_listen(if_ctx->dev_priv, enable);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: dpp_listen op failed", __func__);
+		goto out;
+	}
+
+out:
+	return ret;
+
+}
+
+int wpa_drv_zep_remain_on_channel(void *priv, unsigned int freq,
+				  unsigned int duration)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
+	int ret	= -1;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->remain_on_channel) {
+		wpa_printf(MSG_ERROR, "%s: remain_on_channel op not supported", __func__);
+		goto out;
+	}
+
+	ret = dev_ops->remain_on_channel(if_ctx->dev_priv, freq, duration);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: dpp_listen op failed", __func__);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
+int wpa_drv_zep_cancel_remain_on_channel(void *priv)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
+	int ret	= -1;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->cancel_remain_on_channel) {
+		wpa_printf(MSG_ERROR, "%s: cancel_remain_on_channel op not supported", __func__);
+		goto out;
+	}
+
+	ret = dev_ops->cancel_remain_on_channel(if_ctx->dev_priv);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: dpp_listen op failed", __func__);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
+
 const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.name = "zephyr",
 	.desc = "Zephyr wpa_supplicant driver",
@@ -2049,4 +2139,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.sta_disassoc = wpa_drv_zep_sta_disassoc,
 	.sta_remove = wpa_drv_zep_sta_remove,
 #endif /* CONFIG_AP */
+	.dpp_listen = wpa_drv_zep_dpp_listen,
+	.remain_on_channel = wpa_drv_zep_remain_on_channel,
+	.cancel_remain_on_channel = wpa_drv_zep_cancel_remain_on_channel,
 };
