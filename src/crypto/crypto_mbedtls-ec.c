@@ -58,6 +58,8 @@ const struct crypto_bignum *crypto_ec_get_a(struct crypto_ec *e)
 	/* A = -3 mod P*/
 	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&e->A, &minus_three, &one, &e->group.P, NULL));
 cleanup:
+	mbedtls_mpi_free(&minus_three);
+	mbedtls_mpi_free(&one);
 	return (const struct crypto_bignum *)&e->A;
 }
 
@@ -109,6 +111,7 @@ void crypto_ec_deinit(struct crypto_ec *e)
 		return;
 	}
 
+	mbedtls_mpi_free(&e->A);
 	mbedtls_ecp_group_free(&e->group);
 	os_free(e);
 }
