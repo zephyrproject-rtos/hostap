@@ -68,10 +68,14 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 		return -1;
 	}
 
-	if (resp && len > 1) {
-		/* Remove the LF */
-		os_memcpy(resp, buf, len - 1);
-		resp[len - 1] = '\0';
+	if (resp && len > 0) {
+		os_memcpy(resp, buf, len);
+		if (len > 1 && resp[len - 1] == '\n') {
+			/* Remove the LF */
+			resp[len - 1] = '\0';
+		} else {
+			resp[len] = '\0';
+		}
 		if (strncmp(resp, "FAIL", 4) == 0)
 			return -3;
 	}
