@@ -30,6 +30,7 @@ int zephyr_wpa_ctrl_init(void *wpa_s);
 void zephyr_wpa_ctrl_deinit(void *wpa_s);
 int zephyr_wpa_ctrl_zephyr_cmd(int argc, const char *argv[]);
 int zephyr_wpa_cli_cmd_v(const char *fmt, ...);
+int zephyr_wpa_cli_cmd_resp(const char *cmd, char *resp);
 
 int z_wpa_ctrl_add_network(struct add_network_resp *resp);
 int z_wpa_ctrl_signal_poll(struct signal_poll_resp *resp);

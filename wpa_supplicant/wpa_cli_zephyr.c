@@ -90,6 +90,11 @@ static int wpa_ctrl_command_resp(struct wpa_ctrl *ctrl, const char *cmd, char *r
 	return _wpa_ctrl_command(ctrl, cmd, 0, resp);
 }
 
+int zephyr_wpa_cli_cmd_resp(const char *cmd, char *resp)
+{
+	return _wpa_ctrl_command(ctrl_conn, cmd, 1, resp);
+}
+
 static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 {
 	int ret;
