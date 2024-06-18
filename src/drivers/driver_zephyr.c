@@ -2594,6 +2594,29 @@ out:
 	return ret;
 }
 
+void wpa_drv_zep_send_action_cancel_wait(void *priv)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->send_action_cancel_wait) {
+		wpa_printf(MSG_DEBUG, "%s: send_action_cancel_wait op not supported", __func__);
+		goto out;
+	}
+
+	dev_ops->send_action_cancel_wait(if_ctx->dev_priv);
+
+out:
+	return;
+}
 
 const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.name = "zephyr",
@@ -2643,4 +2666,5 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.dpp_listen = wpa_drv_zep_dpp_listen,
 	.remain_on_channel = wpa_drv_zep_remain_on_channel,
 	.cancel_remain_on_channel = wpa_drv_zep_cancel_remain_on_channel,
+	.send_action_cancel_wait = wpa_drv_zep_send_action_cancel_wait,
 };
