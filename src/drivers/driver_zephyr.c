@@ -389,7 +389,8 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 	struct wpa_scan_res *sr = os_zalloc(scan_res_len);
 	if (!sr) {
 		wpa_printf(MSG_ERROR, "%s: Failed to alloc scan results(%d bytes)", __func__, scan_res_len);
-		return;
+		if_ctx->scan_res2->res = tmp;
+		goto err;
 	}
 
 	os_memcpy(sr, r, scan_res_len);
