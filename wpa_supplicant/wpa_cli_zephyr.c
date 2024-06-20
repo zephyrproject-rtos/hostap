@@ -129,7 +129,6 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 		char buf[sizeof(struct conn_msg)];
 		size_t hlen = sizeof(int);
 		size_t plen = MAX_CTRL_MSG_LEN;
-		int need_flush = 0;
 
 		if (wpa_ctrl_recv(ctrl, buf, &hlen) == 0 &&
 		    hlen == sizeof(int)) {
@@ -143,8 +142,6 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 			struct conn_msg *msg = (struct conn_msg *)buf;
 
 			msg->msg[msg->msg_len] = '\0';
-			wpa_printf(MSG_DEBUG, "Received len: %d, msg_len:%d - %s->END\n",
-					   len, msg->msg_len, msg->msg);
 			if (msg->msg_len >= MAX_CTRL_MSG_LEN) {
 				wpa_printf(MSG_INFO, "Too long message received.\n");
 				continue;
