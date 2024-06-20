@@ -1844,8 +1844,13 @@ err:
 #endif /* CONFIG_OWE */
 
 
+#ifdef __ZEPHYR__
+void hostapd_event(void *ctx, enum wpa_event_type event,
+		   union wpa_event_data *data)
+#else
 void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			  union wpa_event_data *data)
+#endif
 {
 	struct hostapd_data *hapd = ctx;
 #ifndef CONFIG_NO_STDOUT_DEBUG
@@ -2090,8 +2095,13 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 }
 
 
+#ifdef __ZEPHYR__
+void hostapd_event_global(void *ctx, enum wpa_event_type event,
+			  union wpa_event_data *data)
+#else
 void wpa_supplicant_event_global(void *ctx, enum wpa_event_type event,
 				 union wpa_event_data *data)
+#endif
 {
 	struct hapd_interfaces *interfaces = ctx;
 	struct hostapd_data *hapd;
