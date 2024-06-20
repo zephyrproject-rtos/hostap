@@ -689,6 +689,13 @@ struct active_scs_elem {
  * core functions.
  */
 struct wpa_supplicant {
+#if defined(__ZEPHYR__) && defined(HOSTAPD)
+	/** Zephyr has coexistence of hostapd and wpa_supplicant.
+	 * To verify if ctx is hostapd or wpa_supplicant in wpa_msg,
+	 * this should be the first parameter
+	 */
+	int is_hostapd;
+#endif
 	struct wpa_global *global;
 	struct wpa_radio *radio; /* shared radio context */
 	struct dl_list radio_list; /* list head: struct wpa_radio::ifaces */
