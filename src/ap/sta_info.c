@@ -1345,9 +1345,15 @@ void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 
 #ifdef __ZEPHYR__
-		supplicant_send_wifi_mgmt_ap_sta_event(hapd->iface->owner,
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
+		supplicant_send_wifi_mgmt_ap_sta_event(hapd->iface,
 						       event,
 						       sta);
+#else
+		supplicant_send_wifi_mgmt_ap_sta_event(hapd->iface->owner,
+                                                       event,
+                                                       sta);
+#endif
 #endif /* __ZEPHYR__ */
 
 #ifdef CONFIG_FST
