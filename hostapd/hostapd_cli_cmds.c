@@ -18,19 +18,44 @@
 
 static DEFINE_DL_LIST(stations); /* struct cli_txt_entry */
 
+#define CMD_BUF_LEN 1024
+
 static int hostapd_cli_cmd(struct wpa_ctrl *ctrl, const char *cmd,
 			   int min_args, int argc, char *argv[])
 {
-	char buf[1024];
+	char buf[CMD_BUF_LEN] = {0};
+	int ret = 0;
+	bool interactive = 0;
+
+	for (int i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "interactive") == 0) {
+			interactive = 1;
+			argv[i] = NULL;
+			argc--;
+			break;
+		}
+	}
 
 	if (argc < min_args) {
-		printf("Invalid %s command - at least %d argument%s required.\n",
-		       cmd, min_args, min_args > 1 ? "s are" : " is");
+		wpa_printf(MSG_INFO, "Invalid %s command - at least %d argument%s "
+		       "required.\n", cmd, min_args,
+		       min_args > 1 ? "s are" : " is");
 		return -1;
 	}
-	if (write_cmd(buf, sizeof(buf), cmd, argc, argv) < 0)
-		return -1;
-	return hostapd_ctrl_command(ctrl, buf);
+
+	if (write_cmd(buf, CMD_BUF_LEN, cmd, argc, argv) < 0){
+		ret = -1;
+		goto out;
+	}
+
+	if (interactive)
+		ret = hostapd_ctrl_command_interactive(ctrl, buf);
+	else
+		ret = hostapd_ctrl_command(ctrl, buf);
+
+out:
+	return ret;
+
 }
 
 
