@@ -263,7 +263,7 @@ static void hostapd_cli_recv_pending(struct wpa_ctrl *ctrl, struct hostapd_data 
 
 			msg->msg[msg->msg_len] = '\0';
 			wpa_printf(MSG_DEBUG, "Received len: %d, msg_len:%d - %s->END\n",
-				   len, msg->msg_len, msg->msg);
+				   plen, msg->msg_len, msg->msg);
 			if (msg->msg_len >= MAX_CTRL_MSG_LEN) {
 				wpa_printf(MSG_INFO, "Too long message received.\n");
 				continue;
