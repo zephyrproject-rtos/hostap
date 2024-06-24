@@ -55,6 +55,9 @@
 #include "hs20.h"
 #include "airtime_policy.h"
 #include "wpa_auth_kay.h"
+#ifdef __ZEPHYR__
+#include <supp_events.h>
+#endif /* __ZEPHYR__ */
 
 
 static int hostapd_flush_old_stations(struct hostapd_data *hapd, u16 reason);
@@ -2202,6 +2205,11 @@ dfs_offload:
 	for (j = 0; j < iface->num_bss; j++)
 		hostapd_neighbor_set_own_report(iface->bss[j]);
 
+#ifdef __ZEPHYR__
+	supplicant_send_wifi_mgmt_ap_status(iface,
+					    NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					    WIFI_STATUS_AP_SUCCESS);
+#endif
 	return 0;
 
 fail:
