@@ -953,6 +953,16 @@ static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_RX_MGMT, &event);
 }
 
+static void wpa_drv_zep_event_ecsa_complete(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
+{
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
+	if (if_ctx->hapd)
+		hostapd_event_wrapper(if_ctx->hapd, EVENT_CH_SWITCH, event);
+	else
+#endif
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_CH_SWITCH, event);
+}
+
 static struct hostapd_hw_modes *
 wpa_driver_wpa_supp_postprocess_modes(struct hostapd_hw_modes *modes,
 		u16 *num_modes)
@@ -1191,6 +1201,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.mgmt_rx = wpa_drv_zep_event_mgmt_rx;
 	callbk_fns.chan_list_changed = wpa_drv_zep_event_chan_list_changed;
 	callbk_fns.mac_changed = wpa_drv_zep_event_mac_changed;
+	callbk_fns.ecsa_complete = wpa_drv_zep_event_ecsa_complete;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
@@ -1290,6 +1301,7 @@ static void *wpa_drv_zep_hapd_init(struct hostapd_data *hapd, struct wpa_init_pa
 	callbk_fns.mgmt_tx_status    = wpa_drv_zep_event_mgmt_tx_status;
 	callbk_fns.mac_changed       = wpa_drv_zep_event_mac_changed;
 	callbk_fns.chan_list_changed = wpa_drv_zep_event_chan_list_changed;
+	callbk_fns.ecsa_complete     = wpa_drv_zep_event_ecsa_complete;
 
 	if_ctx->dev_priv = dev_ops->hapd_init(if_ctx, params->ifname, &callbk_fns);
 	if (!if_ctx->dev_priv) {
