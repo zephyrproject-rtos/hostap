@@ -10,7 +10,6 @@
 #include "includes.h"
 
 #include "common/cli.h"
-#include "common/wpa_ctrl.h"
 #include "utils/common.h"
 #include "utils/eloop.h"
 #include "utils/edit.h"
@@ -211,6 +210,11 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 int hostapd_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd)
 {
 	return _wpa_ctrl_command(ctrl, cmd, 0, NULL);
+}
+
+int hostapd_ctrl_command_interactive(struct wpa_ctrl *ctrl, const char *cmd)
+{
+	return _wpa_ctrl_command(ctrl, cmd, 1, NULL);
 }
 
 int zephyr_hostapd_cli_cmd_resp(const char *cmd, char *resp)
