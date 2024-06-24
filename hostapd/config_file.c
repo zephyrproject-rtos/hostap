@@ -3079,6 +3079,7 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "ft_psk_generate_local") == 0) {
 		bss->ft_psk_generate_local = atoi(pos);
 #endif /* CONFIG_IEEE80211R_AP */
+#ifndef __ZEPHYR__
 #ifndef CONFIG_NO_CTRL_IFACE
 	} else if (os_strcmp(buf, "ctrl_interface") == 0) {
 		os_free(bss->ctrl_interface);
@@ -3110,6 +3111,7 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			   bss->ctrl_interface_gid);
 #endif /* CONFIG_NATIVE_WINDOWS */
 #endif /* CONFIG_NO_CTRL_IFACE */
+#endif /* __ZEPHYR__ */
 #ifdef RADIUS_SERVER
 	} else if (os_strcmp(buf, "radius_server_clients") == 0) {
 		os_free(bss->radius_server_clients);

@@ -1532,9 +1532,17 @@ static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
 }
 
 
+#ifdef __ZEPHYR__
+void hostapd_event_eapol_rx(void *ctx, const u8 *src,
+			    const u8 *data, size_t data_len)
+#else
 static void hostapd_event_eapol_rx(struct hostapd_data *hapd, const u8 *src,
 				   const u8 *data, size_t data_len)
+#endif /* __ZEPHYR__ */
 {
+#ifdef __ZEPHYR__
+	struct hostapd_data *hapd = ctx;
+#endif
 	struct hostapd_iface *iface = hapd->iface;
 	struct sta_info *sta;
 	size_t j;

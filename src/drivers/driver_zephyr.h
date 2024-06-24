@@ -19,6 +19,9 @@
 #include "driver.h"
 #include "wpa_supplicant_i.h"
 #include "bss.h"
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
+#include "hostapd.h"
+#endif
 
 #define __WPA_SUPP_PKD __attribute__((__packed__))
 
@@ -85,6 +88,15 @@ struct wpa_supp_event_sta_vht_cap {
 	struct wpa_supp_event_vht_mcs_info vht_mcs;
 } __WPA_SUPP_PKD;
 
+struct wpa_supp_event_sta_he_cap {
+	signed char wpa_supp_he_supported;
+	unsigned char phy_cap[HE_MAX_PHY_CAPAB_SIZE];
+	unsigned char mac_cap[HE_MAX_MAC_CAPAB_SIZE];
+	unsigned char mcs[HE_MAX_MCS_CAPAB_SIZE];
+	unsigned char ppet[HE_MAX_PPET_CAPAB_SIZE];
+	unsigned short he_6ghz_capa;
+} __WPA_SUPP_PKD;
+
 struct wpa_supp_event_supported_band {
 	unsigned short wpa_supp_n_channels;
 	unsigned short wpa_supp_n_bitrates;
@@ -94,6 +106,7 @@ struct wpa_supp_event_supported_band {
 	struct wpa_supp_event_rate bitrates[WPA_SUPP_SBAND_MAX_RATES];
 	struct wpa_supp_event_sta_ht_cap ht_cap;
 	struct wpa_supp_event_sta_vht_cap vht_cap;
+	struct wpa_supp_event_sta_he_cap he_cap;
 	signed char band;
 } __WPA_SUPP_PKD;
 
@@ -136,6 +149,13 @@ struct zep_drv_if_ctx {
 	unsigned char auth_bssid[6];
 	unsigned char auth_attempt_bssid[6];
 	bool beacon_set;
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
+	struct zep_wpa_supp_dev_ops *dev_ops;
+	struct hostapd_data *hapd;
+	int is_ap;
+	bool survey_res_get_in_prog;
+	union wpa_event_data *data;
+#endif
 };
 
 
@@ -180,6 +200,43 @@ struct zep_wpa_supp_dev_callbk_fns {
 	void (*mac_changed)(struct zep_drv_if_ctx *if_ctx);
 };
 
+struct zep_hostapd_dev_callbk_fns
+{
+	void (*mac_changed)(struct zep_drv_if_ctx *if_ctx);
+
+	void (*chan_list_changed)(struct zep_drv_if_ctx *if_ctx,
+				  union wpa_event_data *event);
+
+	void (*scan_done)(struct zep_drv_if_ctx *if_ctx,
+			  union wpa_event_data *event);
+
+	void (*survey_res)(struct zep_drv_if_ctx *if_ctx,
+			   struct freq_survey *survey, bool more_res);
+
+	void (*acs_channel_sel)(struct zep_drv_if_ctx *if_ctx,
+				union wpa_event_data *event);
+
+	void (*mgmt_rx)(struct zep_drv_if_ctx *if_ctx,
+			char *frame, int frame_len, int frequency, int rx_signal_dbm);
+
+	void (*eapol_rx)(struct zep_drv_if_ctx *if_ctx,
+			 union wpa_event_data *event);
+
+	void (*mgmt_tx_status)(struct zep_drv_if_ctx *if_ctx,
+			       const u8 *frame, size_t len, bool ack);
+
+	void (*ecsa_complete)(struct zep_drv_if_ctx *if_ctx,
+			      union wpa_event_data *event);
+
+	void (*dfs_cac_started)(struct zep_drv_if_ctx *if_ctx,
+				union wpa_event_data *event);
+
+	void (*dfs_cac_finished)(struct zep_drv_if_ctx *if_ctx,
+				 union wpa_event_data *event);
+
+	void (*get_wiphy_res)(struct zep_drv_if_ctx *if_ctx,
+			      void *band);
+};
 
 struct zep_wpa_supp_dev_ops {
 	void *(*init)(void *supp_drv_if_ctx,
@@ -232,7 +289,21 @@ struct zep_wpa_supp_dev_ops {
 	int (*get_conn_info)(void *if_priv,
 			struct wpa_conn_info *info);
 
+	int (*set_country)(void *priv, const char *alpha2);
+
+	int (*get_country)(void *priv, char *alpha2);
+
 	/* AP mode (shared headers, so, skip compile time flags protection)*/
+	void *(*hapd_init)(void *hapd_drv_if_ctx, const char *iface_name,
+                           struct zep_hostapd_dev_callbk_fns *hostapd_callbk_fns);
+
+	void (*hapd_deinit)(void *priv);
+
+	int (*set_ap)(void *priv, int beacon_set,
+                      struct wpa_driver_ap_params *params);
+
+	int (*do_acs)(void *priv, struct drv_acs_params *params);
+
 	int (*init_ap)(void *if_priv,
 			struct wpa_driver_associate_params *params);
 
