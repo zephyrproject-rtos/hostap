@@ -200,7 +200,6 @@ struct zep_wpa_supp_dev_callbk_fns {
 			      union wpa_event_data *event);
 };
 
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 struct zep_hostapd_dev_callbk_fns
 {
 	void (*mac_changed)(struct zep_drv_if_ctx *if_ctx);
@@ -238,7 +237,6 @@ struct zep_hostapd_dev_callbk_fns
 	void (*get_wiphy_res)(struct zep_drv_if_ctx *if_ctx,
 			      void *band);
 };
-#endif
 
 struct zep_wpa_supp_dev_ops {
 	void *(*init)(void *supp_drv_if_ctx,
@@ -296,7 +294,6 @@ struct zep_wpa_supp_dev_ops {
 	int (*get_country)(void *priv, char *alpha2);
 
 	/* AP mode (shared headers, so, skip compile time flags protection)*/
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	void *(*hapd_init)(void *hapd_drv_if_ctx, const char *iface_name,
                            struct zep_hostapd_dev_callbk_fns *hostapd_callbk_fns);
 
@@ -306,7 +303,6 @@ struct zep_wpa_supp_dev_ops {
                       struct wpa_driver_ap_params *params);
 
 	int (*do_acs)(void *priv, struct drv_acs_params *params);
-#endif
 
 	int (*init_ap)(void *if_priv,
 			struct wpa_driver_associate_params *params);
