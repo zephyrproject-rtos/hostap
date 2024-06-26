@@ -58,24 +58,21 @@ out:
 
 }
 
-
 static int hostapd_cli_cmd_set(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
-        char cmd[2048];
-        int res;
+	char cmd[256];
+	int res;
 
-        if (argc != 2) {
-                printf("Invalid SET command: needs two arguments (variable "
-                       "name and value)\n");
-                return -1;
-        }
+	if (argc == 1) {
+		res = os_snprintf(cmd, sizeof(cmd), "SET %s ", argv[0]);
+		if (os_snprintf_error(sizeof(cmd), res)) {
+			wpa_printf(MSG_INFO, "Too long SET command.\n");
+			return -1;
+		}
+		return hostapd_cli_cmd(ctrl, cmd, 0, argc, argv);
+	}
 
-        res = os_snprintf(cmd, sizeof(cmd), "SET %s %s", argv[0], argv[1]);
-        if (os_snprintf_error(sizeof(cmd), res)) {
-                printf("Too long SET command.\n");
-                return -1;
-        }
-        return hostapd_ctrl_command(ctrl, cmd);
+	return hostapd_cli_cmd(ctrl, "SET", 2, argc, argv);
 }
 
 
