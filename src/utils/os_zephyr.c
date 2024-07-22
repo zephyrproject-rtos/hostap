@@ -145,9 +145,13 @@ void os_daemonize_terminate(const char *pid_file)
 
 int os_get_random(unsigned char *buf, size_t len)
 {
-	sys_csrand_get(buf, len);
+#if defined(CONFIG_ENTROPY_HAS_DRIVER)
+	return sys_csrand_get(buf, len);
+#else
+	sys_rand_get(buf, len);
 
 	return 0;
+#endif
 }
 
 unsigned long os_random(void)
