@@ -1734,6 +1734,7 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
     int ret = mbedtls_ssl_config_defaults(
         &tls_conf->conf, tls_ctx_global.tls_conf ? MBEDTLS_SSL_IS_SERVER : MBEDTLS_SSL_IS_CLIENT,
         MBEDTLS_SSL_TRANSPORT_STREAM,
+        (tls_conf->flags & TLS_CONN_CNSA) ? MBEDTLS_SSL_PRESET_CNSA :
         (tls_conf->flags & TLS_CONN_SUITEB) ? MBEDTLS_SSL_PRESET_SUITEB : MBEDTLS_SSL_PRESET_DEFAULT);
     if (ret != 0)
     {
@@ -1751,7 +1752,7 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb192);
         mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 3072);
     }
-    else if (tls_conf->flags & TLS_CONN_SUITEB)
+    else if ((tls_conf->flags & TLS_CONN_SUITEB) | (tls_conf->flags & TLS_CONN_CNSA))
     {
         /* treat as suiteb192 while allowing any PK algorithm */
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb192_anypk);
@@ -1780,10 +1781,10 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
         if (!tls_mbedtls_set_ciphers(tls_conf, params->openssl_ciphers))
             return -1;
     }
-    else if (tls_conf->flags & TLS_CONN_SUITEB)
+    else if (tls_conf->flags & TLS_CONN_CNSA)
     {
         /* special-case a select set of ciphers for hwsim tests */
-        if (!tls_mbedtls_set_ciphers(tls_conf, (tls_conf->flags & TLS_CONN_SUITEB_NO_ECDH) ?
+        if (!tls_mbedtls_set_ciphers(tls_conf, (tls_conf->flags & TLS_CONN_CNSA_NO_ECDH) ?
                                                    "DHE-RSA-AES256-GCM-SHA384" :
                                                    "ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384"))
             return -1;
