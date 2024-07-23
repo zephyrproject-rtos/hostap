@@ -1730,7 +1730,7 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
     int ret = mbedtls_ssl_config_defaults(
         &tls_conf->conf, tls_ctx_global.tls_conf ? MBEDTLS_SSL_IS_SERVER : MBEDTLS_SSL_IS_CLIENT,
         MBEDTLS_SSL_TRANSPORT_STREAM,
-        (tls_conf->flags & TLS_CONN_SUITEB) ? MBEDTLS_SSL_PRESET_SUITEB : MBEDTLS_SSL_PRESET_DEFAULT);
+        MBEDTLS_SSL_PRESET_DEFAULT);
     if (ret != 0)
     {
         elog(ret, "mbedtls_ssl_config_defaults");
