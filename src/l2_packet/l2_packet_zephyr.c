@@ -166,6 +166,22 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 		goto fail;
 	}
 
+	/* Set the protocol-defined priority of all packets sent on this socket to 6
+	 * (NET_PRIORITY_IC, Internetwork control).
+	 * Network packet priority settings described in IEEE 802.1Q Annex I.1
+	 * The high priority (>= NET_PRIORITY_CA, 3) packet will be pushed directly to network driver
+	 * and will skip the traffic class queues.(Setting a priority outside the range 3 to 6.)
+	 * NOTE: This will only be true if NET_CONTEXT_PRIORITY and NET_TC_SKIP_FOR_HIGH_PRIO are enabled.
+	 */
+	if (IS_ENABLED(CONFIG_NET_CONTEXT_PRIORITY)) {
+		uint8_t priority = 6;
+		ret = setsockopt(l2->fd, SOL_SOCKET, SO_PRIORITY, &priority,
+				sizeof(priority));
+		if (ret < 0) {
+			goto fail;
+		}
+	}
+
 	if (rx_callback) {
 		eloop_register_read_sock(l2->fd, l2_packet_receive, l2, NULL);
 	}
