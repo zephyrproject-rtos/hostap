@@ -1378,7 +1378,7 @@ static int _wpa_drv_zep_set_key(void *priv,
 		goto out;
 	}
 
-	if (!net_if_is_up(iface)) {
+	if (!net_if_is_admin_up(iface)) {
 		goto out;
 	}
 
