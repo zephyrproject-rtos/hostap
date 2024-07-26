@@ -69,7 +69,7 @@ static void wpa_supplicant_ctrl_iface_send(struct wpa_supplicant *wpa_s,
 
 	idx = 0;
 	if (len > MAX_CTRL_MSG_LEN) {
-		wpa_printf(MSG_ERROR, "CTRL_MSG too long");
+		wpa_printf(MSG_DEBUG, "CTRL_MSG too long");
 		return;
 	}
 
