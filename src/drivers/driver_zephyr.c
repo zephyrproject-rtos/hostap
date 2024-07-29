@@ -396,6 +396,15 @@ void wpa_drv_zep_event_chan_list_changed(struct zep_drv_if_ctx *if_ctx, union wp
 
 void wpa_drv_zep_event_mac_changed(struct zep_drv_if_ctx *if_ctx)
 {
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
+	const struct net_linkaddr *link_addr = NULL;
+
+	if (if_ctx->hapd) {
+		link_addr = net_if_get_link_addr(net_if_get_wifi_uap());
+		os_memcpy(if_ctx->hapd->own_addr, link_addr->addr, link_addr->len);
+	}
+	else
+#endif
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_INTERFACE_MAC_CHANGED,
 			NULL);
