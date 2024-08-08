@@ -174,6 +174,9 @@ struct zep_wpa_supp_dev_callbk_fns {
 	void (*mgmt_rx)(struct zep_drv_if_ctx *if_ctx,
 			char *frame, int frame_len, int frequency, int rx_signal_dbm);
 
+	void (*chan_list_changed)(struct zep_drv_if_ctx *if_ctx,
+			union wpa_event_data *event);
+
 	void (*mac_changed)(struct zep_drv_if_ctx *if_ctx);
 };
 
