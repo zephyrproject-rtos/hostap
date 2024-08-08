@@ -216,7 +216,7 @@ struct tls_connection
 #if MBEDTLS_VERSION_NUMBER < 0x03000000 /* mbedtls 3.0.0 */
     unsigned char expkey_secret[MBEDTLS_EXPKEY_FIXED_SECRET_LEN];
 #else
-    unsigned char expkey_secret[MBEDTLS_MD_MAX_SIZE];
+    unsigned char expkey_secret[48];
 #endif
     unsigned char expkey_randbytes[MBEDTLS_EXPKEY_RAND_LEN * 2];
 
