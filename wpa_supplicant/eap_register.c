@@ -267,6 +267,6 @@ int eap_register_methods(void)
 	if (ret == 0)
 		ret = eap_server_pwd_register();
 #endif /* EAP_SERVER_PWD */
-#endif /* HOSTAPD *
+#endif /* HOSTAPD */
 	return ret;
 }
