@@ -860,13 +860,13 @@ int omac1_aes_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *a
     switch (key_len)
     {
         case 16:
-            cipher_type = MBEDTLS_CIPHER_AES_128_ECB;
+            cipher_type = MBEDTLS_CIPHER_AES_128_CBC;
             break;
         case 24:
-            cipher_type = MBEDTLS_CIPHER_AES_192_ECB;
+            cipher_type = MBEDTLS_CIPHER_AES_192_CBC;
             break;
         case 32:
-            cipher_type = MBEDTLS_CIPHER_AES_256_ECB;
+            cipher_type = MBEDTLS_CIPHER_AES_256_CBC;
             break;
         default:
             return -1;
