@@ -120,8 +120,7 @@ typedef mbedtls_tls_prf_types int;
  * be replaced by sending a DN hint with ServerHello Certificate Request, and
  * then checking the client cert against the DN hint in certificate verify_cb.
  * Comment out to disable feature and remove ~3k from binary .text segment */
-/* needs mbedtls private access, so temporarily comment out and see what happens */
-//#define TLS_MBEDTLS_CERT_VERIFY_EXTMATCH
+#define TLS_MBEDTLS_CERT_VERIFY_EXTMATCH
 //#define TLS_MBEDTLS_CERT_DISABLE_KEY_USAGE_CHECK
 
 #if defined(EAP_FAST) || defined(EAP_FAST_DYNAMIC) || defined(EAP_SERVER_FAST) || defined(EAP_TEAP) || \
