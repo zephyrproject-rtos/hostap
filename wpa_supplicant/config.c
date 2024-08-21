@@ -4699,6 +4699,7 @@ struct wpa_config * wpa_config_alloc_empty(const char *ctrl_interface,
 	if (driver_param)
 		config->driver_param = os_strdup(driver_param);
 	config->gas_rand_addr_lifetime = DEFAULT_RAND_ADDR_LIFETIME;
+	config->max_idle_period = DEFAULT_MAX_IDLE_PERIOD;
 
 #ifdef CONFIG_TESTING_OPTIONS
 	config->mld_connect_band_pref = DEFAULT_MLD_CONNECT_BAND_PREF;
@@ -5597,6 +5598,7 @@ static const struct global_parse_data global_fields[] = {
 	/* NOTE: When adding new parameters here, add_interface() in
 	 * wpa_supplicant/dbus_new_introspect.c may need to be modified to
 	 * increase the size of the iface->xml buffer. */
+	{ INT(max_idle_period), 0 },
 };
 
 #undef FUNC

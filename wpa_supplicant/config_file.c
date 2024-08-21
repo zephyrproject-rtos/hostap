@@ -1630,6 +1630,8 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 #endif /* CONFIG_TESTING_OPTIONS */
 	if (config->ft_prepend_pmkid)
 		fprintf(f, "ft_prepend_pmkid=%d", config->ft_prepend_pmkid);
+	if (config->max_idle_period != DEFAULT_MAX_IDLE_PERIOD)
+		fprintf(f, "max_idle_period=%u\n", config->max_idle_period);
 }
 
 #endif /* CONFIG_NO_CONFIG_WRITE */

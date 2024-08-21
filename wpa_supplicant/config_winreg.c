@@ -287,6 +287,9 @@ static int wpa_config_read_global(struct wpa_config *config, HKEY hk)
 		config->extended_key_id = val;
 	}
 
+	wpa_config_read_reg_dword(hk, TEXT("max_idle_period"),
+				  (int *) &config->max_idle_period);
+
 	return errors ? -1 : 0;
 }
 
@@ -643,6 +646,11 @@ static int wpa_config_write_global(struct wpa_config *config, HKEY hk)
 
 	wpa_config_write_reg_dword(hk, TEXT("external_sim"),
 				   config->external_sim, 0);
+
+
+	wpa_config_write_reg_dword(hk, TEXT("max_idle_period"),
+				   config->max_idle_period,
+				   DEFAULT_MAX_IDLE_PERIOD);
 
 	return 0;
 }

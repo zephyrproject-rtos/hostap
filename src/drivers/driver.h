@@ -1375,6 +1375,9 @@ struct wpa_driver_associate_params {
 	 * rsn_overriding - wpa_supplicant RSN overriding support
 	 */
 	bool rsn_overriding;
+
+	/* max_idle_period - Maximum idle period likely for this connection */
+	u16 max_idle_period;
 };
 
 enum hide_ssid {
