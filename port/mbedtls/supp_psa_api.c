@@ -408,6 +408,56 @@ exit:
     return (int)status;
 }
 
+int pbkdf2_sha1_psa(mbedtls_md_type_t md_alg, const u8 *password, size_t plen,
+                    const unsigned char *salt, size_t slen,
+                    unsigned int iteration_count, uint32_t key_length,
+                    unsigned char *output)
+{
+    psa_status_t status;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_algorithm_t alg             = PSA_ALG_NONE;
+    mbedtls_svc_key_id_t key_id     = MBEDTLS_SVC_KEY_ID_INIT;
+    psa_key_derivation_operation_t operation = PSA_KEY_DERIVATION_OPERATION_INIT;
+    int block_size;
+
+    supp_psa_get_hash_alg(md_alg, &alg, &block_size);
+    if (alg == PSA_ALG_NONE) {
+        printk("unknown md type %d\r\n", md_alg);
+    }
+
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DERIVE);
+    psa_set_key_lifetime(&attributes, PSA_KEY_LIFETIME_VOLATILE);
+    psa_set_key_algorithm(&attributes, PSA_ALG_PBKDF2_HMAC(alg));
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_PASSWORD);
+    psa_set_key_bits(&attributes, PSA_BYTES_TO_BITS(plen));
+
+    status = psa_import_key(&attributes, password, plen, &key_id);
+    ASSERT_STATUS(status, PSA_SUCCESS);
+
+    status = psa_key_derivation_setup(&operation, PSA_ALG_PBKDF2_HMAC(alg));
+    ASSERT_STATUS(status, PSA_SUCCESS);
+
+    status = psa_key_derivation_input_integer(&operation, PSA_KEY_DERIVATION_INPUT_COST,
+                                              iteration_count);
+    ASSERT_STATUS(status, PSA_SUCCESS);
+
+    status = psa_key_derivation_input_bytes(&operation, PSA_KEY_DERIVATION_INPUT_SALT, salt,
+                                            slen);
+    ASSERT_STATUS(status, PSA_SUCCESS);
+
+    status = psa_key_derivation_input_key(&operation, PSA_KEY_DERIVATION_INPUT_PASSWORD,
+                                          key_id);
+    ASSERT_STATUS(status, PSA_SUCCESS);
+
+    status = psa_key_derivation_output_bytes(&operation, output, key_length);
+    ASSERT_STATUS(status, PSA_SUCCESS);
+
+exit:
+    psa_key_derivation_abort(&operation);
+    psa_destroy_key(key_id);
+    return (int)status;
+}
+
 int supp_psa_crypto_init(void)
 {
     return psa_crypto_init();

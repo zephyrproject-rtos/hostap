@@ -52,6 +52,12 @@ int hmac_vector_psa(const u8 *key,
                     u8 *mac,
                     mbedtls_md_type_t md_type);
 
+int pbkdf2_sha1_psa(mbedtls_md_type_t md_alg,
+                    const u8 *password, size_t plen,
+                    const unsigned char *salt, size_t slen,
+                    unsigned int iteration_count, uint32_t key_length,
+                    unsigned char *output);
+
 int supp_psa_crypto_init(void);
 void supp_psa_crypto_deinit(void);
 #endif /* SUPP_PSA_API_H */
