@@ -722,6 +722,11 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 #include <mbedtls/pkcs5.h>
 int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int iterations, u8 *buf, size_t buflen)
 {
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
+    return pbkdf2_sha1_psa(MBEDTLS_MD_SHA1, (const u8 *)passphrase,
+                           os_strlen(passphrase), ssid, ssid_len,
+                           iterations, 32, buf) ? -1: 0;
+#else
 #if MBEDTLS_VERSION_NUMBER >= 0x03020200 /* mbedtls 3.2.2 */
     return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA1, (const u8 *)passphrase, os_strlen(passphrase), ssid, ssid_len,
                                          iterations, 32, buf) ?
@@ -742,6 +747,7 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int ite
     mbedtls_md_free(&ctx);
     return ret;
 #endif
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 }
 #endif
 
