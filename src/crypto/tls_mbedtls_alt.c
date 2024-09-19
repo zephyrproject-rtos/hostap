@@ -1502,8 +1502,6 @@ static int tls_mbedtls_set_ca_cert(struct tls_conf *tls_conf, const struct tls_c
     {
         size_t len = params->ca_cert_blob_len;
         int is_pem = tls_mbedtls_data_is_pem(params->ca_cert_blob);
-        if (len && params->ca_cert_blob[len - 1] != '\0' && is_pem)
-            ++len; /*(include '\0' in len for PEM)*/
         int ret = mbedtls_x509_crt_parse(&tls_conf->ca_cert, params->ca_cert_blob, len);
         if (ret != 0)
         {
@@ -1581,8 +1579,7 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf, const struct tls_con
     if (params->client_cert_blob)
     {
         size_t len = params->client_cert_blob_len;
-        if (len && params->client_cert_blob[len - 1] != '\0' && tls_mbedtls_data_is_pem(params->client_cert_blob))
-            ++len; /*(include '\0' in len for PEM)*/
+
         ret = mbedtls_x509_crt_parse(&tls_conf->client_cert, params->client_cert_blob, len);
     }
     if (params->client_cert || params->client_cert_blob)
@@ -1608,9 +1605,8 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf, const struct tls_con
     {
         size_t len = params->private_key_blob_len;
         u8 *data;
+
         *(const u8 **)&data = params->private_key_blob;
-        if (len && data[len - 1] != '\0' && tls_mbedtls_data_is_pem(data))
-            ++len; /*(include '\0' in len for PEM)*/
         if (params->private_key && tls_mbedtls_readfile(params->private_key, &data, &len))
         {
             return -1;
