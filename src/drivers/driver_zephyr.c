@@ -993,6 +993,12 @@ static void wpa_drv_zep_event_dfs_cac_finished(struct zep_drv_if_ctx *if_ctx, un
 }
 #endif
 
+static void wpa_drv_zep_event_signal_change(struct zep_drv_if_ctx *if_ctx,
+					    union wpa_event_data *event)
+{
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_SIGNAL_CHANGE, event);
+}
+
 static struct hostapd_hw_modes *
 wpa_driver_wpa_supp_postprocess_modes(struct hostapd_hw_modes *modes,
 		u16 *num_modes)
@@ -1232,6 +1238,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.chan_list_changed = wpa_drv_zep_event_chan_list_changed;
 	callbk_fns.mac_changed = wpa_drv_zep_event_mac_changed;
 	callbk_fns.ecsa_complete = wpa_drv_zep_event_ecsa_complete;
+	callbk_fns.signal_change = wpa_drv_zep_event_signal_change;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
