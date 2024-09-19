@@ -63,6 +63,7 @@
 #include <net/if_ether.h>
 #elif defined(__ZEPHYR__)
 #include <zephyr/net/ethernet.h>
+#include <supp_events.h>
 #endif
 
 static int wpa_supplicant_global_iface_list(struct wpa_global *global,
@@ -10308,6 +10309,13 @@ static void wpas_ctrl_neighbor_rep_cb(void *ctx, struct wpabuf *neighbor_rep)
 		data = end;
 		len -= 2 + nr_len;
 	}
+
+#ifdef __ZEPHYR__
+	supplicant_send_wifi_mgmt_event(wpa_s->ifname,
+					NET_EVENT_WIFI_CMD_NEIGHBOR_REP_COMPLETE,
+					(void *)wpa_s->current_ssid->ssid,
+					wpa_s->current_ssid->ssid_len);
+#endif
 
 out:
 	wpabuf_free(neighbor_rep);
