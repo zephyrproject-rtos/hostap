@@ -530,11 +530,26 @@ void wpa_drv_zep_event_proc_auth_resp(struct zep_drv_if_ctx *if_ctx,
 }
 
 
+static void wpa_drv_zep_free_pairwise_key_params(struct wpa_driver_set_key_params *params)
+{
+	os_free((void *)params->ifname);
+	os_free((void *)params->addr);
+	os_free((void *)params->seq);
+	os_free((void *)params->key);
+	os_free(params);
+}
+
+
 void wpa_drv_zep_event_proc_assoc_resp(struct zep_drv_if_ctx *if_ctx,
 				       union wpa_event_data *event,
 				       unsigned int status)
 {
 	if (status != WLAN_STATUS_SUCCESS) {
+		if (if_ctx->ft_roaming) {
+			if_ctx->ft_roaming = false;
+			wpa_drv_zep_free_pairwise_key_params(if_ctx->key_params);
+			if_ctx->key_params = NULL;
+		}
 		wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 				EVENT_ASSOC_REJECT,
 				event);
@@ -1528,6 +1543,78 @@ out:
 }
 
 
+static int wpa_drv_zep_save_pairwise_key_params(void *priv, struct wpa_driver_set_key_params *params)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	int ret = -1;
+
+	if_ctx = priv;
+
+	if (if_ctx->key_params) {
+		wpa_drv_zep_free_pairwise_key_params(if_ctx->key_params);
+		if_ctx->key_params = NULL;
+	}
+
+	if_ctx->key_params = (struct wpa_driver_set_key_params *)os_zalloc(sizeof(struct wpa_driver_set_key_params));
+
+	if (!if_ctx->key_params) {
+		wpa_printf(MSG_DEBUG, "%s: failed to alloc", __func__);
+		return -1;
+	}
+
+	if (params->ifname) {
+		if_ctx->key_params->ifname = os_strdup(params->ifname);
+
+		if (!if_ctx->key_params->ifname) {
+			wpa_printf(MSG_DEBUG, "%s: failed to alloc ifname", __func__);
+			goto out;
+		}
+	}
+
+	if (params->addr) {
+		if_ctx->key_params->addr = os_memdup(params->addr, ETH_ALEN);
+
+		if (!if_ctx->key_params->addr) {
+			wpa_printf(MSG_DEBUG, "%s: failed to alloc addr", __func__);
+			goto out;
+		}
+	}
+
+	if (params->seq) {
+		if_ctx->key_params->seq = os_memdup(params->seq, params->seq_len);
+
+		if (!if_ctx->key_params->seq) {
+			wpa_printf(MSG_DEBUG, "%s: failed to alloc seq", __func__);
+			goto out;
+		}
+		if_ctx->key_params->seq_len = params->seq_len;
+	}
+
+	if (params->key) {
+		if_ctx->key_params->key = os_memdup(params->key, params->key_len);
+
+		if (!if_ctx->key_params->key) {
+			wpa_printf(MSG_DEBUG, "%s: failed to alloc key", __func__);
+			goto out;
+		}
+		if_ctx->key_params->key_len = params->key_len;
+	}
+
+	if_ctx->key_params->alg      = params->alg;
+	if_ctx->key_params->key_idx  = params->key_idx;
+	if_ctx->key_params->set_tx   = params->set_tx;
+	if_ctx->key_params->key_flag = params->key_flag;
+
+	ret = 0;
+out:
+	if (ret) {
+		wpa_drv_zep_free_pairwise_key_params(if_ctx->key_params);
+		if_ctx->key_params = NULL;
+	}
+	return ret;
+}
+
+
 static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 				      u16 reason_code)
 {
@@ -1541,6 +1628,10 @@ static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 	}
 
 	if_ctx = priv;
+
+	if (if_ctx->ft_roaming) {
+		if_ctx->ft_roaming = false;
+	}
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	ret = dev_ops->deauthenticate(if_ctx->dev_priv, addr, reason_code);
@@ -1569,6 +1660,12 @@ static int wpa_drv_zep_authenticate(void *priv,
 	}
 
 	if_ctx = priv;
+
+	if_ctx->ft_roaming = false;
+
+	if (params->auth_alg == WPA_AUTH_ALG_FT) {
+		if_ctx->ft_roaming = true;
+	}
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
@@ -1720,6 +1817,29 @@ out:
 static int wpa_drv_zep_set_key(void* priv,
 			       struct wpa_driver_set_key_params *params)
 {
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	enum key_flag key_flag        = params->key_flag;
+
+	if_ctx = priv;
+
+	if (if_ctx->ft_roaming && (key_flag & KEY_FLAG_PAIRWISE)) {
+		return wpa_drv_zep_save_pairwise_key_params(priv, params);
+	}
+
+	if (if_ctx->ft_roaming && (key_flag & KEY_FLAG_GROUP)) {
+		if (if_ctx->key_params &&
+		    (if_ctx->key_params->key_flag & KEY_FLAG_PAIRWISE)) {
+			_wpa_drv_zep_set_key(priv, (const unsigned char *)if_ctx->key_params->ifname,
+					     if_ctx->key_params->alg, if_ctx->key_params->addr,
+					     if_ctx->key_params->key_idx, if_ctx->key_params->set_tx,
+					     if_ctx->key_params->seq, if_ctx->key_params->seq_len,
+					     if_ctx->key_params->key, if_ctx->key_params->key_len,
+					     if_ctx->key_params->key_flag);
+			wpa_drv_zep_free_pairwise_key_params(if_ctx->key_params);
+			if_ctx->key_params = NULL;
+		}
+	}
+
 	return _wpa_drv_zep_set_key(priv,
 				    params->ifname,
 				    params->alg,
