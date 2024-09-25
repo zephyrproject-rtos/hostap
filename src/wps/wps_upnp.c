@@ -670,8 +670,8 @@ static int subscription_first_event(struct subscription *s)
 		msg = build_fake_wsc_ack();
 		if (msg) {
 			s->sm->wlanevent =
-				base64_encode(wpabuf_head(msg),
-					      wpabuf_len(msg), NULL);
+				hostap_base64_encode(wpabuf_head(msg),
+						     wpabuf_len(msg), NULL);
 			wpabuf_free(msg);
 		}
 	}
@@ -844,7 +844,7 @@ int upnp_wps_device_send_wlan_event(struct upnp_wps_device_sm *sm,
 	}
 	raw_len = pos;
 
-	val = base64_encode(raw, raw_len, &val_len);
+	val = hostap_base64_encode(raw, raw_len, &val_len);
 	if (val == NULL)
 		goto fail;
 

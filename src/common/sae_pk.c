@@ -488,7 +488,7 @@ struct sae_pk * sae_parse_pk(const char *val)
 		pos2++;
 	}
 #endif /* CONFIG_TESTING_OPTIONS */
-	der = base64_decode(pos, b_len, &der_len);
+	der = hostap_base64_decode(pos, b_len, &der_len);
 	if (!der) {
 		wpa_printf(MSG_INFO, "SAE: Failed to base64 decode PK key");
 		goto fail;
@@ -505,7 +505,7 @@ struct sae_pk * sae_parse_pk(const char *val)
 
 #ifdef CONFIG_TESTING_OPTIONS
 	if (pos2) {
-		der = base64_decode(pos2, os_strlen(pos2), &der_len);
+		der = hostap_base64_decode(pos2, os_strlen(pos2), &der_len);
 		if (!der) {
 			wpa_printf(MSG_INFO,
 				   "SAE: Failed to base64 decode PK key");

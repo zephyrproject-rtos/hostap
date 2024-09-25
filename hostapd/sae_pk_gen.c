@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "\nFound a valid hash in %llu iterations: %s\n",
 		i + 1, hash_hex);
 
-	b64 = base64_encode(der, der_len, NULL);
+	b64 = hostap_base64_encode(der, der_len, NULL);
 	if (!b64)
 		goto fail;
 	src = pos = b64;

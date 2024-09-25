@@ -364,7 +364,7 @@ static int download_cert(struct hs20_osu_client *ctx, xml_node_t *params,
 		return -1;
 	}
 
-	b64 = base64_encode(cert, len, NULL);
+	b64 = hostap_base64_encode(cert, len, NULL);
 	os_free(cert);
 	if (b64 == NULL)
 		return -1;

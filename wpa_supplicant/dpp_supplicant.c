@@ -4422,7 +4422,7 @@ int wpas_dpp_ca_set(struct wpa_supplicant *wpa_s, const char *cmd)
 		return auth->trusted_eap_server_name ? 0 : -1;
 	}
 
-	bin = base64_decode(value, os_strlen(value), &bin_len);
+	bin = hostap_base64_decode(value, os_strlen(value), &bin_len);
 	if (!bin)
 		return -1;
 	buf = wpabuf_alloc_copy(bin, bin_len);

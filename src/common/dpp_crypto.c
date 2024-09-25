@@ -342,7 +342,7 @@ int dpp_keygen(struct dpp_bootstrap_info *bi, const char *curve,
 		goto fail;
 	}
 
-	base64 = base64_encode(wpabuf_head(der), wpabuf_len(der), &len);
+	base64 = hostap_base64_encode(wpabuf_head(der), wpabuf_len(der), &len);
 	wpabuf_free(der);
 	der = NULL;
 	if (!base64)
@@ -2158,7 +2158,7 @@ int dpp_validate_csr(struct dpp_authentication *auth,
 		goto fail;
 	}
 
-	cp = base64_decode((const char *) attr, attr_len, &cp_len);
+	cp = hostap_base64_decode((const char *) attr, attr_len, &cp_len);
 	if (!cp) {
 		wpa_printf(MSG_DEBUG,
 			   "DPP: Could not base64 decode challengePassword");

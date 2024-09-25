@@ -539,7 +539,7 @@ struct wpabuf * json_get_member_base64(struct json_token *json,
 	token = json_get_member(json, name);
 	if (!token || token->type != JSON_STRING)
 		return NULL;
-	buf = base64_decode(token->string, os_strlen(token->string), &buflen);
+	buf = hostap_base64_decode(token->string, os_strlen(token->string), &buflen);
 	if (!buf)
 		return NULL;
 	ret = wpabuf_alloc_ext_data(buf, buflen);
