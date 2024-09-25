@@ -330,7 +330,7 @@ static int dpp_parse_uri_pk(struct dpp_bootstrap_info *bi, const char *info)
 	if (!end)
 		return -1;
 
-	data = base64_decode(info, end - info, &data_len);
+	data = hostap_base64_decode(info, end - info, &data_len);
 	if (!data) {
 		wpa_printf(MSG_DEBUG,
 			   "DPP: Invalid base64 encoding on URI public-key");
@@ -3060,7 +3060,7 @@ static u8 * dpp_get_csr_attrs(const u8 *attrs, size_t attrs_len, size_t *len)
 	b64 = dpp_get_attr(attrs, attrs_len, DPP_ATTR_CSR_ATTR_REQ, &b64_len);
 	if (!b64)
 		return NULL;
-	return base64_decode((const char *) b64, b64_len, len);
+	return hostap_base64_decode((const char *) b64, b64_len, len);
 }
 #endif /* CONFIG_DPP2 */
 

@@ -301,48 +301,48 @@ static int base64_tests(void)
 
 	wpa_printf(MSG_INFO, "base64 tests");
 
-	res2 = base64_encode("", ~0, &res_len);
+	res2 = hostap_base64_encode("", ~0, &res_len);
 	if (res2) {
 		errors++;
 		os_free(res2);
 	}
 
-	res2 = base64_encode("=", 1, &res_len);
+	res2 = hostap_base64_encode("=", 1, &res_len);
 	if (!res2 || res_len != 5 || res2[0] != 'P' || res2[1] != 'Q' ||
 	    res2[2] != '=' || res2[3] != '=' || res2[4] != '\n')
 		errors++;
 	os_free(res2);
 
-	res2 = base64_encode("=", 1, NULL);
+	res2 = hostap_base64_encode("=", 1, NULL);
 	if (!res2 || res2[0] != 'P' || res2[1] != 'Q' ||
 	    res2[2] != '=' || res2[3] != '=' || res2[4] != '\n')
 		errors++;
 	os_free(res2);
 
-	res = base64_decode("", 0, &res_len);
+	res = hostap_base64_decode("", 0, &res_len);
 	if (res) {
 		errors++;
 		os_free(res);
 	}
 
-	res = base64_decode("a", 1, &res_len);
+	res = hostap_base64_decode("a", 1, &res_len);
 	if (res) {
 		errors++;
 		os_free(res);
 	}
 
-	res = base64_decode("====", 4, &res_len);
+	res = hostap_base64_decode("====", 4, &res_len);
 	if (res) {
 		errors++;
 		os_free(res);
 	}
 
-	res = base64_decode("PQ==", 4, &res_len);
+	res = hostap_base64_decode("PQ==", 4, &res_len);
 	if (!res || res_len != 1 || res[0] != '=')
 		errors++;
 	os_free(res);
 
-	res = base64_decode("P.Q-=!=*", 8, &res_len);
+	res = hostap_base64_decode("P.Q-=!=*", 8, &res_len);
 	if (!res || res_len != 1 || res[0] != '=')
 		errors++;
 	os_free(res);

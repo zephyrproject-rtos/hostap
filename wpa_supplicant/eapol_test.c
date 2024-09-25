@@ -441,7 +441,7 @@ static void eapol_test_write_cert(FILE *f, const char *subject,
 {
 	char *encoded;
 
-	encoded = base64_encode(wpabuf_head(cert), wpabuf_len(cert), NULL);
+	encoded = hostap_base64_encode(wpabuf_head(cert), wpabuf_len(cert), NULL);
 	if (encoded == NULL)
 		return;
 	fprintf(f, "%s\n-----BEGIN CERTIFICATE-----\n%s"

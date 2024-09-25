@@ -26,9 +26,9 @@ int main(int argc, char *argv[])
 		return -1;
 
 	if (strcmp(argv[1], "encode") == 0)
-		e = (unsigned char *) base64_encode(buf, len, &elen);
+		e = (unsigned char *) hostap_base64_encode(buf, len, &elen);
 	else
-		e = base64_decode((const char *) buf, len, &elen);
+		e = hostap_base64_decode((const char *) buf, len, &elen);
 	if (e == NULL)
 		return -2;
 	f = fopen(argv[3], "w");

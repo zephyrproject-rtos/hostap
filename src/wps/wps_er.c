@@ -902,8 +902,8 @@ static struct wpabuf * wps_er_soap_hdr(const struct wpabuf *msg,
 	struct wpabuf *buf;
 
 	if (msg) {
-		encoded = base64_encode(wpabuf_head(msg), wpabuf_len(msg),
-					&encoded_len);
+		encoded = hostap_base64_encode(wpabuf_head(msg), wpabuf_len(msg),
+					       &encoded_len);
 		if (encoded == NULL)
 			return NULL;
 	} else {

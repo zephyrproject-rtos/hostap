@@ -251,7 +251,7 @@ static struct wpa_config_blob * wpa_config_read_blob(FILE *f, int *line,
 		return NULL;
 	}
 	blob->name = os_strdup(name);
-	blob->data = base64_decode(encoded, encoded_len, &blob->len);
+	blob->data = hostap_base64_decode(encoded, encoded_len, &blob->len);
 	os_free(encoded);
 
 	if (blob->name == NULL || blob->data == NULL) {
@@ -1047,7 +1047,7 @@ static int wpa_config_write_blob(FILE *f, struct wpa_config_blob *blob)
 {
 	char *encoded;
 
-	encoded = base64_encode(blob->data, blob->len, NULL);
+	encoded = hostap_base64_encode(blob->data, blob->len, NULL);
 	if (encoded == NULL)
 		return -1;
 

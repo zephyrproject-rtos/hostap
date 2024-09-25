@@ -156,7 +156,7 @@ static unsigned char * base64_gen_decode(const char *src, size_t len,
 
 
 /**
- * base64_encode - Base64 encode
+ * hostap_base64_encode - Base64 encode
  * @src: Data to be encoded
  * @len: Length of the data to be encoded
  * @out_len: Pointer to output length variable, or %NULL if not used
@@ -167,7 +167,7 @@ static unsigned char * base64_gen_decode(const char *src, size_t len,
  * nul terminated to make it easier to use as a C string. The nul terminator is
  * not included in out_len.
  */
-char * base64_encode(const void *src, size_t len, size_t *out_len)
+char * hostap_base64_encode(const void *src, size_t len, size_t *out_len)
 {
 	return base64_gen_encode(src, len, out_len, base64_table,
 				 BASE64_PAD | BASE64_LF);
@@ -187,7 +187,7 @@ char * base64_url_encode(const void *src, size_t len, size_t *out_len)
 
 
 /**
- * base64_decode - Base64 decode
+ * hostap_base64_decode - Base64 decode
  * @src: Data to be decoded
  * @len: Length of the data to be decoded
  * @out_len: Pointer to output length variable
@@ -196,7 +196,7 @@ char * base64_url_encode(const void *src, size_t len, size_t *out_len)
  *
  * Caller is responsible for freeing the returned buffer.
  */
-unsigned char * base64_decode(const char *src, size_t len, size_t *out_len)
+unsigned char * hostap_base64_decode(const char *src, size_t len, size_t *out_len)
 {
 	return base64_gen_decode(src, len, out_len, base64_table);
 }

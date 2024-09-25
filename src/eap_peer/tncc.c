@@ -156,7 +156,7 @@ static TNC_Result TNC_TNCC_SendMessage(
 	if (imcID >= TNC_MAX_IMC_ID || tnc_imc[imcID] == NULL)
 		return TNC_RESULT_INVALID_PARAMETER;
 
-	b64 = base64_encode(message, messageLength, &b64len);
+	b64 = hostap_base64_encode(message, messageLength, &b64len);
 	if (b64 == NULL)
 		return TNC_RESULT_FATAL;
 
@@ -629,7 +629,7 @@ static unsigned char * tncc_get_base64(char *start, size_t *decoded_len)
 		return NULL;
 	*pos2 = '\0';
 
-	decoded = base64_decode(pos, os_strlen(pos), decoded_len);
+	decoded = hostap_base64_decode(pos, os_strlen(pos), decoded_len);
 	*pos2 = '<';
 	if (decoded == NULL) {
 		wpa_printf(MSG_DEBUG, "TNC: Failed to decode Base64 data");

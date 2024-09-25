@@ -3450,7 +3450,7 @@ def test_ap_wps_upnp_subscribe(dev, apdev):
         time.sleep(0.1)
 
     with alloc_fail(hapd, 1,
-                    "base64_gen_encode;?base64_encode;upnp_wps_device_send_wlan_event"):
+                    "base64_gen_encode;?hostap_base64_encode;upnp_wps_device_send_wlan_event"):
         dev[1].dump_monitor()
         dev[1].request("WPS_PIN " + apdev[0]['bssid'] + " 12345670")
         dev[1].wait_event(["CTRL-EVENT-SCAN-RESULTS"], 5)
@@ -4000,7 +4000,7 @@ def test_ap_wps_init_oom(dev, apdev):
     params = {"ssid": ssid, "eap_server": "1", "wps_state": "1"}
     hapd = hostapd.add_ap(apdev[0], params)
 
-    with alloc_fail(hapd, 1, "base64_gen_encode;?base64_encode;wps_build_cred"):
+    with alloc_fail(hapd, 1, "base64_gen_encode;?hostap_base64_encode;wps_build_cred"):
         pin = dev[0].wps_read_pin()
         hapd.request("WPS_PIN any " + pin)
         dev[0].scan_for_bss(apdev[0]['bssid'], freq="2412")
@@ -4038,7 +4038,7 @@ def _test_ap_wps_er_oom(dev, apdev):
     dev[0].connect(ssid, psk="12345678", scan_freq="2412")
 
     with alloc_fail(dev[0], 1,
-                    "base64_gen_decode;?base64_decode;xml_get_base64_item"):
+                    "base64_gen_decode;?hostap_base64_decode;xml_get_base64_item"):
         dev[0].request("WPS_ER_START ifname=lo")
         ev = dev[0].wait_event(["WPS-ER-AP-ADD"], timeout=3)
         if ev is not None:
@@ -4052,7 +4052,7 @@ def _test_ap_wps_er_oom(dev, apdev):
 
     dev[1].scan_for_bss(apdev[0]['bssid'], freq=2412)
     with alloc_fail(dev[0], 1,
-                    "base64_gen_decode;?base64_decode;xml_get_base64_item"):
+                    "base64_gen_decode;?hostap_base64_decode;xml_get_base64_item"):
         dev[1].request("WPS_PBC " + apdev[0]['bssid'])
         ev = dev[1].wait_event(["CTRL-EVENT-SCAN-RESULTS"], timeout=10)
         if ev is None:
@@ -4865,7 +4865,7 @@ RGV2aWNlIEEQSQAGADcqAAEg
         raise Exception("Enrollee add event not seen")
 
     with alloc_fail(dev[0], 1,
-                    "base64_gen_encode;?base64_encode;wps_er_soap_hdr"):
+                    "base64_gen_encode;?hostap_base64_encode;wps_er_soap_hdr"):
         send_wlanevent(url, uuid, data)
 
     with alloc_fail(dev[0], 1, "wpabuf_alloc;wps_er_soap_hdr"):
