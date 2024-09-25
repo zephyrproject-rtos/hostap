@@ -153,7 +153,7 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 				/* Only interested in CTRL-EVENTs */
 				if (strncmp(msg->msg, "CTRL-EVENT", 10) == 0) {
 					supplicant_send_wifi_mgmt_event(wpa_s->ifname,
-									NET_EVENT_SUPPLICANT_CMD_INT_EVENT,
+									NET_EVENT_WIFI_CMD_SUPPLICANT,
 									msg->msg, msg->msg_len);
 				}
 			}
