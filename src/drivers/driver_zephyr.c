@@ -657,6 +657,7 @@ static void phy_info_freq_cfg(struct hostapd_hw_modes *mode,
 	chan->flag = 0;
 	chan->allowed_bw = ~0;
 	chan->dfs_cac_ms = 0;
+	chan->max_tx_power = chnl_info->wpa_supp_max_power;
 
 	if (ieee80211_freq_to_chan(chan->freq, &channel) != NUM_HOSTAPD_MODES) {
 		chan->chan = channel;
@@ -715,6 +716,8 @@ static int phy_info_freqs_cfg(struct phy_info_arg *phy_info,
 			sizeof(struct hostapd_channel_data));
 	if (!channel)
 		return -1;
+
+	os_memset(channel, 0, (mode->num_channels + new_channels) * sizeof(*channel));
 
 	mode->channels = channel;
 	mode->num_channels += new_channels;
