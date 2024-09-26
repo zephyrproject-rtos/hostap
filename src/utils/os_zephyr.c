@@ -29,8 +29,8 @@ int os_get_time(struct os_time *t)
 	struct timeval tv;
 
 	res = gettimeofday(&tv, NULL);
-	t->sec = tv.tv_sec;
-	t->usec = tv.tv_usec;
+	t->sec = (os_time_t)tv.tv_sec;
+	t->usec = (os_time_t)tv.tv_usec;
 	return res;
 }
 
