@@ -605,10 +605,57 @@ int sha384_prf(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA384);
 }
 
+/**
+ * Based on Supplicant internal implementaion of SHA-256. This API
+ * uses PSA APIs instead of Supplicant internal implementation or
+ * mbedtls APIs.
+ */
+static int hmac_prf256(const u8 *key,
+                       size_t key_len,
+                       const char *label,
+                       const u8 *data,
+                       size_t data_len,
+                       u8 *buf_in,
+                       size_t buf_len_bits,
+                       mbedtls_md_type_t md_type)
+{
+    unsigned short ctr, n_le = host_to_le16(buf_len_bits);
+    const u8 *addr[]         = {(u8 *)&ctr, (u8 *)label, data, (u8 *)&n_le};
+    const size_t len[]       = {2, os_strlen(label), data_len, 2};
+    size_t buf_len           = (buf_len_bits + 7) / 8;
+    u8 *buf  = buf_in;
+
+    for (ctr = 1; buf_len >= SHA256_MAC_LEN; buf_len -= SHA256_MAC_LEN, ++ctr)
+    {
+            if (hmac_sha256_vector(key, key_len, 4, addr, len, buf))
+                    return -1;
+            buf += SHA256_MAC_LEN;
+    }
+
+    if (buf_len)
+    {
+            u8 hash[SHA256_MAC_LEN];
+            if (hmac_sha256_vector(key, key_len, 4, addr, len, hash))
+                    return -1;
+            os_memcpy(buf, hash, buf_len);
+            forced_memzero(hash, sizeof(hash));
+    }
+
+    /* Mask out unused bits in last octet if it does not use all the bits */
+    if ((buf_len_bits &= 0x7))
+            buf[-1] &= (u8)(0xff << (8 - buf_len_bits));
+
+    return 0;
+}
+
 int sha256_prf(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len)
 {
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
+    return hmac_prf256(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
+#else
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
+#endif
 }
 
 int sha256_prf_bits(
