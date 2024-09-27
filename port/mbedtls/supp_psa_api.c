@@ -23,6 +23,9 @@
  */
 
 #include "supp_psa_api.h"
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_TEST
+#include "module_tests.h"
+#endif
 
 #define ASSERT_STATUS(actual, expected)                                            \
     do                                                                             \
@@ -460,7 +463,24 @@ exit:
 
 int supp_psa_crypto_init(void)
 {
-    return psa_crypto_init();
+    int ret;
+
+    ret = (int)psa_crypto_init();
+    if (ret)
+    {
+        printk("supp_psa_crypto_init failed ret %d", ret);
+        return ret;
+    }
+
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_TEST
+    ret = crypto_module_tests();
+    if (ret)
+    {
+        printk("crypto_module_tests failed ret %d", ret);
+        return ret;
+    }
+#endif
+    return ret;
 }
 
 void supp_psa_crypto_deinit(void)
