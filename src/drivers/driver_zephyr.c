@@ -975,25 +975,23 @@ static void wpa_drv_zep_event_ecsa_complete(struct zep_drv_if_ctx *if_ctx, union
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_CH_SWITCH, event);
 }
 
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 static void wpa_drv_zep_event_dfs_cac_started(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_DFS_CAC_STARTED, event);
 	else
-#endif
 		wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_DFS_CAC_STARTED, event);
 }
 
 static void wpa_drv_zep_event_dfs_cac_finished(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_DFS_CAC_FINISHED, event);
 	else
-#endif
 		wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_DFS_CAC_FINISHED, event);
 }
+#endif
 
 static struct hostapd_hw_modes *
 wpa_driver_wpa_supp_postprocess_modes(struct hostapd_hw_modes *modes,
