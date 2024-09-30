@@ -605,6 +605,7 @@ int sha384_prf(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA384);
 }
 
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
 /**
  * Based on Supplicant internal implementaion of SHA-256. This API
  * uses PSA APIs instead of Supplicant internal implementation or
@@ -647,6 +648,7 @@ static int hmac_prf256(const u8 *key,
 
     return 0;
 }
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 
 int sha256_prf(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len)
