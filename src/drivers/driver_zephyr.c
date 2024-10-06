@@ -116,7 +116,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!ies) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_AUTH %u Failed to alloc ies %d bytes\n",
+					  "%s:%d event %u Failed to alloc ies %d bytes\n",
 					  __func__, __LINE__, event, data->auth.ies_len);
 					os_free(msg.data);
 					return;
@@ -133,7 +133,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!frame) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_RX_MGMT %u Failed to alloc frame %d bytes\n",
+					  "%s:%d event %u Failed to alloc frame %d bytes\n",
 					  __func__, __LINE__, event, data->rx_mgmt.frame_len);
 					os_free(msg.data);
 					return;
@@ -151,7 +151,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!frame) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_TX_STATUS %u Failed to alloc frame %d bytes\n",
+					  "%s:%d event %u Failed to alloc frame %d bytes\n",
 					  __func__, __LINE__, event, data->tx_status.data_len);
 					os_free(msg.data);
 					return;
@@ -168,7 +168,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!addr) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_ASSOC %u Failed to alloc addr %d bytes\n",
+				  "%s:%d event %u Failed to alloc addr %d bytes\n",
 				  __func__, __LINE__, event, ETH_ALEN);
 				os_free(msg.data);
 				return;
@@ -182,7 +182,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!req_ies) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_ASSOC %u Failed to alloc req_ies %d bytes\n",
+					  "%s:%d event %u Failed to alloc req_ies %d bytes\n",
 					  __func__, __LINE__, event, data->assoc_info.req_ies_len);
 					os_free(msg.data);
 					os_free(addr);
@@ -198,7 +198,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!resp_ies) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_ASSOC %u Failed to alloc resp_ies %d bytes\n",
+					  "%s:%d event %u Failed to alloc resp_ies %d bytes\n",
 					  __func__, __LINE__, event, data->assoc_info.resp_ies_len);
 					os_free(msg.data);
 					os_free(addr);
@@ -216,7 +216,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!resp_frame) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_ASSOC %u Failed to alloc resp_frame %d bytes\n",
+					  "%s:%d event %u Failed to alloc resp_frame %d bytes\n",
 					  __func__, __LINE__, event, data->assoc_info.resp_frame_len);
 					os_free(msg.data);
 					os_free(addr);
@@ -237,7 +237,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!bssid) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_ASSOC_REJECT %u Failed to alloc bssid %d bytes\n",
+				  "%s:%d event %u Failed to alloc bssid %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				return;
@@ -251,7 +251,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!resp_ies) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_ASSOC_REJECT %u Failed to alloc resp_ies %d bytes\n",
+					  "%s:%d event %u Failed to alloc resp_ies %d bytes\n",
 					  __func__, __LINE__,  event, data->assoc_reject.resp_ies_len);
 					os_free(msg.data);
 					os_free(bssid);
@@ -268,7 +268,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!sa) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_DEAUTH %u Failed to alloc sa %d bytes\n",
+				  "%s:%d event %u Failed to alloc sa %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				return;
@@ -281,7 +281,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!ie) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_DEAUTH %u Failed to alloc ie %d bytes\n",
+					  "%s:%d event %u Failed to alloc ie %d bytes\n",
 					  __func__, __LINE__,  event, data->deauth_info.ie_len);
 					os_free(msg.data);
 					os_free(sa);
@@ -297,7 +297,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!sa) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_DISASSOC %u Failed to alloc sa %d bytes\n",
+				  "%s:%d event %u Failed to alloc sa %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				return;
@@ -310,7 +310,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 				if (!ie) {
 					wpa_printf(MSG_ERROR,
-					  "%s:%d EVENT_DISASSOC %u Failed to alloc ie %d bytes\n",
+					  "%s:%d event %u Failed to alloc ie %d bytes\n",
 					  __func__, __LINE__,  event, data->disassoc_info.ie_len);
 					os_free(msg.data);
 					os_free(sa);
@@ -327,7 +327,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!sa) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_UNPROT_DEAUTH %u Failed to alloc sa %d bytes\n",
+				  "%s:%d event %u Failed to alloc sa %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				if (da)
@@ -337,7 +337,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!da) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_UNPROT_DEAUTH %u Failed to alloc da %d bytes\n",
+				  "%s:%d event %u Failed to alloc da %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				if (sa)
@@ -355,7 +355,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!sa) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_UNPROT_DISASSOC %u Failed to alloc sa %d bytes\n",
+				  "%s:%d event %u Failed to alloc sa %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				if (da)
@@ -365,7 +365,7 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 			if (!da) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d EVENT_UNPROT_DISASSOC %u Failed to alloc da %d bytes\n",
+				  "%s:%d event %u Failed to alloc da %d bytes\n",
 				  __func__, __LINE__,  event, ETH_ALEN);
 				os_free(msg.data);
 				if (sa)
