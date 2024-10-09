@@ -2205,7 +2205,7 @@ dfs_offload:
 	for (j = 0; j < iface->num_bss; j++)
 		hostapd_neighbor_set_own_report(iface->bss[j]);
 
-#ifdef __ZEPHYR__
+#if defined(__ZEPHYR__) && defined(CONFIG_WIFI_NM_HOSTAPD_AP)
 	supplicant_send_wifi_mgmt_ap_status(iface,
 					    NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
 					    WIFI_STATUS_AP_SUCCESS);
