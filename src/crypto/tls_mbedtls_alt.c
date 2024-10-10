@@ -121,7 +121,9 @@ typedef mbedtls_tls_prf_types int;
  * then checking the client cert against the DN hint in certificate verify_cb.
  * Comment out to disable feature and remove ~3k from binary .text segment */
 #define TLS_MBEDTLS_CERT_VERIFY_EXTMATCH
-//#define TLS_MBEDTLS_CERT_DISABLE_KEY_USAGE_CHECK
+#ifdef MBEDTLS_ALLOW_PRIVATE_ACCESS
+#define TLS_MBEDTLS_CERT_DISABLE_KEY_USAGE_CHECK
+#endif
 
 #if defined(EAP_FAST) || defined(EAP_FAST_DYNAMIC) || defined(EAP_SERVER_FAST) || defined(EAP_TEAP) || \
     defined(EAP_SERVER_TEAP)
