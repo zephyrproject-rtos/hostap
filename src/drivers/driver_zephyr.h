@@ -137,6 +137,9 @@ struct zep_drv_if_ctx {
 	struct wpa_scan_results *scan_res2;
 	bool scan_res2_get_in_prog;
 
+	bool ft_roaming;
+	struct wpa_driver_set_key_params *key_params;
+
 	unsigned int freq;
 	unsigned char ssid[SSID_MAX_LEN];
 	size_t ssid_len;
@@ -207,6 +210,9 @@ struct zep_wpa_supp_dev_callbk_fns {
 
 	void (*dfs_cac_finished)(struct zep_drv_if_ctx *if_ctx,
 				 union wpa_event_data *event);
+
+	void (*signal_change)(struct zep_drv_if_ctx *if_ctx,
+			      union wpa_event_data *event);
 };
 
 struct zep_hostapd_dev_callbk_fns
