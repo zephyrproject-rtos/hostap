@@ -538,6 +538,9 @@ void wpa_drv_zep_event_proc_assoc_resp(struct zep_drv_if_ctx *if_ctx,
 		wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 				EVENT_ASSOC_REJECT,
 				event);
+		if (if_ctx->roaming) {
+		    if_ctx->roaming = false;
+		}
 	} else {
 		if_ctx->associated = true;
 
@@ -1534,7 +1537,9 @@ static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 	}
 
 	if_ctx = priv;
-
+	if (if_ctx->roaming) {
+		if_ctx->roaming = false;
+	}
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	ret = dev_ops->deauthenticate(if_ctx->dev_priv, addr, reason_code);
 	if (ret) {
@@ -1563,8 +1568,13 @@ static int wpa_drv_zep_authenticate(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	wpa_s = if_ctx->supp_if_ctx;
+	if_ctx->roaming = false;
+	if (wpa_s->assoc_freq) {
+		if_ctx->roaming = true;
+	}
 
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	os_memcpy(if_ctx->ssid, params->ssid, params->ssid_len);
 
 	if_ctx->ssid_len = params->ssid_len;
@@ -1798,6 +1808,7 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	struct net_if *iface = NULL;
 
+	struct wpa_supplicant *wpa_s = NULL;
 	int ret;
 
 	if_ctx = priv;
@@ -1812,7 +1823,11 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 
 #ifdef CONFIG_NET_DHCPV4
 	if (authorized) {
-		net_dhcpv4_restart(iface);
+		if (if_ctx->roaming == true) {
+			if_ctx->roaming = false;
+		} else {
+			net_dhcpv4_restart(iface);
+		}
 	}
 #endif
 
