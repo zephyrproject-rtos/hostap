@@ -341,6 +341,117 @@ static int wpa_cli_cmd_interface_list(struct wpa_ctrl *ctrl, int argc,
 	return wpa_cli_cmd(ctrl, "INTERFACE_LIST", 0, argc, argv);
 }
 
+static int wpa_cli_cmd_set(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	char cmd[256];
+	int res;
+
+	if (argc == 1) {
+		res = os_snprintf(cmd, sizeof(cmd), "SET %s ", argv[0]);
+		if (os_snprintf_error(sizeof(cmd), res)) {
+			wpa_printf(MSG_INFO, "Too long SET command.\n");
+			return -1;
+		}
+		return wpa_cli_cmd(ctrl, cmd, 0, argc, argv);
+	}
+
+	return wpa_cli_cmd(ctrl, "SET", 2, argc, argv);
+}
+
+
+static char ** wpa_cli_complete_set(const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	const char *fields[] = {
+		/* runtime values */
+		"EAPOL::heldPeriod", "EAPOL::authPeriod", "EAPOL::startPeriod",
+		"EAPOL::maxStart", "dot11RSNAConfigPMKLifetime",
+		"dot11RSNAConfigPMKReauthThreshold", "dot11RSNAConfigSATimeout",
+		"wps_fragment_size", "wps_version_number", "ampdu",
+		"tdls_testing", "tdls_disabled", "pno", "radio_disabled",
+		"uapsd", "ps", "wifi_display", "bssid_filter", "disallow_aps",
+		"no_keep_alive",
+		/* global configuration parameters */
+		"ctrl_interface", "no_ctrl_interface", "ctrl_interface_group",
+		"eapol_version", "ap_scan", "bgscan",
+#ifdef CONFIG_MESH
+		"user_mpm", "max_peer_links", "mesh_max_inactivity",
+		"dot11RSNASAERetransPeriod",
+#endif /* CONFIG_MESH */
+		"disable_scan_offload", "fast_reauth", "opensc_engine_path",
+		"pkcs11_engine_path", "pkcs11_module_path", "openssl_ciphers",
+		"pcsc_reader", "pcsc_pin", "external_sim", "driver_param",
+		"dot11RSNAConfigPMKLifetime",
+		"dot11RSNAConfigPMKReauthThreshold",
+		"dot11RSNAConfigSATimeout",
+#ifndef CONFIG_NO_CONFIG_WRITE
+		"update_config",
+#endif /* CONFIG_NO_CONFIG_WRITE */
+		"load_dynamic_eap",
+#ifdef CONFIG_WPS
+		"uuid", "device_name", "manufacturer", "model_name",
+		"model_number", "serial_number", "device_type", "os_version",
+		"config_methods", "wps_cred_processing", "wps_vendor_ext_m1",
+#endif /* CONFIG_WPS */
+#ifdef CONFIG_P2P
+		"sec_device_type",
+		"p2p_listen_reg_class", "p2p_listen_channel",
+		"p2p_oper_reg_class", "p2p_oper_channel", "p2p_go_intent",
+		"p2p_ssid_postfix", "persistent_reconnect", "p2p_intra_bss",
+		"p2p_group_idle", "p2p_passphrase_len", "p2p_pref_chan",
+		"p2p_no_go_freq", "p2p_add_cli_chan",
+		"p2p_optimize_listen_chan", "p2p_go_ht40", "p2p_go_vht",
+		"p2p_disabled", "p2p_go_ctwindow", "p2p_no_group_iface",
+		"p2p_ignore_shared_freq", "ip_addr_go", "ip_addr_mask",
+		"ip_addr_start", "ip_addr_end", "p2p_go_edmg",
+#endif /* CONFIG_P2P */
+		"country", "bss_max_count", "bss_expiration_age",
+		"bss_expiration_scan_count", "filter_ssids", "filter_rssi",
+		"max_num_sta", "disassoc_low_ack", "ap_isolate",
+#ifdef CONFIG_HS20
+		"hs20",
+#endif /* CONFIG_HS20 */
+		"interworking", "hessid", "access_network_type", "pbc_in_m1",
+		"go_interworking", "go_access_network_type", "go_internet",
+		"go_venue_group", "go_venue_type",
+		"autoscan", "wps_nfc_dev_pw_id", "wps_nfc_dh_pubkey",
+		"wps_nfc_dh_privkey", "wps_nfc_dev_pw", "ext_password_backend",
+		"p2p_go_max_inactivity", "auto_interworking", "okc", "pmf",
+		"sae_groups", "dtim_period", "beacon_int",
+		"ap_vendor_elements", "ignore_old_scan_res", "freq_list",
+		"scan_cur_freq", "scan_res_valid_for_connect",
+		"sched_scan_interval",
+		"tdls_external_control", "osu_dir", "wowlan_triggers",
+		"p2p_search_delay", "mac_addr", "rand_addr_lifetime",
+		"preassoc_mac_addr", "key_mgmt_offload", "passive_scan",
+		"reassoc_same_bss_optim", "wps_priority",
+		"ap_assocresp_elements",
+#ifdef CONFIG_TESTING_OPTIONS
+		"ignore_auth_resp",
+#endif /* CONFIG_TESTING_OPTIONS */
+		"relative_rssi", "relative_band_adjust",
+		"extended_key_id",
+	};
+	int i, num_fields = ARRAY_SIZE(fields);
+
+	if (arg == 1) {
+		char **res = os_calloc(num_fields + 1, sizeof(char *));
+		if (res == NULL)
+			return NULL;
+		for (i = 0; i < num_fields; i++) {
+			res[i] = os_strdup(fields[i]);
+			if (res[i] == NULL)
+				return res;
+		}
+		return res;
+	}
+
+	if (arg > 1 && os_strncasecmp(str, "set bssid_filter ", 17) == 0)
+		return cli_txt_list_array(&bsses);
+
+	return NULL;
+}
+
 #if CONFIG_AP || CONFIG_P2P || \
 	!defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 static void wpa_cli_msg_cb(char *msg, size_t len)
@@ -580,116 +691,6 @@ static int wpa_cli_mesh_cmd_pmksa_add(struct wpa_ctrl *ctrl, int argc,
 #endif /* CONFIG_MESH */
 #endif /* CONFIG_PMKSA_CACHE_EXTERNAL */
 
-static int wpa_cli_cmd_set(struct wpa_ctrl *ctrl, int argc, char *argv[])
-{
-	char cmd[256];
-	int res;
-
-	if (argc == 1) {
-		res = os_snprintf(cmd, sizeof(cmd), "SET %s ", argv[0]);
-		if (os_snprintf_error(sizeof(cmd), res)) {
-			wpa_printf(MSG_INFO, "Too long SET command.\n");
-			return -1;
-		}
-		return wpa_cli_cmd(ctrl, cmd, 0, argc, argv);
-	}
-
-	return wpa_cli_cmd(ctrl, "SET", 2, argc, argv);
-}
-
-
-static char ** wpa_cli_complete_set(const char *str, int pos)
-{
-	int arg = get_cmd_arg_num(str, pos);
-	const char *fields[] = {
-		/* runtime values */
-		"EAPOL::heldPeriod", "EAPOL::authPeriod", "EAPOL::startPeriod",
-		"EAPOL::maxStart", "dot11RSNAConfigPMKLifetime",
-		"dot11RSNAConfigPMKReauthThreshold", "dot11RSNAConfigSATimeout",
-		"wps_fragment_size", "wps_version_number", "ampdu",
-		"tdls_testing", "tdls_disabled", "pno", "radio_disabled",
-		"uapsd", "ps", "wifi_display", "bssid_filter", "disallow_aps",
-		"no_keep_alive",
-		/* global configuration parameters */
-		"ctrl_interface", "no_ctrl_interface", "ctrl_interface_group",
-		"eapol_version", "ap_scan", "bgscan",
-#ifdef CONFIG_MESH
-		"user_mpm", "max_peer_links", "mesh_max_inactivity",
-		"dot11RSNASAERetransPeriod",
-#endif /* CONFIG_MESH */
-		"disable_scan_offload", "fast_reauth", "opensc_engine_path",
-		"pkcs11_engine_path", "pkcs11_module_path", "openssl_ciphers",
-		"pcsc_reader", "pcsc_pin", "external_sim", "driver_param",
-		"dot11RSNAConfigPMKLifetime",
-		"dot11RSNAConfigPMKReauthThreshold",
-		"dot11RSNAConfigSATimeout",
-#ifndef CONFIG_NO_CONFIG_WRITE
-		"update_config",
-#endif /* CONFIG_NO_CONFIG_WRITE */
-		"load_dynamic_eap",
-#ifdef CONFIG_WPS
-		"uuid", "device_name", "manufacturer", "model_name",
-		"model_number", "serial_number", "device_type", "os_version",
-		"config_methods", "wps_cred_processing", "wps_vendor_ext_m1",
-#endif /* CONFIG_WPS */
-#ifdef CONFIG_P2P
-		"sec_device_type",
-		"p2p_listen_reg_class", "p2p_listen_channel",
-		"p2p_oper_reg_class", "p2p_oper_channel", "p2p_go_intent",
-		"p2p_ssid_postfix", "persistent_reconnect", "p2p_intra_bss",
-		"p2p_group_idle", "p2p_passphrase_len", "p2p_pref_chan",
-		"p2p_no_go_freq", "p2p_add_cli_chan",
-		"p2p_optimize_listen_chan", "p2p_go_ht40", "p2p_go_vht",
-		"p2p_disabled", "p2p_go_ctwindow", "p2p_no_group_iface",
-		"p2p_ignore_shared_freq", "ip_addr_go", "ip_addr_mask",
-		"ip_addr_start", "ip_addr_end", "p2p_go_edmg",
-#endif /* CONFIG_P2P */
-		"country", "bss_max_count", "bss_expiration_age",
-		"bss_expiration_scan_count", "filter_ssids", "filter_rssi",
-		"max_num_sta", "disassoc_low_ack", "ap_isolate",
-#ifdef CONFIG_HS20
-		"hs20",
-#endif /* CONFIG_HS20 */
-		"interworking", "hessid", "access_network_type", "pbc_in_m1",
-		"go_interworking", "go_access_network_type", "go_internet",
-		"go_venue_group", "go_venue_type",
-		"autoscan", "wps_nfc_dev_pw_id", "wps_nfc_dh_pubkey",
-		"wps_nfc_dh_privkey", "wps_nfc_dev_pw", "ext_password_backend",
-		"p2p_go_max_inactivity", "auto_interworking", "okc", "pmf",
-		"sae_groups", "dtim_period", "beacon_int",
-		"ap_vendor_elements", "ignore_old_scan_res", "freq_list",
-		"scan_cur_freq", "scan_res_valid_for_connect",
-		"sched_scan_interval",
-		"tdls_external_control", "osu_dir", "wowlan_triggers",
-		"p2p_search_delay", "mac_addr", "rand_addr_lifetime",
-		"preassoc_mac_addr", "key_mgmt_offload", "passive_scan",
-		"reassoc_same_bss_optim", "wps_priority",
-		"ap_assocresp_elements",
-#ifdef CONFIG_TESTING_OPTIONS
-		"ignore_auth_resp",
-#endif /* CONFIG_TESTING_OPTIONS */
-		"relative_rssi", "relative_band_adjust",
-		"extended_key_id",
-	};
-	int i, num_fields = ARRAY_SIZE(fields);
-
-	if (arg == 1) {
-		char **res = os_calloc(num_fields + 1, sizeof(char *));
-		if (res == NULL)
-			return NULL;
-		for (i = 0; i < num_fields; i++) {
-			res[i] = os_strdup(fields[i]);
-			if (res[i] == NULL)
-				return res;
-		}
-		return res;
-	}
-
-	if (arg > 1 && os_strncasecmp(str, "set bssid_filter ", 17) == 0)
-		return cli_txt_list_array(&bsses);
-
-	return NULL;
-}
 
 static int wpa_cli_cmd_dump(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
@@ -3004,6 +3005,10 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "interface_list", wpa_cli_cmd_interface_list, NULL,
 	  cli_cmd_flag_none,
 	  "= list available interfaces" },
+	{ "set", wpa_cli_cmd_set, wpa_cli_complete_set,
+	  cli_cmd_flag_none,
+	  "= set variables (shows list of variables when run without "
+	  "arguments)" },
 #ifdef CONFIG_AP
 	{ "sta", wpa_cli_cmd_sta, wpa_cli_complete_sta,
 	  cli_cmd_flag_none,
@@ -3045,10 +3050,6 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "mib", wpa_cli_cmd_mib, NULL,
 	  cli_cmd_flag_none,
 	  "= get MIB variables (dot1x, dot11)" },
-	{ "set", wpa_cli_cmd_set, wpa_cli_complete_set,
-	  cli_cmd_flag_none,
-	  "= set variables (shows list of variables when run without "
-	  "arguments)" },
 	{ "dump", wpa_cli_cmd_dump, NULL,
 	  cli_cmd_flag_none,
 	  "= dump config variables" },
