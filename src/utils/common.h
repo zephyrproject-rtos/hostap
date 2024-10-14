@@ -558,6 +558,7 @@ static inline int is_multicast_ether_addr(const u8 *a)
 
 #if defined(__ZEPHYR__)
 #include "wpa_debug_zephyr.h"
+#define inet_aton(cp, addr) inet_pton(AF_INET, cp, (char *)addr)
 #else
 #include "wpa_debug.h"
 #endif
