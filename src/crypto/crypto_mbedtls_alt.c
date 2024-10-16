@@ -809,7 +809,7 @@ void aes_decrypt_deinit(void *ctx)
 
 #include "aes_wrap.h"
 
-#ifdef MBEDTLS_NIST_KW_C
+#ifdef HOSTAP_MBEDTLS_NIST_KW_C
 
 #include <mbedtls/nist_kw.h>
 
@@ -846,7 +846,7 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
     mbedtls_nist_kw_free(&ctx);
     return ret;
 }
-#endif /* MBEDTLS_NIST_KW_C */
+#endif /* HOSTAP_MBEDTLS_NIST_KW_C */
 
 #ifdef MBEDTLS_CMAC_C
 

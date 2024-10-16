@@ -556,7 +556,7 @@ int aes_128_ctr_encrypt(
 	return aes_ctr_encrypt(key, 16, nonce, data, data_len);
 }
 
-#ifdef MBEDTLS_NIST_KW_C
+#ifdef HOSTAP_MBEDTLS_NIST_KW_C
 int aes_wrap(const u8 *kek, size_t kek_len, int n, const u8 *plain, u8 *cipher)
 {
 	mbedtls_nist_kw_context ctx;
@@ -700,7 +700,7 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 
 /* Only enable this if all other ciphers are using MbedTLS implementation */
 #if defined(MBEDTLS_CCM_C) && defined(MBEDTLS_CMAC_C) &&                       \
-    defined(MBEDTLS_NIST_KW_C)
+    defined(HOSTAP_MBEDTLS_NIST_KW_C)
 int aes_ccm_ae(
     const u8 *key, size_t key_len, const u8 *nonce, size_t M, const u8 *plain,
     size_t plain_len, const u8 *aad, size_t aad_len, u8 *crypt, u8 *auth)
