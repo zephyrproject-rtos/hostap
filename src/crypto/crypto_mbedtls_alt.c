@@ -120,12 +120,16 @@
 #endif /* dh5_init_fixed() */
 #endif /* crypto_dh_*() */
 
-#if !defined(CONFIG_NO_WPA) /* CONFIG_NO_WPA= */
+#if defined(MBEDTLS_ECDH_C) || defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_ECDH
 #endif /* crypto_ecdh_*() */
 
 #define CRYPTO_MBEDTLS_CRYPTO_BIGNUM
+
+#if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK) || defined(EAP_PWD) \
+    || defined(EAP_SERVER_PWD) || defined(CONFIG_SAE)
 #define CRYPTO_MBEDTLS_CRYPTO_EC
+#endif
 
 #if defined(CONFIG_DPP)              /* CONFIG_DPP=y */
 #define CRYPTO_MBEDTLS_CRYPTO_EC_DPP /* extra for DPP */
@@ -248,14 +252,14 @@ int sha256_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA256);
 }
 
-#ifdef MBEDTLS_SHA1_C
+#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int sha1_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
 }
 #endif
 
-#ifdef MBEDTLS_MD5_C
+#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
 int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -416,7 +420,7 @@ int hmac_sha256(const u8 *key, size_t key_len, const u8 *data, size_t data_len, 
     return hmac_vector(key, key_len, 1, &data, &data_len, mac, MBEDTLS_MD_SHA256);
 }
 
-#ifdef MBEDTLS_SHA1_C
+#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int hmac_sha1_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
@@ -428,7 +432,7 @@ int hmac_sha1(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8
 }
 #endif
 
-#ifdef MBEDTLS_MD5_C
+#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
 int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -666,7 +670,7 @@ int sha256_prf_bits(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, MBEDTLS_MD_SHA256);
 }
 
-#ifdef MBEDTLS_SHA1_C
+#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
 
 /* sha1-prf.c */
 
@@ -739,7 +743,7 @@ int sha1_t_prf(
 }
 
 #endif /* CRYPTO_MBEDTLS_SHA1_T_PRF */
-#endif /* MBEDTLS_SHA1_C */
+#endif /* MBEDTLS_SHA1_C || CONFIG_PSA_WANT_ALG_SHA_1 */
 
 #ifdef MBEDTLS_DES_C
 #include <mbedtls/des.h>
@@ -841,7 +845,7 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
 }
 #endif /* MBEDTLS_NIST_KW_C */
 
-#ifdef MBEDTLS_CMAC_C
+#if defined(MBEDTLS_CMAC_C) || defined(CONFIG_PSA_WANT_ALG_CMAC)
 
 /* aes-omac1.c */
 
@@ -916,7 +920,7 @@ int omac1_aes_256(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 
 #endif /* MBEDTLS_CMAC_C */
 
-#ifdef MBEDTLS_AES_C
+#if defined(MBEDTLS_AES_C) || defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
 
 /* These interfaces can be inefficient when used in loops, as the overhead of
  * initialization each call is large for each block input (e.g. 16 bytes) */
@@ -1658,7 +1662,6 @@ static mbedtls_ecp_group_id crypto_mbedtls_ecp_group_id_from_ike_id(int group)
     }
 }
 
-#ifdef CRYPTO_MBEDTLS_CRYPTO_EC
 static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 {
     /* https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml */
@@ -1709,7 +1712,6 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
             return -1;
     }
 }
-#endif
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_ECDH || CRYPTO_MBEDTLS_CRYPTO_EC */
 
@@ -1963,7 +1965,7 @@ size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_ECDH */
 
-#ifdef CRYPTO_MBEDTLS_CRYPTO_EC
+#if defined(CRYPTO_MBEDTLS_CRYPTO_EC)
 
 #include <mbedtls/ecp.h>
 
@@ -2500,7 +2502,6 @@ struct crypto_ec_key *crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
-
 static struct crypto_ec_key *crypto_ec_key_set_pub_point_for_group(mbedtls_ecp_group_id grp_id,
                                                                    const mbedtls_ecp_point *pub,
                                                                    const u8 *buf,
@@ -2636,7 +2637,6 @@ struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
-
 struct wpabuf *crypto_ec_key_get_ecprivate_key(struct crypto_ec_key *key, bool include_pub)
 {
 #ifndef MBEDTLS_PK_ECP_PRV_DER_MAX_BYTES /*(mbedtls/library/pkwrite.h)*/
