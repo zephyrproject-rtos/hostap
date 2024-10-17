@@ -120,7 +120,7 @@
 #endif /* dh5_init_fixed() */
 #endif /* crypto_dh_*() */
 
-#if !defined(CONFIG_NO_WPA) /* CONFIG_NO_WPA= */
+#if defined(MBEDTLS_ECDH_C) || defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_ECDH
 #endif /* crypto_ecdh_*() */
 
@@ -248,14 +248,14 @@ int sha256_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA256);
 }
 
-#ifdef MBEDTLS_SHA1_C
+#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int sha1_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
 }
 #endif
 
-#ifdef MBEDTLS_MD5_C
+#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
 int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -416,7 +416,7 @@ int hmac_sha256(const u8 *key, size_t key_len, const u8 *data, size_t data_len, 
     return hmac_vector(key, key_len, 1, &data, &data_len, mac, MBEDTLS_MD_SHA256);
 }
 
-#ifdef MBEDTLS_SHA1_C
+#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int hmac_sha1_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
@@ -428,7 +428,7 @@ int hmac_sha1(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8
 }
 #endif
 
-#ifdef MBEDTLS_MD5_C
+#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
 int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -666,7 +666,7 @@ int sha256_prf_bits(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, MBEDTLS_MD_SHA256);
 }
 
-#ifdef MBEDTLS_SHA1_C
+#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
 
 /* sha1-prf.c */
 
@@ -739,7 +739,7 @@ int sha1_t_prf(
 }
 
 #endif /* CRYPTO_MBEDTLS_SHA1_T_PRF */
-#endif /* MBEDTLS_SHA1_C */
+#endif /* MBEDTLS_SHA1_C || CONFIG_PSA_WANT_ALG_SHA_1 */
 
 #ifdef MBEDTLS_DES_C
 #include <mbedtls/des.h>
@@ -841,7 +841,7 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
 }
 #endif /* MBEDTLS_NIST_KW_C */
 
-#ifdef MBEDTLS_CMAC_C
+#if defined(MBEDTLS_CMAC_C) || defined(CONFIG_PSA_WANT_ALG_CMAC)
 
 /* aes-omac1.c */
 
@@ -916,7 +916,7 @@ int omac1_aes_256(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 
 #endif /* MBEDTLS_CMAC_C */
 
-#ifdef MBEDTLS_AES_C
+#if defined(MBEDTLS_AES_C) || defined(CONFIG_PSA_WANT_ALG_CTR) || defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
 
 /* These interfaces can be inefficient when used in loops, as the overhead of
  * initialization each call is large for each block input (e.g. 16 bytes) */
@@ -1658,7 +1658,7 @@ static mbedtls_ecp_group_id crypto_mbedtls_ecp_group_id_from_ike_id(int group)
     }
 }
 
-#ifdef CRYPTO_MBEDTLS_CRYPTO_EC
+#if defined(CRYPTO_MBEDTLS_CRYPTO_EC) && (defined(CONFIG_DPP) || defined(CONFIG_SAE_PK))
 static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 {
     /* https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml */
@@ -1709,7 +1709,7 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
             return -1;
     }
 }
-#endif
+#endif /* CRYPTO_MBEDTLS_CRYPTO_EC && (CONFIG_DPP || CONFIG_SAE_PK) */
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_ECDH || CRYPTO_MBEDTLS_CRYPTO_EC */
 
@@ -2166,6 +2166,7 @@ int crypto_ec_point_to_bin(struct crypto_ec *e, const struct crypto_ec_point *po
     return 0;
 }
 
+#if defined(EAP_PWD) || defined(CONFIG_DPP) || defined(CONFIG_SAE) || defined(EAP_SERVER_PWD)
 struct crypto_ec_point *crypto_ec_point_from_bin(struct crypto_ec *e, const u8 *val)
 {
     if (TEST_FAIL())
@@ -2261,6 +2262,7 @@ int crypto_ec_point_invert(struct crypto_ec *e, struct crypto_ec_point *p)
                0 :
                -1;
 }
+#endif /* EAP_PWD || EAP_SERVER_PWD || CONFIG_DPP || CONFIG_SAE */
 
 #ifdef MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED
 static int crypto_ec_point_y_sqr_weierstrass(mbedtls_ecp_group *e, const mbedtls_mpi *x, mbedtls_mpi *y2)
@@ -2347,6 +2349,7 @@ void crypto_ec_point_debug_print(const struct crypto_ec *e, const struct crypto_
 }
 #endif
 
+#if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK)
 struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
 {
     mbedtls_pk_context *ctx = os_malloc(sizeof(*ctx));
@@ -2498,6 +2501,7 @@ struct crypto_ec_key *crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
     os_free(ctx);
     return NULL;
 }
+#endif /* CONFIG_DPP || CONFIG_SAE_PK */
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 
@@ -2576,6 +2580,7 @@ struct crypto_ec_key *crypto_ec_key_gen(int group)
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
+#if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK)
 void crypto_ec_key_deinit(struct crypto_ec_key *key)
 {
     mbedtls_pk_free((mbedtls_pk_context *)key);
@@ -2634,6 +2639,7 @@ struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
 #endif
     return wpabuf_alloc_copy(p, (size_t)len);
 }
+#endif /* CONFIG_DPP || CONFIG_SAE_PK */
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 
@@ -2762,6 +2768,7 @@ const struct crypto_bignum *crypto_ec_key_get_private_key(struct crypto_ec_key *
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
+#if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK)
 static mbedtls_md_type_t crypto_ec_key_sign_md(size_t len)
 {
     /* get mbedtls_md_type_t from length of hash data to be signed */
@@ -2808,6 +2815,7 @@ struct wpabuf *crypto_ec_key_sign(struct crypto_ec_key *key, const u8 *data, siz
     wpabuf_free(buf);
     return NULL;
 }
+#endif /* CONFIG_DPP || CONFIG_SAE_PK */
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 struct wpabuf *crypto_ec_key_sign_r_s(struct crypto_ec_key *key, const u8 *data, size_t len)
@@ -2867,6 +2875,7 @@ struct wpabuf *crypto_ec_key_sign_r_s(struct crypto_ec_key *key, const u8 *data,
 }
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
+#if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK)
 int crypto_ec_key_verify_signature(struct crypto_ec_key *key, const u8 *data, size_t len, const u8 *sig, size_t sig_len)
 {
     switch (mbedtls_pk_verify((mbedtls_pk_context *)key, crypto_ec_key_sign_md(len), data, len, sig, sig_len))
@@ -2880,6 +2889,7 @@ int crypto_ec_key_verify_signature(struct crypto_ec_key *key, const u8 *data, si
             return -1;
     }
 }
+#endif /* CONFIG_DPP || CONFIG_SAE_PK */
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 int crypto_ec_key_verify_signature_r_s(
@@ -2909,6 +2919,7 @@ int crypto_ec_key_verify_signature_r_s(
 }
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
+#if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK)
 int crypto_ec_key_group(struct crypto_ec_key *key)
 {
     mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
@@ -2917,6 +2928,7 @@ int crypto_ec_key_group(struct crypto_ec_key *key)
     mbedtls_ecp_group *ecp_group = &ecp_kp->MBEDTLS_PRIVATE(grp);
     return crypto_mbedtls_ike_id_from_ecp_group_id(ecp_group->id);
 }
+#endif /* CONFIG_DPP || CONFIG_SAE_PK */
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 
