@@ -64,8 +64,6 @@
 #include <mbedtls/debug.h>
 #ifdef __ZEPHYR__
 #define PRINTF printk
-#else
-#include "fsl_debug_console.h"
 #endif
 #define tls_mbedtls_d(...) PRINTF("tls_mbedtls", ##__VA_ARGS__)
 #else
