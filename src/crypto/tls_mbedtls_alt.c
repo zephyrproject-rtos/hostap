@@ -1740,18 +1740,24 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
     if (suiteb128)
     {
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb128);
+#if defined(MBEDTLS_DHM_C)
         mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 2048);
+#endif
     }
     else if (suiteb192)
     {
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb192);
+#if defined(MBEDTLS_DHM_C)
         mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 3072);
+#endif
     }
     else if (tls_conf->flags & TLS_CONN_SUITEB)
     {
         /* treat as suiteb192 while allowing any PK algorithm */
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb192_anypk);
+#if defined(MBEDTLS_DHM_C)
         mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 3072);
+#endif
     }
 
     tls_mbedtls_set_allowed_tls_vers(tls_conf, &tls_conf->conf);
