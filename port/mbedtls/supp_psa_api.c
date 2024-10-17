@@ -117,7 +117,7 @@ exit:
     return status;
 }
 
-#ifdef MBEDTLS_AES_C
+#if defined(MBEDTLS_AES_C) || defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
 #define SUPP_PSA_AES_BLOCK_SIZE 16
 
 int aes_128_encrypt_block_psa(const u8 *key, const u8 *in, u8 *out)
@@ -275,7 +275,7 @@ exit:
 }
 #endif
 
-#ifdef MBEDTLS_CMAC_C
+#if defined(MBEDTLS_CMAC_C) || defined(CONFIG_PSA_WANT_ALG_CMAC)
 int omac1_aes_vector_psa(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     psa_status_t status;
