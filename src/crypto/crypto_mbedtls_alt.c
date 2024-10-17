@@ -663,7 +663,11 @@ int sha256_prf(
 int sha256_prf_bits(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len_bits)
 {
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
+    return hmac_prf256(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
+#else
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, MBEDTLS_MD_SHA256);
+#endif
 }
 
 #if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
