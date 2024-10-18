@@ -10429,8 +10429,10 @@ static int wpas_ctrl_iface_pmksa(struct wpa_supplicant *wpa_s,
 
 	reply_len = wpa_sm_pmksa_cache_list(wpa_s->wpa, buf, buflen);
 #ifdef CONFIG_AP
-	reply_len += wpas_ap_pmksa_cache_list(wpa_s, &buf[reply_len],
-					      buflen - reply_len);
+	if (reply_len != -1) {
+		reply_len += wpas_ap_pmksa_cache_list(wpa_s, &buf[reply_len],
+						      buflen - reply_len);
+	}
 #endif /* CONFIG_AP */
 	return reply_len;
 }
