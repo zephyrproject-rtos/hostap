@@ -451,7 +451,11 @@ static void wpas_rrm_send_msr_report(struct wpa_supplicant *wpa_s,
 	int len = wpabuf_len(buf);
 	u8 *pos = wpabuf_mhead_u8(buf), *next = pos;
 
+#ifdef CONFIG_RRM_MSR_REPORT_LEN
+#define MPDU_REPORT_LEN (int) (CONFIG_RRM_MSR_REPORT_LEN - IEEE80211_HDRLEN - 3)
+#else
 #define MPDU_REPORT_LEN (int) (IEEE80211_MAX_MMPDU_SIZE - IEEE80211_HDRLEN - 3)
+#endif
 
 	while (len) {
 		int send_len = (len > MPDU_REPORT_LEN) ? next - pos : len;
