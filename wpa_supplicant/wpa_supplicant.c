@@ -8220,7 +8220,6 @@ void wpas_request_disconnection(struct wpa_supplicant *wpa_s)
 }
 
 
-#ifndef __ZEPHYR__
 void dump_freq_data(struct wpa_supplicant *wpa_s, const char *title,
 		    struct wpa_used_freq_data *freqs_data,
 		    unsigned int len)
@@ -8235,7 +8234,6 @@ void dump_freq_data(struct wpa_supplicant *wpa_s, const char *title,
 			i, cur->freq, cur->flags);
 	}
 }
-#endif /* __ZEPHYR__ */
 
 
 /*
