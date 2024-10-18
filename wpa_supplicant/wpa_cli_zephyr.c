@@ -152,8 +152,18 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 			if (msg->msg_len > 0) {
 				/* Only interested in CTRL-EVENTs */
 				if (strncmp(msg->msg, "CTRL-EVENT", 10) == 0) {
-					supplicant_send_wifi_mgmt_event(wpa_s->ifname,
+					if (strncmp(msg->msg, "CTRL-EVENT-SIGNAL-CHANGE", 24) == 0) {
+						supplicant_send_wifi_mgmt_event(wpa_s->ifname,
+									NET_EVENT_WIFI_CMD_SIGNAL_CHANGE,
+									msg->msg, msg->msg_len);
+					} else {
+						supplicant_send_wifi_mgmt_event(wpa_s->ifname,
 									NET_EVENT_WIFI_CMD_SUPPLICANT,
+									msg->msg, msg->msg_len);
+					}
+				} else if (strncmp(msg->msg, "RRM-NEIGHBOR-REP-RECEIVED", 25) == 0) {
+						supplicant_send_wifi_mgmt_event(wpa_s->ifname,
+									NET_EVENT_WIFI_CMD_NEIGHBOR_REP_RECEIVED,
 									msg->msg, msg->msg_len);
 				}
 			}
