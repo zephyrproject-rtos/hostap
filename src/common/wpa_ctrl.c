@@ -548,7 +548,7 @@ retry_send:
 	os_free(cmd_buf);
 
 	for (;;) {
-		tv.tv_sec = 10;
+		tv.tv_sec = CONFIG_WIFI_NM_WPA_CTRL_RESP_TIMEOUT_S;
 		tv.tv_usec = 0;
 		FD_ZERO(&rfds);
 		FD_SET(ctrl->s, &rfds);
