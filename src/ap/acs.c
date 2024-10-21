@@ -23,6 +23,14 @@
 #include "acs.h"
 
 /*
+ * clang complains about implicit conversion from 'double' to 'long double'
+ * just silence the compiler for time being.
+ */
+#if __clang__
+#pragma clang diagnostic ignored "-Wdouble-promotion"
+#endif
+
+/*
  * Automatic Channel Selection
  * ===========================
  *
