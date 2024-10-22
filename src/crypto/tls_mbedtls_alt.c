@@ -115,9 +115,7 @@ typedef mbedtls_tls_prf_types int;
  * then checking the client cert against the DN hint in certificate verify_cb.
  * Comment out to disable feature and remove ~3k from binary .text segment */
 #define TLS_MBEDTLS_CERT_VERIFY_EXTMATCH
-#ifdef MBEDTLS_ALLOW_PRIVATE_ACCESS
 #define TLS_MBEDTLS_CERT_DISABLE_KEY_USAGE_CHECK
-#endif
 
 #if defined(EAP_FAST) || defined(EAP_FAST_DYNAMIC) || defined(EAP_SERVER_FAST) || defined(EAP_TEAP) || \
     defined(EAP_SERVER_TEAP)
@@ -3092,8 +3090,8 @@ static int tls_mbedtls_verify_cb(void *arg, mbedtls_x509_crt *crt, int depth, ui
     uint32_t flags_in           = *flags;
 
 #if defined(TLS_MBEDTLS_CERT_DISABLE_KEY_USAGE_CHECK)
-    crt->ext_types &= ~MBEDTLS_X509_EXT_KEY_USAGE;
-    crt->ext_types &= ~MBEDTLS_X509_EXT_EXTENDED_KEY_USAGE;
+    crt->MBEDTLS_PRIVATE(ext_types) &= ~MBEDTLS_X509_EXT_KEY_USAGE;
+    crt->MBEDTLS_PRIVATE(ext_types) &= ~MBEDTLS_X509_EXT_EXTENDED_KEY_USAGE;
 #endif
 
     if (depth > 8)
