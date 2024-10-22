@@ -76,10 +76,6 @@
 #include <mbedtls/net.h>
 #endif
 
-#ifndef MBEDTLS_PRIVATE
-#define MBEDTLS_PRIVATE(x) x
-#endif
-
 #if MBEDTLS_VERSION_NUMBER < 0x03020000 /* mbedtls 3.2.0 */
 #define mbedtls_ssl_get_ciphersuite_id_from_ssl(ssl) \
     ((ssl)->MBEDTLS_PRIVATE(session) ? (ssl)->MBEDTLS_PRIVATE(session)->MBEDTLS_PRIVATE(ciphersuite) : 0)
