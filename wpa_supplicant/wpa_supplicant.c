@@ -8229,9 +8229,11 @@ void dump_freq_data(struct wpa_supplicant *wpa_s, const char *title,
 	wpa_dbg(wpa_s, MSG_DEBUG, "Shared frequencies (len=%u): %s",
 		len, title);
 	for (i = 0; i < len; i++) {
+#if CONFIG_WIFI_NM_WPA_SUPPLICANT_DEBUG_LEVEL <= MSG_DEBUG
 		struct wpa_used_freq_data *cur = &freqs_data[i];
 		wpa_dbg(wpa_s, MSG_DEBUG, "freq[%u]: %d, flags=0x%X",
 			i, cur->freq, cur->flags);
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_DEBUG_LEVEL <= MSG_DEBUG */
 	}
 }
 
