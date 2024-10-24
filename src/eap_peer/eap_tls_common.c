@@ -102,6 +102,14 @@ static void eap_tls_params_flags(struct tls_connection_params *params,
 		params->flags |= TLS_CONN_SUITEB_NO_ECDH;
 	if (os_strstr(txt, "tls_suiteb_no_ecdh=0"))
 		params->flags &= ~TLS_CONN_SUITEB_NO_ECDH;
+	if (os_strstr(txt, "tls_cnsa=1"))
+		params->flags |= TLS_CONN_CNSA;
+	if (os_strstr(txt, "tls_cnsa=0"))
+		params->flags &= ~TLS_CONN_CNSA;
+	if (os_strstr(txt, "tls_cnsa_no_ecdh=1"))
+		params->flags |= TLS_CONN_CNSA_NO_ECDH;
+	if (os_strstr(txt, "tls_cnsa_no_ecdh=0"))
+		params->flags &= ~TLS_CONN_CNSA_NO_ECDH;
 }
 
 
