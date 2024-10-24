@@ -47,6 +47,7 @@
 #define DEFAULT_OCE_SUPPORT OCE_STA
 #define DEFAULT_EXTENDED_KEY_ID 0
 #define DEFAULT_SCAN_RES_VALID_FOR_CONNECT 5
+#define DEFAULT_MAX_IDLE_PERIOD 300
 
 #include "config_ssid.h"
 #include "wps/wps.h"
@@ -1699,6 +1700,10 @@ struct wpa_config {
 
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_PASN*/
+	/**
+	 * max_idle_period - Maximum idle period after which STA will send keep-alive
+	 */
+	unsigned int max_idle_period;
 };
 
 
