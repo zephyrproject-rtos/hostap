@@ -269,7 +269,7 @@ int hostapd_set_authorized(struct hostapd_data *hapd,
 
 	return hostapd_sta_set_flags(hapd, sta->addr,
 				     hostapd_sta_flags_to_drv(sta->flags),
-				     0, ~WPA_STA_AUTHORIZED);
+				     0, ~(int)WPA_STA_AUTHORIZED);
 }
 
 
