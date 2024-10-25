@@ -134,7 +134,7 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 		    hlen == sizeof(int)) {
 			plen = *((int *)buf);
 		} else {
-			wpa_printf(MSG_ERROR, "Could not read pending message header len %d.\n", hlen);
+			wpa_printf(MSG_ERROR, "Could not read pending message header len %zu\n", hlen);
 			continue;
 		}
 
@@ -142,7 +142,7 @@ static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *w
 			struct conn_msg *msg = (struct conn_msg *)buf;
 
 			msg->msg[msg->msg_len] = '\0';
-			wpa_printf(MSG_DEBUG, "Received len: %d, msg_len:%d - %s->END\n",
+			wpa_printf(MSG_DEBUG, "Received len: %zu, msg_len:%d - %s->END\n",
 				   plen, msg->msg_len, msg->msg);
 			if (msg->msg_len >= MAX_CTRL_MSG_LEN) {
 				wpa_printf(MSG_DEBUG, "Too long message received.\n");
@@ -333,7 +333,7 @@ static char make_argv(char **ppcmd, uint8_t c)
 }
 
 
-char supp_make_argv(size_t *argc, const char **argv, char *cmd,
+static char supp_make_argv(int *argc, const char **argv, char *cmd,
 		       uint8_t max_argc)
 {
 	char quote = 0;

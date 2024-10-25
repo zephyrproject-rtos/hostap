@@ -599,7 +599,7 @@ struct wpa_ctrl * wpa_ctrl_open(const int sock)
 
 	ctrl = os_zalloc(sizeof(*ctrl));
 	if (ctrl == NULL) {
-		wpa_printf(MSG_ERROR, "Failed to allocate memory: %d\n", sizeof(*ctrl));
+		wpa_printf(MSG_ERROR, "Failed to allocate memory: %zu\n", sizeof(*ctrl));
 		return NULL;
 	}
 
