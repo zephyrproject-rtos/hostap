@@ -349,7 +349,8 @@ int wpas_nan_usd_init(struct wpa_supplicant *wpa_s)
 	cb.subscribe_terminated = wpas_nan_de_subscribe_terminated;
 	cb.receive = wpas_nan_de_receive;
 
-	wpa_s->nan_de = nan_de_init(wpa_s->own_addr, false, &cb);
+	wpa_s->nan_de = nan_de_init(wpa_s->own_addr, false,
+				    wpa_s->max_remain_on_chan, &cb);
 	if (!wpa_s->nan_de)
 		return -1;
 	return 0;

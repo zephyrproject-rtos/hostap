@@ -63,6 +63,7 @@ struct nan_de_service {
 struct nan_de {
 	u8 nmi[ETH_ALEN];
 	bool ap;
+	unsigned int max_listen;
 	struct nan_callbacks cb;
 
 	struct nan_de_service *service[NAN_DE_MAX_SERVICE];
@@ -78,6 +79,7 @@ struct nan_de {
 
 
 struct nan_de * nan_de_init(const u8 *nmi, bool ap,
+			    unsigned int max_listen,
 			    const struct nan_callbacks *cb)
 {
 	struct nan_de *de;
@@ -88,6 +90,7 @@ struct nan_de * nan_de_init(const u8 *nmi, bool ap,
 
 	os_memcpy(de->nmi, nmi, ETH_ALEN);
 	de->ap = ap;
+	de->max_listen = max_listen ? max_listen : 1000;
 	os_memcpy(&de->cb, cb, sizeof(*cb));
 
 	return de;
