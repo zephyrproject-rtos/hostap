@@ -12,6 +12,7 @@ import time
 import shutil
 import struct
 import sys
+from test_ap_hs20 import hs20_ap_params
 
 try:
     if sys.version_info[0] > 2:
@@ -28,7 +29,7 @@ from wpasupplicant import WpaSupplicant
 from utils import *
 from p2p_utils import *
 from test_ap_tdls import connect_2sta_open
-from test_ap_eap import check_altsubject_match_support
+from test_ap_eap import check_altsubject_match_support, check_eap_capa
 from test_nfc_p2p import set_ip_addr_info
 from test_wpas_mesh import check_mesh_support, add_open_mesh_network
 
@@ -738,6 +739,7 @@ def test_dbus_wps_pbc_overlap(dev, apdev):
     dev[0].request("WPS_CANCEL")
     dev[0].request("DISCONNECT")
     hapd.disable()
+    hapd2.disable()
     dev[0].flush_scan_cache()
 
 def test_dbus_wps_pin(dev, apdev):
@@ -2030,7 +2032,8 @@ def _test_dbus_interface(dev, apdev):
     (bus, wpas_obj, path, if_obj) = prepare_dbus(dev[0])
     wpas = dbus.Interface(wpas_obj, WPAS_DBUS_SERVICE)
 
-    params = dbus.Dictionary({'Ifname': 'lo', 'Driver': 'none'},
+    params = dbus.Dictionary({'Ifname': 'lo', 'Driver': 'none', 'Type': 'sta',
+                              'Address': '02:03:11:22:33:44'},
                              signature='sv')
     path = wpas.CreateInterface(params)
     logger.debug("New interface path: " + str(path))
@@ -2069,6 +2072,38 @@ def _test_dbus_interface(dev, apdev):
             raise Exception("Unexpected error message for invalid CreateInterface: " + str(e))
 
     params = dbus.Dictionary({'Driver': 'none'}, signature='sv')
+    try:
+        wpas.CreateInterface(params)
+        raise Exception("Invalid CreateInterface() accepted")
+    except dbus.exceptions.DBusException as e:
+        if "InvalidArgs" not in str(e):
+            raise Exception("Unexpected error message for invalid CreateInterface: " + str(e))
+
+    try:
+        wpas.GetInterface("lo")
+        raise Exception("Invalid GetInterface() accepted")
+    except dbus.exceptions.DBusException as e:
+        if "InterfaceUnknown" not in str(e):
+            raise Exception("Unexpected error message for invalid RemoveInterface: " + str(e))
+
+    params = dbus.Dictionary({'Ifname': 'lo', 'Driver': 'none',
+                              'Type': 'foo'}, signature='sv')
+    try:
+        wpas.CreateInterface(params)
+        raise Exception("Invalid CreateInterface() accepted")
+    except dbus.exceptions.DBusException as e:
+        if "InvalidArgs" not in str(e):
+            raise Exception("Unexpected error message for invalid CreateInterface: " + str(e))
+
+    try:
+        wpas.GetInterface("lo")
+        raise Exception("Invalid GetInterface() accepted")
+    except dbus.exceptions.DBusException as e:
+        if "InterfaceUnknown" not in str(e):
+            raise Exception("Unexpected error message for invalid RemoveInterface: " + str(e))
+
+    params = dbus.Dictionary({'Ifname': 'lo', 'Driver': 'none',
+                              'Address': 'foo'}, signature='sv')
     try:
         wpas.CreateInterface(params)
         raise Exception("Invalid CreateInterface() accepted")
@@ -3371,11 +3406,21 @@ def test_dbus_p2p_service_discovery(dev, apdev):
     bonjour_query = dbus.ByteArray(binascii.unhexlify('0b5f6166706f766572746370c00c000c01'))
     bonjour_response = dbus.ByteArray(binascii.unhexlify('074578616d706c65c027'))
 
+    tests = [{'service_type': 'bonjour',
+              'query': bonjour_query,
+              'response': bonjour_response},
+             {'service_type': 'upnp',
+              'version': 0x10,
+              'service': 'uuid:6859dede-8574-59ab-9332-123456789012::upnp:rootdevice',
+              'query': bonjour_query,
+              'response': bonjour_response}]
+    for args in tests:
+        p2p.AddService(args)
+        p2p.FlushService()
+
     args = {'service_type': 'bonjour',
             'query': bonjour_query,
             'response': bonjour_response}
-    p2p.AddService(args)
-    p2p.FlushService()
     p2p.AddService(args)
 
     try:
@@ -3466,11 +3511,16 @@ def test_dbus_p2p_service_discovery(dev, apdev):
         if "InvalidArgs" not in str(e):
             raise Exception("Unexpected error message for invalid AddService(): " + str(e))
 
-    args = {'service_type': 'upnp',
-            'version': 0x10,
-            'service': 'ssdp:foo'}
-    ref = p2p.ServiceDiscoveryRequest(args)
-    p2p.ServiceDiscoveryCancelRequest(ref)
+    tests= [{'service_type': 'upnp',
+             'version': 0x10,
+             'service': 'ssdp:foo'},
+            {'service_type': 'upnp',
+             'version': 0x10,
+             'service': 'ssdp:bar',
+             'tlv': dbus.ByteArray(b"\x02\x00\x00\x01")}]
+    for args in tests:
+        ref = p2p.ServiceDiscoveryRequest(args)
+        p2p.ServiceDiscoveryCancelRequest(ref)
 
     tests = [{'service_type': 'foo'},
              {'foo': 'bar'},
@@ -3501,13 +3551,16 @@ def test_dbus_p2p_service_discovery(dev, apdev):
             if "InvalidArgs" not in str(e):
                 raise Exception("Unexpected error message for invalid ServiceDiscoveryRequest(): " + str(e))
 
-    args = {'foo': 'bar'}
-    try:
-        p2p.ServiceDiscoveryResponse(dbus.Dictionary(args, signature='sv'))
-        raise Exception("Invalid ServiceDiscoveryResponse accepted")
-    except dbus.exceptions.DBusException as e:
-        if "InvalidArgs" not in str(e):
-            raise Exception("Unexpected error message for invalid ServiceDiscoveryResponse(): " + str(e))
+    tests = [{'foo': 'bar'},
+             {'tlvs': dbus.ByteArray(b"\x02\x00\x00\x01"),
+              'bar': 'foo'}]
+    for args in tests:
+        try:
+            p2p.ServiceDiscoveryResponse(dbus.Dictionary(args, signature='sv'))
+            raise Exception("Invalid ServiceDiscoveryResponse accepted")
+        except dbus.exceptions.DBusException as e:
+            if "InvalidArgs" not in str(e):
+                raise Exception("Unexpected error message for invalid ServiceDiscoveryResponse(): " + str(e))
 
 def test_dbus_p2p_service_discovery_query(dev, apdev):
     """D-Bus P2P service discovery query"""
@@ -3703,8 +3756,7 @@ def test_dbus_p2p_autogo(dev, apdev):
                                            WPAS_DBUS_IFACE_P2PDEVICE)
                 group_p2p.Disconnect()
             else:
-                dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-                dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 join")
+                dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 join")
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -3868,6 +3920,10 @@ def test_dbus_p2p_autogo(dev, apdev):
             p2p.RemoveClient({'peer': self.peer_path})
 
             self.waiting_end = True
+
+            # wait for client to be fully connected
+            dev[1].wait_connected()
+            # so we can cleanly disconnect it now
             group_p2p = dbus.Interface(self.g_if_obj,
                                        WPAS_DBUS_IFACE_P2PDEVICE)
             group_p2p.Disconnect()
@@ -3929,8 +3985,7 @@ def test_dbus_p2p_autogo_pbc(dev, apdev):
             self.group = properties['group_object']
             self.g_if_obj = bus.get_object(WPAS_DBUS_SERVICE,
                                            properties['interface_object'])
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.global_request("P2P_CONNECT " + addr0 + " pbc join")
+            dev[1].global_request("P2P_CONNECT " + addr0 + " pbc join")
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -3959,6 +4014,9 @@ def test_dbus_p2p_autogo_pbc(dev, apdev):
 
         def staAuthorized(self, name):
             logger.debug("staAuthorized: " + name)
+            # wait for client to be fully connected
+            dev[1].wait_connected()
+            # so we can cleanly disconnect it now
             group_p2p = dbus.Interface(self.g_if_obj,
                                        WPAS_DBUS_IFACE_P2PDEVICE)
             group_p2p.Disconnect()
@@ -4020,9 +4078,8 @@ def test_dbus_p2p_autogo_legacy(dev, apdev):
                                       properties['interface_object'])
             wps = dbus.Interface(g_if_obj, WPAS_DBUS_IFACE_WPS)
             wps.Start(params)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.scan_for_bss(bssid, freq=2412)
-            dev1.request("WPS_PIN " + bssid + " " + pin)
+            dev[1].scan_for_bss(bssid, freq=2412)
+            dev[1].request("WPS_PIN " + bssid + " " + pin)
             self.group_p2p = dbus.Interface(g_if_obj, WPAS_DBUS_IFACE_P2PDEVICE)
 
         def groupFinished(self, properties):
@@ -4032,8 +4089,7 @@ def test_dbus_p2p_autogo_legacy(dev, apdev):
 
         def staAuthorized(self, name):
             logger.debug("staAuthorized: " + name)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.request("DISCONNECT")
+            dev[1].request("DISCONNECT")
             self.group_p2p.Disconnect()
 
         def run_test(self, *args):
@@ -4057,7 +4113,6 @@ def test_dbus_p2p_join(dev, apdev):
     addr1 = dev[1].p2p_dev_addr()
     addr2 = dev[2].p2p_dev_addr()
     dev[1].p2p_start_go(freq=2412)
-    dev1_group_ifname = dev[1].group_ifname
     dev[2].p2p_listen()
 
     class TestDbusP2p(TestDbus):
@@ -4101,9 +4156,7 @@ def test_dbus_p2p_join(dev, apdev):
                         'frequency': 2412}
                 pin = p2p.Connect(args)
 
-                dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-                dev1.group_ifname = dev1_group_ifname
-                dev1.group_request("WPS_PIN any " + pin)
+                dev[1].group_request("WPS_PIN any " + pin)
 
         def groupStarted(self, properties):
             logger.debug("groupStarted: " + str(properties))
@@ -4156,9 +4209,7 @@ def test_dbus_p2p_join(dev, apdev):
             logger.debug("invitationResult: " + str(result))
             if result['status'] != 1:
                 raise Exception("Unexpected invitation result: " + str(result))
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.group_ifname = dev1_group_ifname
-            dev1.remove_group()
+            dev[1].remove_group()
 
         def run_test(self, *args):
             logger.debug("run_test")
@@ -4208,9 +4259,8 @@ def test_dbus_p2p_invitation_received(dev, apdev):
 
         def run_test(self, *args):
             logger.debug("run_test")
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
             cmd = "P2P_INVITE persistent=" + peer['persistent'] + " peer=" + addr0
-            dev1.global_request(cmd)
+            dev[1].global_request(cmd)
             return False
 
         def success(self):
@@ -4458,9 +4508,8 @@ def test_dbus_p2p_reinvoke_persistent(dev, apdev):
                                    dbus_interface=dbus.PROPERTIES_IFACE,
                                    byte_arrays=True)
                 bssid = ':'.join(["%02x" % i for i in struct.unpack('6B', res['BSSID'])])
-                dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-                dev1.scan_for_bss(bssid, freq=2412)
-                dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 join")
+                dev[1].scan_for_bss(bssid, freq=2412)
+                dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 join")
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -4468,9 +4517,8 @@ def test_dbus_p2p_reinvoke_persistent(dev, apdev):
                 self.done = True
                 self.loop.quit()
             else:
-                dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-                dev1.global_request("SET persistent_reconnect 1")
-                dev1.p2p_listen()
+                dev[1].global_request("SET persistent_reconnect 1")
+                dev[1].p2p_listen()
 
                 args = {'persistent_group_object': dbus.ObjectPath(path),
                         'peer': self.peer_path}
@@ -4486,8 +4534,8 @@ def test_dbus_p2p_reinvoke_persistent(dev, apdev):
                 pin = p2p.Invite(args)
                 self.invited = True
 
-                self.sta_group_ev = dev1.wait_global_event(["P2P-GROUP-STARTED"],
-                                                           timeout=15)
+                self.sta_group_ev = dev[1].wait_global_event(["P2P-GROUP-STARTED"],
+                                                             timeout=15)
                 if self.sta_group_ev is None:
                     raise Exception("P2P-GROUP-STARTED event not seen")
 
@@ -4513,20 +4561,18 @@ def test_dbus_p2p_reinvoke_persistent(dev, apdev):
                       'Type': 'pin',
                       'Pin': '12345670'}
             logger.info("Authorize peer to connect to the group")
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
             wps = dbus.Interface(self.g_if_obj, WPAS_DBUS_IFACE_WPS)
             wps.Start(params)
-            self.sta_group_ev = dev1.wait_global_event(["P2P-GROUP-STARTED"],
-                                                       timeout=15)
+            self.sta_group_ev = dev[1].wait_global_event(["P2P-GROUP-STARTED"],
+                                                         timeout=15)
             if self.sta_group_ev is None:
                 raise Exception("P2P-GROUP-STARTED event not seen")
 
         def staAuthorized(self, name):
             logger.debug("staAuthorized: " + name)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.group_form_result(self.sta_group_ev)
-            dev1.remove_group()
-            ev = dev1.wait_global_event(["P2P-GROUP-REMOVED"], timeout=10)
+            dev[1].group_form_result(self.sta_group_ev)
+            dev[1].remove_group()
+            ev = dev[1].wait_global_event(["P2P-GROUP-REMOVED"], timeout=10)
             if ev is None:
                 raise Exception("Group removal timed out")
             group_p2p = dbus.Interface(self.g_if_obj, WPAS_DBUS_IFACE_P2PDEVICE)
@@ -4616,10 +4662,9 @@ def test_dbus_p2p_go_neg_rx(dev, apdev):
         def run_test(self, *args):
             logger.debug("run_test")
             p2p.Listen(10)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            if not dev1.discover_peer(addr0):
+            if not dev[1].discover_peer(addr0):
                 raise Exception("Peer not found")
-            dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 enter")
+            dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 enter")
             return False
 
         def success(self):
@@ -4680,11 +4725,10 @@ def test_dbus_p2p_go_neg_auth(dev, apdev):
                     'go_intent': 15, 'authorize_only': True}
             p2p.Connect(args)
             p2p.Listen(10)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            if not dev1.discover_peer(addr0):
+            if not dev[1].discover_peer(addr0):
                 raise Exception("Peer not found")
-            dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=0")
-            ev = dev1.wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
+            dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=0")
+            ev = dev[1].wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
             if ev is None:
                 raise Exception("Group formation timed out")
             self.sta_group_ev = ev
@@ -4696,9 +4740,8 @@ def test_dbus_p2p_go_neg_auth(dev, apdev):
             logger.debug("groupStarted: " + str(properties))
             self.g_if_obj = bus.get_object(WPAS_DBUS_SERVICE,
                                            properties['interface_object'])
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.group_form_result(self.sta_group_ev)
-            dev1.remove_group()
+            dev[1].group_form_result(self.sta_group_ev)
+            dev[1].remove_group()
 
         def staDeauthorized(self, name):
             logger.debug("staDeuthorized: " + name)
@@ -4764,22 +4807,18 @@ def test_dbus_p2p_go_neg_init(dev, apdev):
 
         def deviceFound(self, path):
             logger.debug("deviceFound: path=%s" % path)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
             args = {'peer': path, 'wps_method': 'keypad', 'pin': '12345670',
                     'go_intent': 0}
             p2p.Connect(args)
 
-            ev = dev1.wait_global_event(["P2P-GO-NEG-REQUEST"], timeout=15)
+            ev = dev[1].wait_global_event(["P2P-GO-NEG-REQUEST"], timeout=15)
             if ev is None:
                 raise Exception("Timeout while waiting for GO Neg Request")
-            dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=15")
-            ev = dev1.wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
+            dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=15")
+            ev = dev[1].wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
             if ev is None:
                 raise Exception("Group formation timed out")
             self.sta_group_ev = ev
-            dev1.close_monitor_global()
-            dev1.close_monitor_mon()
-            dev1 = None
 
         def goNegotiationSuccess(self, properties):
             logger.debug("goNegotiationSuccess: properties=%s" % str(properties))
@@ -4790,10 +4829,8 @@ def test_dbus_p2p_go_neg_init(dev, apdev):
                                       properties['interface_object'])
             group_p2p = dbus.Interface(g_if_obj, WPAS_DBUS_IFACE_P2PDEVICE)
             group_p2p.Disconnect()
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1', monitor=False)
-            dev1.group_form_result(self.sta_group_ev)
-            dev1.remove_group()
-            dev1 = None
+            dev[1].group_form_result(self.sta_group_ev)
+            dev[1].remove_group()
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -4863,22 +4900,18 @@ def test_dbus_p2p_group_termination_by_go(dev, apdev):
 
         def deviceFound(self, path):
             logger.debug("deviceFound: path=%s" % path)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
             args = {'peer': path, 'wps_method': 'keypad', 'pin': '12345670',
                     'go_intent': 0}
             p2p.Connect(args)
 
-            ev = dev1.wait_global_event(["P2P-GO-NEG-REQUEST"], timeout=15)
+            ev = dev[1].wait_global_event(["P2P-GO-NEG-REQUEST"], timeout=15)
             if ev is None:
                 raise Exception("Timeout while waiting for GO Neg Request")
-            dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=15")
-            ev = dev1.wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
+            dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=15")
+            ev = dev[1].wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
             if ev is None:
                 raise Exception("Group formation timed out")
             self.sta_group_ev = ev
-            dev1.close_monitor_global()
-            dev1.close_monitor_mon()
-            dev1 = None
 
         def goNegotiationSuccess(self, properties):
             logger.debug("goNegotiationSuccess: properties=%s" % str(properties))
@@ -4887,9 +4920,8 @@ def test_dbus_p2p_group_termination_by_go(dev, apdev):
             logger.debug("groupStarted: " + str(properties))
             g_if_obj = bus.get_object(WPAS_DBUS_SERVICE,
                                       properties['interface_object'])
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1', monitor=False)
-            dev1.group_form_result(self.sta_group_ev)
-            dev1.remove_group()
+            dev[1].group_form_result(self.sta_group_ev)
+            dev[1].remove_group()
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -4962,22 +4994,18 @@ def _test_dbus_p2p_group_idle_timeout(dev, apdev):
 
         def deviceFound(self, path):
             logger.debug("deviceFound: path=%s" % path)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
             args = {'peer': path, 'wps_method': 'keypad', 'pin': '12345670',
                     'go_intent': 0}
             p2p.Connect(args)
 
-            ev = dev1.wait_global_event(["P2P-GO-NEG-REQUEST"], timeout=15)
+            ev = dev[1].wait_global_event(["P2P-GO-NEG-REQUEST"], timeout=15)
             if ev is None:
                 raise Exception("Timeout while waiting for GO Neg Request")
-            dev1.global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=15")
-            ev = dev1.wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
+            dev[1].global_request("P2P_CONNECT " + addr0 + " 12345670 display go_intent=15")
+            ev = dev[1].wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
             if ev is None:
                 raise Exception("Group formation timed out")
             self.sta_group_ev = ev
-            dev1.close_monitor_global()
-            dev1.close_monitor_mon()
-            dev1 = None
 
         def goNegotiationSuccess(self, properties):
             logger.debug("goNegotiationSuccess: properties=%s" % str(properties))
@@ -4987,14 +5015,13 @@ def _test_dbus_p2p_group_idle_timeout(dev, apdev):
             self.group_started = True
             g_if_obj = bus.get_object(WPAS_DBUS_SERVICE,
                                       properties['interface_object'])
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1', monitor=False)
-            dev1.group_form_result(self.sta_group_ev)
-            ifaddr = dev1.group_request("STA-FIRST").splitlines()[0]
+            dev[1].group_form_result(self.sta_group_ev)
+            ifaddr = dev[1].group_request("STA-FIRST").splitlines()[0]
             # Force disassociation with different reason code so that the
             # P2P Client using D-Bus does not get normal group termination event
             # from the GO.
-            dev1.group_request("DEAUTHENTICATE " + ifaddr + " reason=0 test=0")
-            dev1.remove_group()
+            dev[1].group_request("DEAUTHENTICATE " + ifaddr + " reason=0 test=0")
+            dev[1].remove_group()
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -5090,10 +5117,9 @@ def test_dbus_p2p_wps_failure(dev, apdev):
         def run_test(self, *args):
             logger.debug("run_test")
             p2p.Listen(10)
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            if not dev1.discover_peer(addr0):
+            if not dev[1].discover_peer(addr0):
                 raise Exception("Peer not found")
-            dev1.global_request("P2P_CONNECT " + addr0 + " 87654321 enter")
+            dev[1].global_request("P2P_CONNECT " + addr0 + " 87654321 enter")
             return False
 
         def success(self):
@@ -5113,7 +5139,6 @@ def test_dbus_p2p_two_groups(dev, apdev):
     addr1 = dev[1].p2p_dev_addr()
     addr2 = dev[2].p2p_dev_addr()
     dev[1].p2p_start_go(freq=2412)
-    dev1_group_ifname = dev[1].group_ifname
 
     class TestDbusP2p(TestDbus):
         def __init__(self, bus):
@@ -5155,9 +5180,7 @@ def test_dbus_p2p_two_groups(dev, apdev):
                 logger.info("Join the group")
                 p2p.StopFind()
                 pin = '12345670'
-                dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-                dev1.group_ifname = dev1_group_ifname
-                dev1.group_request("WPS_PIN any " + pin)
+                dev[1].group_request("WPS_PIN any " + pin)
                 args = {'peer': self.go,
                         'join': True,
                         'wps_method': 'pin',
@@ -5206,13 +5229,12 @@ def test_dbus_p2p_two_groups(dev, apdev):
                 g_wps.Start(params)
 
                 bssid = ':'.join(["%02x" % i for i in struct.unpack('6B', self.g2_bssid)])
-                dev2 = WpaSupplicant('wlan2', '/tmp/wpas-wlan2')
-                dev2.scan_for_bss(bssid, freq=2412)
-                dev2.global_request("P2P_CONNECT " + bssid + " 12345670 join freq=2412")
-                ev = dev2.wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
+                dev[2].scan_for_bss(bssid, freq=2412)
+                dev[2].global_request("P2P_CONNECT " + bssid + " 12345670 join freq=2412")
+                ev = dev[2].wait_global_event(["P2P-GROUP-STARTED"], timeout=15)
                 if ev is None:
                     raise Exception("Group join timed out")
-                self.dev2_group_ev = ev
+                dev[2].group_form_result(ev)
 
         def groupFinished(self, properties):
             logger.debug("groupFinished: " + str(properties))
@@ -5232,9 +5254,7 @@ def test_dbus_p2p_two_groups(dev, apdev):
                 return
             self.check_results()
 
-            dev2 = WpaSupplicant('wlan2', '/tmp/wpas-wlan2')
-            dev2.group_form_result(self.dev2_group_ev)
-            dev2.remove_group()
+            dev[2].remove_group()
 
             logger.info("Disconnect group2")
             group_p2p = dbus.Interface(self.g2_if_obj,
@@ -5540,8 +5560,7 @@ def test_dbus_ap(dev, apdev):
             logger.debug("propertiesChanged: %s" % str(properties))
             if 'State' in properties and properties['State'] == "completed":
                 self.started = True
-                dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-                dev1.connect(ssid, psk=passphrase, scan_freq="2412")
+                dev[1].connect(ssid, psk=passphrase, scan_freq="2412")
 
         def stationAdded(self, station, properties):
             logger.debug("stationAdded: %s" % str(station))
@@ -5569,8 +5588,7 @@ def test_dbus_ap(dev, apdev):
         def staAuthorized(self, name):
             logger.debug("staAuthorized: " + name)
             self.authorized = True
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.request("DISCONNECT")
+            dev[1].request("DISCONNECT")
 
         def staDeauthorized(self, name):
             logger.debug("staDeauthorized: " + name)
@@ -6008,18 +6026,15 @@ def test_dbus_mesh(dev, apdev):
             logger.debug("MeshGroup: " + str(res))
             if res != b"wpas-mesh-open":
                 raise Exception("Unexpected MeshGroup")
-            dev1 = WpaSupplicant('wlan1', '/tmp/wpas-wlan1')
-            dev1.mesh_group_remove()
+            dev[1].mesh_group_remove()
 
         def meshPeerDisconnected(self, args):
             logger.debug("MeshPeerDisconnected: " + str(args))
-            dev0 = WpaSupplicant('wlan0', '/tmp/wpas-wlan0')
-            dev0.mesh_group_remove()
+            dev[0].mesh_group_remove()
 
         def run_test(self, *args):
             logger.debug("run_test")
-            dev0 = WpaSupplicant('wlan0', '/tmp/wpas-wlan0')
-            add_open_mesh_network(dev0)
+            add_open_mesh_network(dev[0])
             return False
 
         def success(self):
@@ -6098,14 +6113,14 @@ def test_dbus_roam(dev, apdev):
             raise Exception("Expected signals not seen")
 
 def test_dbus_creds(dev, apdev):
-    "D-Bus interworking credentials"
+    """D-Bus interworking credentials"""
     (bus, wpas_obj, path, if_obj) = prepare_dbus(dev[0])
     iface = dbus.Interface(if_obj, WPAS_DBUS_IFACE)
 
-    args = {'domain': 'server.w1.fi',
+    args = {'domain': ['server.w1.fi','server2.w1.fi'],
             'realm': 'server.w1.fi',
-            'roaming_consortium': '50a9bf',
-            'required_roaming_consortium': '23bf50',
+            'home_ois': '50a9bf',
+            'required_home_ois': '23bf50',
             'eap': 'TTLS',
             'phase2': 'auth=MSCHAPV2',
             'username': 'user',
@@ -6118,6 +6133,8 @@ def test_dbus_creds(dev, apdev):
         if k == 'password':
             continue
         prop = dev[0].get_cred(0, k)
+        if isinstance(v, list):
+            v = '\n'.join(v)
         if prop != v:
             raise Exception('Credential add failed: %s does not match %s' % (prop, v))
 
@@ -6143,7 +6160,7 @@ def test_dbus_creds(dev, apdev):
         raise Exception("Credential remove failed")
 
 def test_dbus_interworking(dev, apdev):
-    "D-Bus interworking selection"
+    """D-Bus interworking selection"""
     (bus, wpas_obj, path, if_obj) = prepare_dbus(dev[0])
     iface = dbus.Interface(if_obj, WPAS_DBUS_IFACE)
 
@@ -6205,5 +6222,205 @@ def test_dbus_interworking(dev, apdev):
             return self.interworking_ap_seen and self.interworking_select_done
 
     with TestDbusInterworking(bus) as t:
+        if not t.success():
+            raise Exception("Expected signals not seen")
+
+def test_dbus_hs20_terms_and_conditions(dev, apdev):
+    """D-Bus HS2.0 Terms and Conditions acceptance"""
+    check_eap_capa(dev[0], "MSCHAPV2")
+
+    (bus, wpa_obj, path, if_obj) = prepare_dbus(dev[0])
+    iface = dbus.Interface(if_obj, WPAS_DBUS_IFACE)
+
+    bssid = apdev[0]['bssid']
+    params = {"ssid": "test-hs20", "hessid": bssid, "wpa": "2",
+              "rsn_pairwise": "CCMP", "wpa_key_mgmt": "WPA-EAP",
+              "ieee80211w": "1", "ieee8021x": "1",
+              "auth_server_addr": "127.0.0.1", "auth_server_port": "1812",
+              "auth_server_shared_secret": "radius", "interworking": "1",
+              "access_network_type": "14", "internet": "1", "asra": "0",
+              "esr": "0", "uesa": "0", "venue_group": "7", "venue_type": "1",
+              "venue_name": ["eng:Example venue", "fin:Esimerkkipaikka"],
+              "roaming_consortium": ["112233", "1020304050", "010203040506",
+              "fedcba"], "domain_name": "example.com,another.example.com",
+              "nai_realm": ["0,example.com,13[5:6],21[2:4][5:7]",
+              "0,another.example.com"], "hs20": "1",
+              "hs20_wan_metrics": "01:8000:1000:80:240:3000",
+              "hs20_conn_capab": ["1:0:2", "6:22:1", "17:5060:0"],
+              "hs20_operating_class": "5173", "anqp_3gpp_cell_net": "244,91",
+              "hs20_t_c_filename": "terms-and-conditions",
+              "hs20_t_c_timestamp": "123456789"}
+
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    class TestDbusInterworking(TestDbus):
+        def __init__(self, bus):
+            TestDbus.__init__(self, bus)
+            self.hs20_t_and_c_seen = False
+
+        def __enter__(self):
+            gobject.timeout_add(1, self.run_connect)
+            gobject.timeout_add(15000, self.timeout)
+            self.add_signal(self.hs20TermsAndConditions, WPAS_DBUS_IFACE,
+                            "HS20TermsAndConditions")
+            self.loop.run()
+            return self
+
+        def hs20TermsAndConditions(self, t_c_url):
+            logger.debug("hs20TermsAndConditions: url=%s" % (t_c_url))
+            url = "https://example.com/t_and_c?addr=%s&ap=123" % dev[0].own_addr()
+            if url in t_c_url:
+                self.hs20_t_and_c_seen = True
+
+        def run_connect(self, *args):
+            dev[0].hs20_enable()
+            dev[0].connect("test-hs20", proto="RSN", key_mgmt="WPA-EAP", eap="TTLS",
+                           identity="hs20-t-c-test", password="password",
+                           ca_cert="auth_serv/ca.pem", phase2="auth=MSCHAPV2",
+                           ieee80211w='2', scan_freq="2412")
+            return False
+
+        def success(self):
+            return self.hs20_t_and_c_seen
+
+    with TestDbusInterworking(bus) as t:
+        if not t.success():
+            raise Exception("Expected signals not seen")
+
+def test_dbus_anqp_get(dev, apdev):
+    """D-Bus ANQP get test"""
+    (bus, wpa_obj, path, if_obj) = prepare_dbus(dev[0])
+    iface = dbus.Interface(if_obj, WPAS_DBUS_IFACE)
+
+    bssid = apdev[0]['bssid']
+    params = hs20_ap_params(ssid="test-anqp")
+    params["hessid"] = bssid
+    params['mbo'] = '1'
+    params['mbo_cell_data_conn_pref'] = '1'
+    params['hs20_oper_friendly_name'] = ["eng:Example operator",
+                                         "fin:Esimerkkioperaattori"]
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    dev[0].flush_scan_cache()
+    dev[0].scan_for_bss(bssid, freq="2412", force_scan=True)
+    iface.ANQPGet({"addr": bssid,
+                   "ids": dbus.Array([257], dbus.Signature("q")),
+                   "mbo_ids": dbus.Array([2], dbus.Signature("y")),
+                   "hs20_ids": dbus.Array([3, 4], dbus.Signature("y"))})
+
+    ev = dev[0].wait_event(["GAS-QUERY-DONE"], timeout=10)
+    if ev is None:
+        raise Exception("GAS query timed out")
+
+    ev = dev[0].wait_event(["RX-ANQP"], timeout=1)
+    if ev is None or "ANQP Capability list" not in ev:
+        raise Exception("Did not receive Capability list")
+
+    ev = dev[0].wait_event(["RX-HS20-ANQP"], timeout=1)
+    if ev is None or "Operator Friendly Name" not in ev:
+        raise Exception("Did not receive Operator Friendly Name")
+
+    ev = dev[0].wait_event(["RX-MBO-ANQP"], timeout=1)
+    if ev is None or "cell_conn_pref" not in ev:
+        raise Exception("Did not receive MBO Cellular Data Connection Preference")
+
+    bss = dev[0].get_bss(bssid)
+    if 'anqp_capability_list' not in bss:
+        raise Exception("Capability List ANQP-element not seen")
+
+def test_dbus_anqp_query_done(dev, apdev):
+    """D-Bus ANQP get test"""
+    (bus, wpa_obj, path, if_obj) = prepare_dbus(dev[0])
+    iface = dbus.Interface(if_obj, WPAS_DBUS_IFACE)
+
+    bssid = apdev[0]['bssid']
+    params = hs20_ap_params(ssid="test-anqp")
+    params["hessid"] = bssid
+    params['mbo'] = '1'
+    params['mbo_cell_data_conn_pref'] = '1'
+    params['hs20_oper_friendly_name'] = ["eng:Example operator",
+                                         "fin:Esimerkkioperaattori"]
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    class TestDbusANQPGet(TestDbus):
+        def __init__(self, bus):
+            TestDbus.__init__(self, bus)
+            self.anqp_query_done = False
+
+        def __enter__(self):
+            gobject.timeout_add(1, self.run_query)
+            gobject.timeout_add(15000, self.timeout)
+            self.add_signal(self.anqpQueryDone, WPAS_DBUS_IFACE,
+                            "ANQPQueryDone")
+            self.loop.run()
+            return self
+
+        def anqpQueryDone(self, addr, result):
+            logger.debug("anqpQueryDone: addr=%s result=%s" % (addr, result))
+            if addr == bssid and "SUCCESS" in result:
+                self.anqp_query_done = True
+
+        def run_query(self, *args):
+            dev[0].scan_for_bss(bssid, freq="2412", force_scan=True)
+            iface.ANQPGet({"addr": bssid,
+                           "ids": dbus.Array([257], dbus.Signature("q"))})
+            return False
+
+        def success(self):
+            return self.anqp_query_done
+
+    with TestDbusANQPGet(bus) as t:
+        if not t.success():
+            raise Exception("Expected signals not seen")
+
+def test_dbus_bss_anqp_properties(dev, apdev):
+    """D-Bus ANQP BSS properties changed"""
+    (bus, wpa_obj, path, if_obj) = prepare_dbus(dev[0])
+    iface = dbus.Interface(if_obj, WPAS_DBUS_IFACE)
+
+    bssid = apdev[0]['bssid']
+    params = hs20_ap_params(ssid="test-anqp")
+    params["hessid"] = bssid
+    params['mbo'] = '1'
+    params['mbo_cell_data_conn_pref'] = '1'
+    params['hs20_oper_friendly_name'] = ["eng:Example operator",
+                                         "fin:Esimerkkioperaattori"]
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    class TestDbusANQPBSSPropertiesChanged(TestDbus):
+        def __init__(self, bus):
+            TestDbus.__init__(self, bus)
+            self.capability_list = False
+            self.venue_name = False
+            self.roaming_consortium = False
+            self.nai_realm = False
+
+        def __enter__(self):
+            gobject.timeout_add(1, self.run_query)
+            gobject.timeout_add(15000, self.timeout)
+            self.add_signal(self.propertiesChanged, WPAS_DBUS_BSS,
+                            "PropertiesChanged")
+            self.loop.run()
+            return self
+
+        def propertiesChanged(self, properties):
+            logger.debug("propertiesChanged: %s" % str(properties))
+            if 'ANQP' in properties:
+                anqp_properties = properties['ANQP']
+                self.capability_list = 'CapabilityList' in anqp_properties
+                self.venue_name = 'VenueName' in anqp_properties
+                self.roaming_consortium = 'RoamingConsortium' in anqp_properties
+                self.nai_realm = 'NAIRealm' in anqp_properties
+
+        def run_query(self, *args):
+            dev[0].scan_for_bss(bssid, freq="2412", force_scan=True)
+            iface.ANQPGet({"addr": bssid,
+                           "ids": dbus.Array([257,258,261,263], dbus.Signature("q"))})
+            return False
+
+        def success(self):
+            return self.capability_list and self.venue_name and self.roaming_consortium and self.nai_realm
+
+    with TestDbusANQPBSSPropertiesChanged(bus) as t:
         if not t.success():
             raise Exception("Expected signals not seen")

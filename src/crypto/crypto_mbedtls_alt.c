@@ -2718,7 +2718,7 @@ struct wpabuf *crypto_ec_key_get_pubkey_point(struct crypto_ec_key *key, int pre
     return NULL;
 }
 
-const struct crypto_ec_point *crypto_ec_key_get_public_key(struct crypto_ec_key *key)
+struct crypto_ec_point *crypto_ec_key_get_public_key(struct crypto_ec_key *key)
 {
     mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
     if (ecp_kp == NULL)
@@ -2739,7 +2739,7 @@ const struct crypto_ec_point *crypto_ec_key_get_public_key(struct crypto_ec_key 
     return (struct crypto_ec_point *)p;
 }
 
-const struct crypto_bignum *crypto_ec_key_get_private_key(struct crypto_ec_key *key)
+struct crypto_bignum *crypto_ec_key_get_private_key(struct crypto_ec_key *key)
 {
     mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
     if (ecp_kp == NULL)

@@ -20,8 +20,56 @@ struct wlantest_sta * sta_find(struct wlantest_bss *bss, const u8 *addr)
 	struct wlantest_sta *sta;
 
 	dl_list_for_each(sta, &bss->sta, struct wlantest_sta, list) {
-		if (os_memcmp(sta->addr, addr, ETH_ALEN) == 0)
+		if (ether_addr_equal(sta->addr, addr))
 			return sta;
+	}
+
+	return NULL;
+}
+
+
+struct wlantest_sta * sta_find_mlo(struct wlantest *wt,
+				   struct wlantest_bss *bss, const u8 *addr)
+{
+	struct wlantest_sta *sta;
+	struct wlantest_bss *obss;
+	int link_id;
+
+	dl_list_for_each(sta, &bss->sta, struct wlantest_sta, list) {
+		if (ether_addr_equal(sta->addr, addr))
+			return sta;
+		if (ether_addr_equal(sta->mld_mac_addr, addr))
+			return sta;
+	}
+
+	if (is_zero_ether_addr(addr))
+		return NULL;
+
+	dl_list_for_each(sta, &bss->sta, struct wlantest_sta, list) {
+		for (link_id = 0; link_id < MAX_NUM_MLD_LINKS; link_id++) {
+			if (ether_addr_equal(sta->link_addr[link_id], addr))
+				return sta;
+		}
+	}
+
+	dl_list_for_each(obss, &wt->bss, struct wlantest_bss, list) {
+		if (obss == bss)
+			continue;
+		if (!is_zero_ether_addr(bss->mld_mac_addr) &&
+		    !ether_addr_equal(obss->mld_mac_addr, bss->mld_mac_addr))
+			continue;
+		dl_list_for_each(sta, &obss->sta, struct wlantest_sta, list) {
+			if (ether_addr_equal(sta->addr, addr))
+				return sta;
+			if (ether_addr_equal(sta->mld_mac_addr, addr))
+				return sta;
+			for (link_id = 0; link_id < MAX_NUM_MLD_LINKS;
+			     link_id++) {
+				if (ether_addr_equal(sta->link_addr[link_id],
+						     addr))
+					return sta;
+			}
+		}
 	}
 
 	return NULL;
@@ -47,8 +95,10 @@ struct wlantest_sta * sta_get(struct wlantest_bss *bss, const u8 *addr)
 	sta->bss = bss;
 	os_memcpy(sta->addr, addr, ETH_ALEN);
 	dl_list_add(&bss->sta, &sta->list);
-	wpa_printf(MSG_DEBUG, "Discovered new STA " MACSTR " in BSS " MACSTR,
-		   MAC2STR(sta->addr), MAC2STR(bss->bssid));
+	wpa_printf(MSG_DEBUG, "Discovered new STA " MACSTR " in BSS " MACSTR
+		   " (MLD " MACSTR ")",
+		   MAC2STR(sta->addr),
+		   MAC2STR(bss->bssid), MAC2STR(bss->mld_mac_addr));
 	return sta;
 }
 
@@ -58,6 +108,26 @@ void sta_deinit(struct wlantest_sta *sta)
 	dl_list_del(&sta->list);
 	os_free(sta->assocreq_ies);
 	os_free(sta);
+}
+
+
+static void sta_update_assoc_ml(struct wlantest_sta *sta,
+				struct ieee802_11_elems *elems)
+{
+	const u8 *mld_addr;
+
+	if (!elems->basic_mle)
+		return;
+
+	mld_addr = get_basic_mle_mld_addr(elems->basic_mle,
+					  elems->basic_mle_len);
+	if (!mld_addr) {
+		wpa_printf(MSG_INFO, "MLO: Invalid Basic Multi-Link element");
+		return;
+	}
+
+	wpa_printf(MSG_DEBUG, "STA MLD Address: " MACSTR, MAC2STR(mld_addr));
+	os_memcpy(sta->mld_mac_addr, mld_addr, ETH_ALEN);
 }
 
 
@@ -180,7 +250,7 @@ skip_rsn_wpa:
 	wpa_printf(MSG_INFO, "STA " MACSTR
 		   " proto=%s%s%s%s"
 		   "pairwise=%s%s%s%s%s%s%s"
-		   "key_mgmt=%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
+		   "key_mgmt=%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
 		   "rsn_capab=%s%s%s%s%s%s%s%s%s%s",
 		   MAC2STR(sta->addr),
 		   sta->proto == 0 ? "OPEN " : "",
@@ -214,6 +284,8 @@ skip_rsn_wpa:
 		   "EAP-SUITE-B " : "",
 		   sta->key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B_192 ?
 		   "EAP-SUITE-B-192 " : "",
+		   sta->key_mgmt & WPA_KEY_MGMT_IEEE8021X_SHA384 ?
+		   "EAP-SHA384 " : "",
 		   sta->rsn_capab & WPA_CAPABILITY_PREAUTH ? "PREAUTH " : "",
 		   sta->rsn_capab & WPA_CAPABILITY_NO_PAIRWISE ?
 		   "NO_PAIRWISE " : "",
@@ -229,4 +301,66 @@ skip_rsn_wpa:
 		   sta->rsn_capab & WPA_CAPABILITY_OCVC ? "OCVC " : "",
 		   sta->rsn_capab & WPA_CAPABILITY_EXT_KEY_ID_FOR_UNICAST ?
 		   "ExtKeyID " : "");
+
+	sta_update_assoc_ml(sta, elems);
+}
+
+
+static void sta_copy_ptk(struct wlantest_sta *sta, struct wpa_ptk *ptk)
+{
+	os_memcpy(&sta->ptk, ptk, sizeof(*ptk));
+	sta->ptk_set = 1;
+	os_memset(sta->rsc_tods, 0, sizeof(sta->rsc_tods));
+	os_memset(sta->rsc_fromds, 0, sizeof(sta->rsc_fromds));
+}
+
+
+void sta_new_ptk(struct wlantest *wt, struct wlantest_sta *sta,
+		 struct wpa_ptk *ptk)
+{
+	struct wlantest_bss *bss;
+	struct wlantest_sta *osta;
+
+	add_note(wt, MSG_DEBUG, "Derived new PTK");
+	sta_copy_ptk(sta, ptk);
+	wpa_hexdump(MSG_DEBUG, "PTK:KCK", sta->ptk.kck, sta->ptk.kck_len);
+	wpa_hexdump(MSG_DEBUG, "PTK:KEK", sta->ptk.kek, sta->ptk.kek_len);
+	wpa_hexdump(MSG_DEBUG, "PTK:TK", sta->ptk.tk, sta->ptk.tk_len);
+
+	dl_list_for_each(bss, &wt->bss, struct wlantest_bss, list) {
+		dl_list_for_each(osta, &bss->sta, struct wlantest_sta, list) {
+			bool match = false;
+			int link_id;
+
+			if (osta == sta)
+				continue;
+			if (ether_addr_equal(sta->addr, osta->addr))
+				match = true;
+			for (link_id = 0; !match && link_id < MAX_NUM_MLD_LINKS;
+			     link_id++) {
+				if (ether_addr_equal(osta->link_addr[link_id],
+						     sta->addr))
+					match = true;
+			}
+
+			if (!match)
+				continue;
+			if (!ether_addr_equal(sta->bss->mld_mac_addr,
+					      osta->bss->mld_mac_addr))
+				continue;
+			wpa_printf(MSG_DEBUG,
+				   "Add PTK to another MLO STA entry " MACSTR
+				   " (MLD " MACSTR " --> " MACSTR ") in BSS "
+				   MACSTR " (MLD " MACSTR " --> " MACSTR ")",
+				   MAC2STR(osta->addr),
+				   MAC2STR(osta->mld_mac_addr),
+				   MAC2STR(sta->mld_mac_addr),
+				   MAC2STR(bss->bssid),
+				   MAC2STR(bss->mld_mac_addr),
+				   MAC2STR(sta->bss->mld_mac_addr));
+			sta_copy_ptk(osta, ptk);
+			os_memcpy(osta->mld_mac_addr, sta->mld_mac_addr,
+				  ETH_ALEN);
+		}
+	}
 }

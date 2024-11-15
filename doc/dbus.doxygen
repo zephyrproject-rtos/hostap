@@ -41,6 +41,9 @@ registered in the bus with fi.w1.wpa_supplicant1 name.
 	      <tr><td>BridgeIfname</td><td>s</td><td>Name of the bridge interface to control, e.g., br0</td><td>No</td>
 	      <tr><td>Driver</td><td>s</td><td>Driver name which the interface uses, e.g., nl80211</td><td>No</td>
 	      <tr><td>ConfigFile</td><td>s</td><td>Configuration file path</td><td>No</td>
+	      <tr><td>Create</td><td>b</td><td>Whether to create a new interface in the kernel</td><td>No</td>
+	      <tr><td>Type</td><td>s</td><td>Interface type to create (sta or ap)</td><td>No</td>
+	      <tr><td>Address</td><td>s</td><td>MAC address in colon-delimited format to be used in the created interface</td><td>No</td>
 	    </table>
 	  </dd>
 	</dl>
@@ -206,9 +209,11 @@ fi.w1.wpa_supplicant1.CreateInterface.
 	      <tr><th>Key</th><th>Value type</th><th>Description</th><th>Required</th>
 	      <tr><td>Type</td><td>s</td><td>Type of the scan. Possible values: "active", "passive"</td><td>Yes</td>
 	      <tr><td>SSIDs</td><td>aay</td><td>Array of SSIDs to scan for (applies only if scan type is active)</td><td>No</td>
-	      <tr><td>IEs</td><td>aay</td><td>Information elements to used in active scan (applies only if scan type is active)</td><td>No</td>
+	      <tr><td>IEs</td><td>aay</td><td>Information elements to used in active scan (applies only if scan type is active). Default IEs will be used in absence of this option.</td><td>No</td>
 	      <tr><td>Channels</td><td>a(uu)</td><td>Array of frequencies to scan in form of (center, width) in MHz.</td><td>No</td>
 	      <tr><td>AllowRoam</td><td>b</td><td>TRUE (or absent) to allow a roaming decision based on the results of this scan, FALSE to prevent a roaming decision.</td><td>No</td>
+	      <tr><td>NonColoc6GHz</td><td>b</td><td>TRUE to force scanning of non-PSC 6 GHz channels, FALSE (or absent) to skip scanning of non-PSC 6 GHz channels.</td><td>No</td>
+	      <tr><td>6GHzOnly</td><td>b</td><td>TRUE to scan only 6 GHz channels, FALSE (or absent) to scan all channels. Applies only if Channels is absent.</td><td>No</td>
 	    </table>
 	  </dd>
 	</dl>
@@ -579,6 +584,24 @@ fi.w1.wpa_supplicant1.CreateInterface.
 	<p>Perform Interworking (Hotspot 2.0) network selection.</p>
       </li>
       <li>
+	<h3>ANQPGet ( a{sv} : args) --> nothing</h3>
+	<p>Send an ANQP request.</p>
+	<h4>Arguments</h4>
+	<dl>
+	  <dt>a{sv} : args</dt>
+	  <dd>
+	    <table>
+	      <tr><th>Key</th><th>Value type</th><th>Description</th><th>Required</th>
+	      <tr><td>addr</td><td>s</td><td>Address of the BSS</td><td>Yes</td>
+	      <tr><td>freq</td><td>u</td><td>Frequency of the BSS</td><td>No</td>
+	      <tr><td>ids</td><td>aq</td><td>List of ANQP information IDs to query</td><td>No</td>
+	      <tr><td>hs20_ids</td><td>ay</td><td>List of Hotspot 2.0 ANQP information IDs to query</td><td>No</td>
+	      <tr><td>mbo_ids</td><td>ay</td><td>List of MBO ANQP information IDs to query</td><td>No</td>
+	    </table>
+	  </dd>
+	</dl>
+      </li>
+      <li>
 	<h3>EAPLogoff ( ) --> nothing</h3>
 	<p>IEEE 802.1X EAPOL state machine logoff.</p>
       </li>
@@ -645,6 +668,33 @@ fi.w1.wpa_supplicant1.CreateInterface.
 	      <tr><td>avg-rssi</td><td>i</td><td>Average RSSI (dBm)</td><td>No</td>
 	      <tr><td>center-frq1</td><td>i</td><td>VHT segment 1 frequency (MHz)</td><td>No</td>
 	      <tr><td>center-frq2</td><td>i</td><td>VHT segment 2 frequency (MHz)</td><td>No</td>
+	      <tr><td>rx-bytes</td><td>i</td><td>Bytes recieved</td><td>No</td>
+	      <tr><td>tx-bytes</td><td>i</td><td>Bytes sent</td><td>No</td>
+	      <tr><td>rx-packets</td><td>i</td><td>Packets recieved</td><td>No</td>
+	      <tr><td>tx-packets</td><td>i</td><td>Packets sent</td><td>No</td>
+	      <tr><td>beacons</td><td>i</td><td>Beacons received</td><td>No</td>
+	      <tr><td>linkrxspeed</td><td>i</td><td>Link Speed (RX, kbps)</td><td>No</td>
+	      <tr><td>linktxspeed</td><td>i</td><td>Link Speed (TX, kbps)</td><td>No</td>
+	      <tr><td>retries-failed</td><td>i</td><td>Retries (failed)</td><td>No</td>
+	      <tr><td>retries</td><td>i</td><td>Retries</td><td>No</td>
+	      <tr><td>last-ack-rssi</td><td>i</td><td>RSSI of last ACK frame (dBm)</td><td>No</td>
+	      <tr><td>fcs-errors</td><td>i</td><td>FCS errors</td><td>No</td>
+	      <tr><td>beacon-losses</td><td>i</td><td>Beacons lost</td><td>No</td>
+	      <tr><td>expected-throughput</td><td>i</td><td>Expected Throughput (kbps)</td><td>No</td>
+	      <tr><td>rx-drop-misc</td><td>i</td><td>RX packets dropped for unspecified reasons</td><td>No</td>
+	      <tr><td>rx-mpdus</td><td>i</td><td>Recieved packets</td><td>No</td>
+	      <tr><td>rx-he-mcs</td><td>i</td><td>MCS index (rx, he)</td><td>No</td>
+	      <tr><td>tx-he-mcs</td><td>i</td><td>MCS index (tx, he)</td><td>No</td>
+	      <tr><td>rx-vht-mcs</td><td>i</td><td>MCS index (rx, vht)</td><td>No</td>
+	      <tr><td>tx-vht-mcs</td><td>i</td><td>MCS index (tx, vht)</td><td>No</td>
+	      <tr><td>rx-mcs</td><td>i</td><td>MCS index (rx)</td><td>No</td>
+	      <tr><td>tx-mcs</td><td>i</td><td>MCS index (tx)</td><td>No</td>
+	      <tr><td>rx-he-nss</td><td>i</td><td>Number of streams (rx, he)</td><td>No</td>
+	      <tr><td>tx-he-nss</td><td>i</td><td>Number of streams (tx, he)</td><td>No</td>
+	      <tr><td>rx-vht-nss</td><td>i</td><td>Number of streams (rx, vht)</td><td>No</td>
+	      <tr><td>tx-vht-nss</td><td>i</td><td>Number of streams (tx, vht)</td><td>No</td>
+	      <tr><td>avg-beacon-rssi</td><td>i</td><td>Average Beacon RSSI (dBm)</td><td>No</td>
+	      <tr><td>avg-ack-rssi</td><td>i</td><td>Average ACK frame RSSI (dBm)</td><td>No</td>
 	    </table>
 	  </dd>
 	</dl>
@@ -1093,6 +1143,16 @@ fi.w1.wpa_supplicant1.CreateInterface.
 	<p>Masks to show which bits not to randomize with MAC address randomization. Possible keys are "scan", "sched_scan", and "pno". Values must be an array of 6 bytes.</p>
 	<p>When this property is set, the new dictionary replaces the old value, rather than merging them together. Leaving a key out of the dictionary will turn off MAC address randomization for that scan type.</p>
       </li>
+
+      <li>
+	<h3>MACAddress - ay - (read)</h3>
+	<p>MAC address of the interface</p>
+      </li>
+
+      <li>
+	<h3>SignalChange - "a{sv}" - (read)</h3>
+	<p>Signal and quality properties of the interface</p>
+      </li>
     </ul>
 
 \subsection dbus_interface_signals Signals
@@ -1238,7 +1298,7 @@ fi.w1.wpa_supplicant1.CreateInterface.
 	<h4>Arguments</h4>
 	<dl>
 	  <dt>a{sv} : properties</dt>
-	  <dd>A dictionary with pairs of properties names which have changed and theirs new values. Possible dictionary keys are: "ApScan", "Scanning", "State", "CurrentBSS", "CurrentNetwork"</dd>
+	  <dd>A dictionary with pairs of properties names which have changed and their new values. Possible dictionary keys are: "ApScan", "Scanning", "State", "CurrentBSS", "CurrentNetwork", "SignalChange"</dd>
 	</dl>
       </li>
 
@@ -1294,6 +1354,31 @@ fi.w1.wpa_supplicant1.CreateInterface.
 
       <li>
 	<h3>InterworkingSelectDone ( )</h3>
+      </li>
+
+      <li>
+	<h3>PskMismatch ( )</h3>
+	<p>A possible PSK mismatch is identified.</p>
+      </li>
+
+      <li>
+	<h3>HS20TermsAndConditions ( s : url )</h3>
+	<p>A terms and conditions page is present. This signal is delivered when the network requires acceptance of the terms and conditions.</p>
+	<dl>
+	  <dt>s : url</dt>
+	  <dd>URL of the terms and conditions page.</dd>
+	</dl>
+      </li>
+
+      <li>
+	<h3>ANQPQueryDone ( s : addr, s : result )</h3>
+	<p>Result of an ANQP query.</p>
+	<dl>
+	  <dt>s : addr</dt>
+	  <dd>Address of the BSS targeted by the query.</dd>
+	  <dt>s : result</dt>
+	  <dd>Determine if the request was successful. If so fields are available in BSS.</dd>
+	</dl>
       </li>
     </ul>
 
@@ -1558,6 +1643,14 @@ Interface for performing P2P (Wi-Fi Peer-to-Peer) P2P Device operations.
 	<tr><td>persistent</td><td>b</td><td>Whether to form a persistent group.</td><td>no</td></tr>
 	<tr><td>persistent_group_object</td><td>o</td><td></td><td>no</td></tr>
 	<tr><td>frequency</td><td>i</td><td>Operating frequency in MHz</td><td>no</td></tr>
+	<tr><td>retry_limit</td><td>i</td><td>Optional limit on the number of scan attempts to join a group</td><td>no</td></tr>
+	<tr><td>ht40</td><td>b</td><td></td><td>no</td></tr>
+	<tr><td>vht</td><td>b</td><td></td><td>no</td></tr>
+	<tr><td>he</td><td>b</td><td></td><td>no</td></tr>
+	<tr><td>edmg</td><td>b</td><td></td><td>no</td></tr>
+	<tr><td>allow_6ghz</td><td>b</td><td></td><td>no</td></tr>
+	<tr><td>freq2</td><td>i</td><td>Center frequency in MHz for segment 2 when operating in 80 MHz + 80 MHz mode</td><td>no</td></tr>
+	<tr><td>max_oper_chwidth</td><td>i</td><td>Maximum operating channel width in MHz (20, 40, 80, 160, 320)</td><td>no</td></tr>
 	</table>
       </dd>
     </dl>
@@ -2126,6 +2219,30 @@ scan results.
       <li>
 	<h3>Age - u - (read)</h3>
 	<p>Number of seconds since the BSS was last seen.</p>
+      </li>
+      <li>
+	<h3>ANQP - a{sv} - (read)</h3>
+	<p>ANQP information of the BSS. Empty dictionary indicates no ANQP field. Named dictionary entries are:</p>
+	<table>
+	  <tr><td>CapabilityList</td><td>ay</td></tr>
+	  <tr><td>VenueName</td><td>ay</td></tr>
+	  <tr><td>NetworkAuthType</td><td>ay</td></tr>
+	  <tr><td>RoamingConsortium</td><td>ay</td></tr>
+	  <tr><td>IPAddrTypeAvailability</td><td>ay</td></tr>
+	  <tr><td>NAIRealm</td><td>ay</td></tr>
+	  <tr><td>3GPP</td><td>ay</td></tr>
+	  <tr><td>DomainName</td><td>ay</td></tr>
+	  <tr><td>FilsRealmInfo</td><td>ay</td></tr>
+	  <tr><td>HS20CapabilityList</td><td>ay</td></tr>
+	  <tr><td>HS20OperatorFriendlyName</td><td>ay</td></tr>
+	  <tr><td>HS20WanMetrics</td><td>ay</td></tr>
+	  <tr><td>HS20ConnectionCapability</td><td>ay</td></tr>
+	  <tr><td>HS20OperatingClass</td><td>ay</td></tr>
+	  <tr><td>HS20OSUProvidersList</td><td>ay</td></tr>
+	  <tr><td>HS20OperatorIconMetadata</td><td>ay</td></tr>
+	  <tr><td>HS20OSUProvidersNAIList</td><td>ay</td></tr>
+	</table>
+	<p>Unnamed ANQP elements have a generic entry name 'anqp[id]' where 'id' is the InfoID of the ANQP element as described in IEEE Std 802.11-2020, Table 9-331 (ANQP-element definitions).</p>
       </li>
     </ul>
 

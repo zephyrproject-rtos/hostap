@@ -12,6 +12,7 @@ import subprocess
 import time
 import remotehost
 import logging
+import re
 logger = logging.getLogger()
 import hostapd
 
@@ -35,33 +36,38 @@ def long_duration_test(func):
     func.long_duration_test = True
     return func
 
-class alloc_fail(object):
-    def __init__(self, dev, count, funcs):
-        self._dev = dev
-        self._count = count
-        self._funcs = funcs
-    def __enter__(self):
-        cmd = "TEST_ALLOC_FAIL %d:%s" % (self._count, self._funcs)
-        if "OK" not in self._dev.request(cmd):
-            raise HwsimSkip("TEST_ALLOC_FAIL not supported")
-    def __exit__(self, type, value, traceback):
-        if type is None:
-            if self._dev.request("GET_ALLOC_FAIL") != "0:%s" % self._funcs:
-                raise Exception("Allocation failure did not trigger")
-
 class fail_test(object):
-    def __init__(self, dev, count, funcs):
+    _test_fail = 'TEST_FAIL'
+    _get_fail = 'GET_FAIL'
+
+    def __init__(self, dev, count, funcs, *args):
         self._dev = dev
-        self._count = count
-        self._funcs = funcs
+        self._funcs = [(count, funcs)]
+
+        args = list(args)
+        while args:
+            count = args.pop(0)
+            funcs = args.pop(0)
+            self._funcs.append((count, funcs))
     def __enter__(self):
-        cmd = "TEST_FAIL %d:%s" % (self._count, self._funcs)
+        patterns = ' '.join(['%d:%s' % (c, f) for c, f in self._funcs])
+        cmd = '%s %s' % (self._test_fail, patterns)
         if "OK" not in self._dev.request(cmd):
             raise HwsimSkip("TEST_FAIL not supported")
     def __exit__(self, type, value, traceback):
+        pending = self._dev.request(self._get_fail)
         if type is None:
-            if self._dev.request("GET_FAIL") != "0:%s" % self._funcs:
-                raise Exception("Test failure did not trigger")
+            expected = ' '.join(['0:%s' % f for c, f in self._funcs])
+            if pending != expected:
+                # Ensure the failure cannot trigger in the future
+                self._dev.request('%s 0:' % self._test_fail)
+                raise Exception("Not all failures triggered (pending: %s)" % pending)
+        else:
+            logger.info("Pending failures at time of exception: %s" % pending)
+
+class alloc_fail(fail_test):
+    _test_fail = 'TEST_ALLOC_FAIL'
+    _get_fail = 'GET_ALLOC_FAIL'
 
 def wait_fail_trigger(dev, cmd, note="Failure not triggered", max_iter=40,
 		      timeout=0.05):
@@ -73,10 +79,8 @@ def wait_fail_trigger(dev, cmd, note="Failure not triggered", max_iter=40,
         time.sleep(timeout)
 
 def require_under_vm():
-    with open('/proc/1/cmdline', 'r') as f:
-        cmd = f.read()
-        if "inside.sh" not in cmd:
-            raise HwsimSkip("Not running under VM")
+    if os.getenv('VM') != 'VM':
+        raise HwsimSkip("Not running under VM")
 
 def iface_is_in_bridge(bridge, ifname):
     fname = "/sys/class/net/"+ifname+"/brport/bridge"
@@ -133,6 +137,12 @@ def check_fils_sk_pfs_capa(dev):
     if capa is None or "FILS-SK-PFS" not in capa:
         raise HwsimSkip("FILS-SK-PFS not supported")
 
+def check_imsi_privacy_support(dev):
+    tls = dev.request("GET tls_library")
+    if tls.startswith("OpenSSL"):
+        return
+    raise HwsimSkip("IMSI privacy not supported with this TLS library: " + tls)
+
 def check_tls_tod(dev):
     tls = dev.request("GET tls_library")
     if not tls.startswith("OpenSSL") and not tls.startswith("internal"):
@@ -140,9 +150,32 @@ def check_tls_tod(dev):
 
 def vht_supported():
     cmd = subprocess.Popen(["iw", "reg", "get"], stdout=subprocess.PIPE)
-    reg = cmd.stdout.read()
+    reg = cmd.stdout.read().decode()
     if "@ 80)" in reg or "@ 160)" in reg:
         return True
+    return False
+
+def eht_320mhz_supported():
+    cmd = subprocess.Popen(["iw", "reg", "get"],
+                           stdout=subprocess.PIPE)
+    cmd = subprocess.Popen(["iw", "reg", "get"], stdout=subprocess.PIPE)
+    reg = cmd.stdout.read().decode()
+    if "@ 320)" in reg:
+        return True
+    return False
+
+def he_6ghz_supported(freq=5975):
+    cmd = subprocess.Popen(["iw", "reg", "get"],
+                           stdout=subprocess.PIPE)
+    reg_rules = cmd.stdout.read().decode().splitlines()
+    for rule in reg_rules:
+        m = re.search(r"\s*\(\d+\s*-\s*\d+", rule)
+        if not m:
+            continue
+        freqs = re.findall(r"\d+", m.group(0))
+        if int(freqs[0]) <= freq and freq <= int(freqs[1]):
+            return True
+
     return False
 
 # This function checks whether the provided dev, which may be either

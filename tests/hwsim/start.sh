@@ -80,12 +80,17 @@ fi
 
 if [ "$1" = "valgrind" ]; then
     VALGRIND=y
-    VALGRIND_WPAS="valgrind --log-file=$LOGDIR/valgrind-wlan%d --leak-check=full"
-    VALGRIND_HAPD="valgrind --log-file=$LOGDIR/valgrind-hostapd --leak-check=full"
+    if [ -r "$DIR/valgrind.suppressions" ]; then
+	VALGRIND_SUPP=" --gen-suppressions=all --suppressions=$DIR/valgrind.suppressions"
+    else
+	VALGRIND_SUPP=""
+    fi
+    VALGRIND_WPAS="valgrind --log-file=$LOGDIR/valgrind-wlan%d --leak-check=full --num-callers=20$VALGRIND_SUPP"
+    VALGRIND_HAPD="valgrind --log-file=$LOGDIR/valgrind-hostapd --leak-check=full --num-callers=20$VALGRIND_SUPP"
     chmod -f a+rx $WPAS
     chmod -f a+rx $HAPD
     chmod -f a+rx $HAPD_AS
-    HAPD_AS="valgrind --log-file=$LOGDIR/valgrind-auth-serv --leak-check=full $HAPD_AS"
+    HAPD_AS="valgrind --log-file=$LOGDIR/valgrind-auth-serv --leak-check=full --num-callers=20$VALGRIND_SUPP $HAPD_AS"
     shift
 else
     unset VALGRIND
@@ -112,7 +117,7 @@ fi
 
 test -d /sys/module/mac80211_hwsim || sudo modprobe mac80211_hwsim radios=7 channels=$NUM_CH support_p2p_device=0 dyndbg=+p
 
-sudo ifconfig hwsim0 up
+sudo ip link set hwsim0 up
 sudo $WLANTEST -i hwsim0 -n $LOGDIR/hwsim0.pcapng -c -dtN -L $LOGDIR/hwsim0 &
 for i in 0 1 2; do
     DBUSARG=""

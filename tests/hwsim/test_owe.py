@@ -311,9 +311,15 @@ def run_owe_transition_mode_ifname_acs(dev, apdev, wait_first):
     wait_acs(hapd2)
     if not wait_first:
         state = hapd.get_status_field("state")
+        logger.info("AP1 state: " + state)
         if state == "ACS-STARTED":
             time.sleep(5)
             state = hapd.get_status_field("state")
+            logger.info("AP1 state after 5 sec: " + state)
+        if state != "ENABLED":
+            time.sleep(1)
+            state = hapd.get_status_field("state")
+            logger.info("AP1 state after 1 sec: " + state)
         if state != "ENABLED":
             raise Exception("AP1 startup did not succeed")
 
@@ -328,6 +334,61 @@ def run_owe_transition_mode_ifname_acs(dev, apdev, wait_first):
     val = dev[0].get_status_field("key_mgmt")
     if val != "OWE":
         raise Exception("Unexpected key_mgmt: " + val)
+
+def test_owe_transition_mode_multi_assoc(dev, apdev):
+    """Opportunistic Wireless Encryption transition mode and multiple associations"""
+    if "OWE" not in dev[0].get_capability("key_mgmt"):
+        raise HwsimSkip("OWE not supported")
+    dev[0].flush_scan_cache()
+    params = {"ssid": "owe-random",
+              "wpa": "2",
+              "wpa_key_mgmt": "OWE",
+              "rsn_pairwise": "CCMP",
+              "ieee80211w": "2",
+              "owe_transition_bssid": apdev[1]['bssid'],
+              "owe_transition_ssid": '"owe-test"',
+              "ignore_broadcast_ssid": "1"}
+    hapd = hostapd.add_ap(apdev[0], params)
+    bssid = hapd.own_addr()
+
+    params = {"ssid": "owe-test",
+              "owe_transition_bssid": apdev[0]['bssid'],
+              "owe_transition_ssid": '"owe-random"'}
+    hapd2 = hostapd.add_ap(apdev[1], params)
+    bssid2 = hapd2.own_addr()
+
+    dev[0].scan_for_bss(bssid, freq="2412")
+    dev[0].scan_for_bss(bssid2, freq="2412")
+
+    dev[0].connect("owe-test", key_mgmt="OWE", ieee80211w="2")
+    hapd.wait_sta()
+
+    if dev[0].get_status_field("bssid") != bssid:
+        raise Exception("Unexpected BSSID")
+
+    for i in range(5):
+        dev[0].request("DISCONNECT")
+        dev[0].wait_disconnected()
+        dev[0].dump_monitor()
+
+        dev[0].scan(freq=2412)
+
+        dev[0].request("RECONNECT")
+        dev[0].wait_connected()
+        hapd.wait_sta()
+        if dev[0].get_status_field("bssid") != bssid:
+            raise Exception("Unexpected BSSID")
+        time.sleep(1)
+        dev[0].dump_monitor()
+
+    res = dev[0].request("SCAN_RESULTS").splitlines()
+    num = 0
+    for r in res:
+        if "owe-random" in r:
+            num += 1
+    if num != 1:
+        logger.info("SCAN_RESULTS:\n" + str(res))
+        raise Exception("Unexpected number of BSS entries for owe-random: %d" % num)
 
 def test_owe_transition_mode_open_only_ap(dev, apdev):
     """Opportunistic Wireless Encryption transition mode connect to open-only AP"""
@@ -378,6 +439,36 @@ def test_owe_only_sta(dev, apdev):
     hapd2 = hostapd.add_ap(apdev[1], params)
     dev[0].request("RECONNECT")
     dev[0].wait_connected()
+
+def test_owe_only_sta_tm_ap(dev, apdev):
+    """Opportunistic Wireless Encryption transition mode disabled on STA and AP using transition mode"""
+    if "OWE" not in dev[0].get_capability("key_mgmt"):
+        raise HwsimSkip("OWE not supported")
+    dev[0].flush_scan_cache()
+
+    adv_bssid = apdev[1]['bssid']
+    params = {"ssid": "owe-random",
+              "wpa": "2",
+              "wpa_key_mgmt": "OWE",
+              "rsn_pairwise": "CCMP",
+              "ieee80211w": "2",
+              "owe_transition_bssid": adv_bssid,
+              "owe_transition_ssid": '"owe-test"',
+              "ignore_broadcast_ssid": "1"}
+    hapd = hostapd.add_ap(apdev[0], params)
+    bssid = hapd.own_addr()
+
+    adv_bssid = apdev[0]['bssid']
+    params = {"ssid": "owe-test",
+              "owe_transition_bssid": adv_bssid,
+              "owe_transition_ssid": '"owe-random"'}
+    hapd2 = hostapd.add_ap(apdev[1], params)
+    bssid2 = hapd2.own_addr()
+
+    dev[0].scan_for_bss(bssid, freq="2412")
+    dev[0].scan_for_bss(bssid2, freq="2412")
+
+    dev[0].connect("owe-test", key_mgmt="OWE", ieee80211w="2", owe_only="1")
 
 def test_owe_transition_mode_open_multiple_scans(dev, apdev):
     """Opportunistic Wireless Encryption transition mode and need for multiple scans"""
@@ -829,6 +920,72 @@ def test_owe_invalid_assoc_resp(dev, apdev):
     dev[0].request("REMOVE_NETWORK all")
     dev[0].dump_monitor()
 
+def test_owe_double_assoc(dev, apdev):
+    """Opportunistic Wireless Encryption - duplicated association attempt"""
+    if "OWE" not in dev[0].get_capability("key_mgmt"):
+        raise HwsimSkip("OWE not supported")
+    params = {"ssid": "owe",
+              "wpa": "2",
+              "ieee80211w": "2",
+              "wpa_key_mgmt": "OWE",
+              "rsn_pairwise": "CCMP"}
+    hapd = hostapd.add_ap(apdev[0], params)
+    bssid = hapd.own_addr()
+
+    dev[0].scan_for_bss(bssid, freq="2412")
+
+    hapd.set("ext_mgmt_frame_handling", "1")
+    dev[0].connect("owe", key_mgmt="OWE", owe_group="19", ieee80211w="2",
+                   scan_freq="2412", wait_connect=False)
+
+    for i in range(0, 10):
+        req = hapd.mgmt_rx()
+        if req is None:
+            raise Exception("MGMT RX wait timed out")
+        if req['subtype'] == 11:
+            break
+        req = None
+    if not req:
+        raise Exception("Authentication frame not received")
+    hapd.request("MGMT_RX_PROCESS freq=2412 datarate=0 ssi_signal=-30 frame=" + binascii.hexlify(req['frame']).decode())
+
+    for i in range(0, 10):
+        req = hapd.mgmt_rx()
+        if req is None:
+            raise Exception("MGMT RX wait timed out")
+        if req['subtype'] == 0:
+            break
+        req = None
+    if not req:
+        raise Exception("Association Request frame not received")
+    hapd.request("MGMT_RX_PROCESS freq=2412 datarate=0 ssi_signal=-30 frame=" + binascii.hexlify(req['frame']).decode())
+
+    ev = hapd.wait_event(["MGMT-TX-STATUS"], timeout=5)
+    if ev is None:
+        raise Exception("Management frame TX status not reported (1)")
+    if "stype=1 ok=1" not in ev:
+        raise Exception("Unexpected management frame TX status (1): " + ev)
+    cmd = "MGMT_TX_STATUS_PROCESS stype=1 ok=0 %s" % (ev.split(' ')[3])
+    if "OK" not in hapd.request(cmd):
+        raise Exception("MGMT_TX_STATUS_PROCESS failed")
+
+    hapd.request("MGMT_RX_PROCESS freq=2412 datarate=0 ssi_signal=-30 frame=" + binascii.hexlify(req['frame']).decode())
+
+    ev = hapd.wait_event(["MGMT-TX-STATUS"], timeout=5)
+    if ev is None:
+        raise Exception("Management frame TX status not reported (1)")
+    if "stype=1 ok=1" not in ev:
+        raise Exception("Unexpected management frame TX status (1): " + ev)
+    cmd = "MGMT_TX_STATUS_PROCESS stype=1 ok=1 %s" % (ev.split(' ')[3])
+    if "OK" not in hapd.request(cmd):
+        raise Exception("MGMT_TX_STATUS_PROCESS failed")
+
+    ev = dev[0].wait_event(["PMKSA-CACHE-ADDED"], timeout=5)
+    if ev is None:
+        raise Exception("No PMKSA cache entry from OWE added")
+
+    dev[0].wait_connected()
+
 def start_owe(dev, apdev, workaround=0):
     if "OWE" not in dev[0].get_capability("key_mgmt"):
         raise HwsimSkip("OWE not supported")
@@ -910,9 +1067,9 @@ def test_owe_transition_mode_disable(dev, apdev):
     dev[0].scan_for_bss(bssid2, freq="2412")
 
     id = dev[0].connect("owe-test", key_mgmt="OWE", ieee80211w="2",
-                        scan_freq="2412")
+                        scan_freq="2412", wait_connect=False)
 
-    ev = dev[0].wait_event(["TRANSITION-DISABLE"], timeout=1)
+    ev = dev[0].wait_event(["TRANSITION-DISABLE"], timeout=15)
     if ev is None:
         raise Exception("Transition disable not indicated")
     if ev.split(' ')[1] != "08":

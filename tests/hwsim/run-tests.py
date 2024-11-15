@@ -8,6 +8,7 @@
 
 import os
 import re
+import gc
 import sys
 import time
 from datetime import datetime
@@ -68,13 +69,10 @@ def reset_devs(dev, apdev):
     try:
         hapd = HostapdGlobal()
         hapd.flush()
-        hapd.remove('wlan3-6')
-        hapd.remove('wlan3-5')
-        hapd.remove('wlan3-4')
-        hapd.remove('wlan3-3')
-        hapd.remove('wlan3-2')
-        for ap in apdev:
-            hapd.remove(ap['ifname'])
+        ifaces = hapd.request("INTERFACES").splitlines()
+        for iface in ifaces:
+            if iface.startswith("wlan"):
+                hapd.remove(iface)
         hapd.remove('as-erp')
     except Exception as e:
         logger.info("Failed to remove hostapd interface")
@@ -125,16 +123,17 @@ def report(conn, prefill, build, commit, run, test, result, duration, logdir,
                              logdir + "/" + test + "." + log)
 
 class DataCollector(object):
-    def __init__(self, logdir, testname, args):
+    def __init__(self, logdir, testname, kmemleak, args):
         self._logdir = logdir
         self._testname = testname
         self._tracing = args.tracing
         self._dmesg = args.dmesg
+        self._kmemleak = kmemleak
         self._dbus = args.dbus
     def __enter__(self):
         if self._tracing:
             output = os.path.abspath(os.path.join(self._logdir, '%s.dat' % (self._testname, )))
-            self._trace_cmd = subprocess.Popen(['trace-cmd', 'record', '-o', output, '-e', 'mac80211', '-e', 'cfg80211', '-e', 'printk', 'sh', '-c', 'echo STARTED ; read l'],
+            self._trace_cmd = subprocess.Popen(['trace-cmd', 'record', '-o', output, '-T', '-e', 'skb', '-e', 'mac80211', '-e', 'cfg80211', '-e', 'printk', 'sh', '-c', 'echo STARTED ; read l'],
                                                stdin=subprocess.PIPE,
                                                stdout=subprocess.PIPE,
                                                stderr=open('/dev/null', 'w'),
@@ -161,6 +160,36 @@ class DataCollector(object):
             self._trace_cmd.stdin.write(b'DONE\n')
             self._trace_cmd.stdin.flush()
             self._trace_cmd.wait()
+
+        if self._kmemleak:
+            output = os.path.join(self._logdir, '%s.kmemleak' % (self._testname, ))
+            num = 0
+            while os.path.exists(output):
+                output = os.path.join(self._logdir, '%s.kmemleak-%d' % (self._testname, num))
+                num += 1
+
+            # Trigger kmemleak
+            with open('/sys/kernel/debug/kmemleak', 'w+') as kmemleak:
+                kmemleak.write('scan')
+                kmemleak.seek(0)
+
+                # Minimum reporting age
+                time.sleep(5)
+
+                kmemleak.write('scan')
+                kmemleak.seek(0)
+
+                leaks = []
+                while l := kmemleak.read():
+                    leaks.append(l)
+                leaks = ''.join(leaks)
+                if leaks:
+                    with open(output, 'w') as out:
+                        out.write(leaks)
+
+                kmemleak.seek(0)
+                kmemleak.write('clear')
+
         if self._dmesg:
             output = os.path.join(self._logdir, '%s.dmesg' % (self._testname, ))
             num = 0
@@ -199,20 +228,30 @@ def get_test_description(t):
         desc += " [long]"
     return desc
 
-def main():
+def import_test_cases():
     tests = []
     test_modules = []
+    names = set()
     files = os.listdir(scriptsdir)
-    for t in files:
-        m = re.match(r'(test_.*)\.py$', t)
-        if m:
-            logger.debug("Import test cases from " + t)
-            mod = __import__(m.group(1))
-            test_modules.append(mod.__name__.replace('test_', '', 1))
-            for key, val in mod.__dict__.items():
-                if key.startswith("test_"):
-                    tests.append(val)
-    test_names = list(set([t.__name__.replace('test_', '', 1) for t in tests]))
+    re_files = (re.match(r'(test_.*)\.py$', n) for n in files)
+    test_files = (m.group(1) for m in re_files if m)
+    for t in test_files:
+        mod = __import__(t)
+        test_modules.append(mod.__name__.replace('test_', '', 1))
+        for key, val in mod.__dict__.items():
+            if key.startswith("test_"):
+                if val.__doc__ is None:
+                    print(f"Test case {val.__name__} misses __doc__")
+                tests.append(val)
+
+                name = val.__name__.replace('test_', '', 1)
+                if name in names:
+                    print(f"Test case {name} defined multiple times")
+                names.add(name)
+    return tests, test_modules, names
+
+def main():
+    tests, test_modules, test_names = import_test_cases()
 
     run = None
 
@@ -397,6 +436,19 @@ def main():
     if args.dmesg:
         subprocess.call(['dmesg', '-c'], stdout=open('/dev/null', 'w'))
 
+    try:
+        # try to clear out any leaks that happened earlier
+        with open('/sys/kernel/debug/kmemleak', 'w') as kmemleak:
+            kmemleak.write('scan')
+            kmemleak.seek(0)
+            time.sleep(5)
+            kmemleak.write('scan')
+            kmemleak.seek(0)
+            kmemleak.write('clear')
+        have_kmemleak = True
+    except OSError:
+        have_kmemleak = False
+
     if conn and args.prefill:
         for t in tests_to_run:
             name = t.__name__.replace('test_', '', 1)
@@ -489,8 +541,14 @@ def main():
             log_handler.setFormatter(log_formatter)
             logger.addHandler(log_handler)
 
+        try:
+            with open('/sys/kernel/debug/clear_warn_once', 'w') as f:
+                f.write('1\n')
+        except FileNotFoundError:
+            pass
+
         reset_ok = True
-        with DataCollector(args.logdir, name, args):
+        with DataCollector(args.logdir, name, have_kmemleak, args):
             count = count + 1
             msg = "START {} {}/{}".format(name, count, num_tests)
             logger.info(msg)
@@ -576,6 +634,15 @@ def main():
                 if args.loglevel == logging.WARNING:
                     print("Exception: " + str(e))
                 result = "FAIL"
+
+            # Work around some objects having __del__, we really should
+            # use context managers, but that's complex. Doing this here
+            # will (on cpython at least) at make sure those objects that
+            # are no longer reachable will be collected now, invoking
+            # __del__() on them. This then ensures that __del__() isn't
+            # invoked at a bad time, e.g. causing recursion in locking.
+            gc.collect()
+
             open('/dev/kmsg', 'w').write('TEST-STOP %s @%.6f\n' % (name, time.time()))
             for d in dev:
                 try:
@@ -638,6 +705,12 @@ def main():
                 logger.info("Kernel issue found in dmesg - mark test failed")
                 result = 'FAIL'
 
+        if result == 'PASS' and have_kmemleak:
+            # The file is only created if a leak was found
+            if os.path.exists(os.path.join(args.logdir, name + '.kmemleak')):
+                logger.info("Kernel memory leak found - mark test failed")
+                result = 'FAIL'
+
         if result == 'PASS':
             passed.append(name)
         elif result == 'SKIP':
@@ -658,6 +731,10 @@ def main():
         if not reset_ok:
             print("Terminating early due to device reset failure")
             break
+
+    for d in dev:
+        d.close_ctrl()
+
     if args.stdin_ctrl:
         set_term_echo(sys.stdin.fileno(), True)
 

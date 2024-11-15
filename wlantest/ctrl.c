@@ -832,7 +832,7 @@ static void ctrl_add_passphrase(struct wlantest *wt, int sock, u8 *cmd,
 	dl_list_for_each(pa, &wt->passphrase, struct wlantest_passphrase, list)
 	{
 		if (os_strcmp(p->passphrase, pa->passphrase) == 0 &&
-		    os_memcmp(p->bssid, pa->bssid, ETH_ALEN) == 0) {
+		    ether_addr_equal(p->bssid, pa->bssid)) {
 			wpa_printf(MSG_INFO, "Passphrase was already known");
 			os_free(p);
 			p = NULL;
@@ -845,7 +845,7 @@ static void ctrl_add_passphrase(struct wlantest *wt, int sock, u8 *cmd,
 		dl_list_add(&wt->passphrase, &p->list);
 		dl_list_for_each(bss, &wt->bss, struct wlantest_bss, list) {
 			if (bssid &&
-			    os_memcmp(p->bssid, bss->bssid, ETH_ALEN) != 0)
+			    !ether_addr_equal(p->bssid, bss->bssid))
 				continue;
 			bss_add_pmk_from_passphrase(bss, p->passphrase);
 		}
@@ -956,6 +956,9 @@ static void info_print_key_mgmt(char *buf, size_t len, int key_mgmt)
 				   pos == buf ? "" : " ");
 	if (key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B_192)
 		pos += os_snprintf(pos, end - pos, "%sEAP-SUITE-B-192",
+				   pos == buf ? "" : " ");
+	if (key_mgmt & WPA_KEY_MGMT_IEEE8021X_SHA384)
+		pos += os_snprintf(pos, end - pos, "%sEAP-SHA384",
 				   pos == buf ? "" : " ");
 }
 
@@ -1148,7 +1151,7 @@ static void ctrl_send_(struct wlantest *wt, int sock, u8 *cmd, size_t clen)
 	switch (WLAN_FC_GET_TYPE(fc)) {
 	case WLAN_FC_TYPE_MGMT:
 		bssid = hdr->addr3;
-		if (os_memcmp(hdr->addr2, hdr->addr3, ETH_ALEN) == 0)
+		if (ether_addr_equal(hdr->addr2, hdr->addr3))
 			sta_addr = hdr->addr1;
 		else
 			sta_addr = hdr->addr2;

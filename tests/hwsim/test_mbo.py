@@ -88,7 +88,7 @@ def run_mbo_supp_oper_classes(dev, apdev, hapd, hapd2, country, freq_list=None,
 
 def run_mbo_supp_oper_class(dev, apdev, country, expected, inc5,
                             freq_list=None, disable_ht=False,
-                            disable_vht=False):
+                            disable_vht=False, alt_expected=None):
     if inc5:
         params = {'ssid': "test-wnm-mbo",
                   'mbo': '1',
@@ -146,30 +146,34 @@ def run_mbo_supp_oper_class(dev, apdev, country, expected, inc5,
     # since they were added only recently in regdb.
     if country == "FI":
         expected3 = expected3.replace("7b7c7d7e7f80", "7b80")
-    if res2 != expected and res2 != expected2 and res2 != expected3:
+    if res2 != expected and res2 != expected2 and res2 != expected3 and res2 != alt_expected:
         raise Exception("Unexpected supp_op_class string (country=%s, 2.4 GHz): %s (expected: %s)" % (country, res2, expected))
-    if inc5 and res5 != expected and res5 != expected2 and res5 != expected3:
+    if inc5 and res5 != expected and res5 != expected2 and res5 != expected3 and res5 != alt_expected:
         raise Exception("Unexpected supp_op_class string (country=%s, 5 GHz): %s (expected: %s)" % (country, res5, expected))
 
 def test_mbo_supp_oper_classes_za(dev, apdev):
     """MBO and supported operating classes (ZA)"""
     run_mbo_supp_oper_class(dev, apdev, "ZA",
-                            "515354737475767778797a7b808182", True)
+                            "515354737475767778797a7b8081008280", True)
 
 def test_mbo_supp_oper_classes_fi(dev, apdev):
     """MBO and supported operating classes (FI)"""
     run_mbo_supp_oper_class(dev, apdev, "FI",
-                            "515354737475767778797a7b7c7d7e7f808182", True)
+                            "515354737475767778797a7b7c7d7e7f8081008280", True,
+                            alt_expected="515354737475767778797a7b7c7d7e7f8081838485860082808785")
 
 def test_mbo_supp_oper_classes_us(dev, apdev):
     """MBO and supported operating classes (US)"""
     run_mbo_supp_oper_class(dev, apdev, "US",
-                            "515354737475767778797a7b7c7d7e7f808182", True)
+                            "515354737475767778797a7b7c7d7e7f8081008280", True,
+                            alt_expected="515354737475767778797a7b7c7d7e7f808183848586890082808785")
 
 def test_mbo_supp_oper_classes_jp(dev, apdev):
     """MBO and supported operating classes (JP)"""
     run_mbo_supp_oper_class(dev, apdev, "JP",
-                            "51525354737475767778797a7b808182", True)
+                            "51525354737475767778797a7b8081008280",
+                            True,
+                            alt_expected="51525354737475767778797a7b8081838485860082808785")
 
 def test_mbo_supp_oper_classes_bd(dev, apdev):
     """MBO and supported operating classes (BD)"""
@@ -189,13 +193,14 @@ def test_mbo_supp_oper_classes_us_freq_list(dev, apdev):
 def test_mbo_supp_oper_classes_us_disable_ht(dev, apdev):
     """MBO and supported operating classes (US) - disable_ht"""
     run_mbo_supp_oper_class(dev, apdev, "US", "517376797c7d", False,
-                            disable_ht=True)
+                            disable_ht=True, alt_expected="517376797c7d8384858689008785")
 
 def test_mbo_supp_oper_classes_us_disable_vht(dev, apdev):
     """MBO and supported operating classes (US) - disable_vht"""
     run_mbo_supp_oper_class(dev, apdev, "US",
                             "515354737475767778797a7b7c7d7e7f", False,
-                            disable_vht=True)
+                            disable_vht=True,
+                            alt_expected="515354737475767778797a7b7c7d7e7f8384858689008785")
 
 def test_mbo_assoc_disallow(dev, apdev, params):
     """MBO and association disallowed"""
@@ -274,6 +279,25 @@ def _test_mbo_assoc_disallow_ignore(dev, apdev):
     if "OK" not in hapd1.request("SET mbo_assoc_disallow 0"):
         raise Exception("Failed to set mbo_assoc_disallow for AP1")
     dev[0].wait_connected()
+
+def test_mbo_assoc_disallow_change(dev, apdev):
+    """MBO and dynamic association disallowed change with passive scanning"""
+    hapd = hostapd.add_ap(apdev[0], {"ssid": "MBO", "mbo": "1"})
+    id = dev[0].connect("MBO", key_mgmt="NONE", scan_freq="2412")
+    dev[0].request("DISCONNECT")
+    dev[0].wait_disconnected()
+    hapd.set("mbo_assoc_disallow", "1")
+    dev[0].scan_for_bss(hapd.own_addr(), 2412, force_scan=True, passive=True)
+    dev[0].request("RECONNECT")
+    ev = dev[0].wait_event(["CTRL-EVENT-NETWORK-NOT-FOUND",
+                            "CTRL-EVENT-ASSOC-REJECT",
+                            "CTRL-EVENT-CONNECTED"], timeout=20)
+    dev[0].request("DISCONNECT")
+    if ev is None:
+        raise Exception("CTRL-EVENT-NETWORK-NOT-FOUND not seen")
+    if "CTRL-EVENT-NETWORK-NOT-FOUND" not in ev:
+        raise Exception("Unexpected connection result: " + ev)
+
 
 @remote_compatible
 def test_mbo_cell_capa_update(dev, apdev):

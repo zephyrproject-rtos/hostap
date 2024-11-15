@@ -59,9 +59,10 @@ def test_fils_sk_full_auth(dev, apdev, params):
                    eap="PSK", identity="psk.user@example.com",
                    password_hex="0123456789abcdef0123456789abcdef",
                    erp="1", scan_freq="2412")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
-    ev = dev[0].wait_event(["WPA: Group rekeying completed"], timeout=2)
+    ev = dev[0].wait_event(["RSN: Group rekeying completed"], timeout=2)
     if ev is None:
         raise Exception("GTK rekey timed out")
     hwsim_utils.test_connectivity(dev[0], hapd)
@@ -108,9 +109,10 @@ def test_fils_sk_sha384_full_auth(dev, apdev, params):
                    eap="PSK", identity="psk.user@example.com",
                    password_hex="0123456789abcdef0123456789abcdef",
                    erp="1", scan_freq="2412")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
-    ev = dev[0].wait_event(["WPA: Group rekeying completed"], timeout=2)
+    ev = dev[0].wait_event(["RSN: Group rekeying completed"], timeout=2)
     if ev is None:
         raise Exception("GTK rekey timed out")
     hwsim_utils.test_connectivity(dev[0], hapd)
@@ -140,12 +142,17 @@ def test_fils_sk_pmksa_caching(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
     pmksa = dev[0].get_pmksa(bssid)
     if pmksa is None:
         raise Exception("No PMKSA cache entry created")
 
+    if dev[0].get_status_field("ssid_verified") == "1":
+        raise Exception("Unexpected ssid_verified=1 in STATUS")
+
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -155,6 +162,9 @@ def test_fils_sk_pmksa_caching(dev, apdev, params):
         raise Exception("Connection using PMKSA caching timed out")
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
+    hapd.wait_sta()
+    if dev[0].get_status_field("ssid_verified") != "1":
+        raise Exception("ssid_verified=1 not in STATUS")
     hwsim_utils.test_connectivity(dev[0], hapd)
     pmksa2 = dev[0].get_pmksa(bssid)
     if pmksa2 is None:
@@ -170,6 +180,9 @@ def test_fils_sk_pmksa_caching(dev, apdev, params):
     ev = dev[0].wait_event(["CTRL-EVENT-EAP-SUCCESS"], timeout=5)
     if ev is None:
         raise Exception("EAP authentication did not succeed")
+    ev = hapd.wait_event(["CTRL-EVENT-EAP-SUCCESS2"], timeout=1)
+    if ev is None:
+        raise Exception("EAP authentication did not succeed (AP)")
     time.sleep(0.1)
     hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -205,8 +218,10 @@ def test_fils_sk_pmksa_caching_ocv(dev, apdev, params):
     if pmksa is None:
         raise Exception("No PMKSA cache entry created")
 
+    hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -216,6 +231,7 @@ def test_fils_sk_pmksa_caching_ocv(dev, apdev, params):
         raise Exception("Connection using PMKSA caching timed out")
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
     pmksa2 = dev[0].get_pmksa(bssid)
     if pmksa2 is None:
@@ -231,6 +247,9 @@ def test_fils_sk_pmksa_caching_ocv(dev, apdev, params):
     ev = dev[0].wait_event(["CTRL-EVENT-EAP-SUCCESS"], timeout=5)
     if ev is None:
         raise Exception("EAP authentication did not succeed")
+    ev = hapd.wait_event(["CTRL-EVENT-EAP-SUCCESS2"], timeout=1)
+    if ev is None:
+        raise Exception("hostapd did not report EAP-Success on reauth")
     time.sleep(0.1)
     hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -303,6 +322,7 @@ def test_fils_sk_pmksa_caching_and_cache_id(dev, apdev):
     if bssid2 not in ev:
         raise Exception("Failed to connect to the second AP")
 
+    hapd2.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd2)
     pmksa2 = dev[0].get_pmksa(bssid2)
     if pmksa2:
@@ -346,6 +366,7 @@ def test_fils_sk_pmksa_caching_ctrl_ext(dev, apdev, params):
     if "ffee" not in res1:
         raise Exception("FILS Cache Identifier not seen in PMKSA cache entry")
 
+    hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
     hapd_as.disable()
@@ -373,6 +394,7 @@ def test_fils_sk_pmksa_caching_ctrl_ext(dev, apdev, params):
     ev = dev[0].wait_connected()
     if bssid2 not in ev:
         raise Exception("Unexpected BSS selected")
+    hapd2.wait_sta()
 
 def test_fils_sk_erp(dev, apdev, params):
     """FILS SK using ERP"""
@@ -404,8 +426,10 @@ def run_fils_sk_erp(dev, apdev, key_mgmt, params):
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
 
+    hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -418,6 +442,7 @@ def run_fils_sk_erp(dev, apdev, key_mgmt, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
 def test_fils_sk_erp_followed_by_pmksa_caching(dev, apdev, params):
@@ -441,9 +466,11 @@ def test_fils_sk_erp_followed_by_pmksa_caching(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     # Force the second connection to use ERP by deleting the PMKSA entry.
     dev[0].request("PMKSA_FLUSH")
@@ -459,6 +486,7 @@ def test_fils_sk_erp_followed_by_pmksa_caching(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
     pmksa = dev[0].get_pmksa(bssid)
@@ -467,6 +495,7 @@ def test_fils_sk_erp_followed_by_pmksa_caching(dev, apdev, params):
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     # The third connection is expected to use PMKSA caching for FILS
     # authentication.
@@ -481,6 +510,7 @@ def test_fils_sk_erp_followed_by_pmksa_caching(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
     pmksa2 = dev[0].get_pmksa(bssid)
@@ -511,9 +541,11 @@ def test_fils_sk_erp_another_ssid(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
     hapd.disable()
     dev[0].flush_scan_cache()
     if "FAIL" in dev[0].request("PMKSA_FLUSH"):
@@ -543,6 +575,7 @@ def test_fils_sk_erp_another_ssid(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
 def test_fils_sk_multiple_realms(dev, apdev, params):
@@ -617,9 +650,11 @@ def test_fils_sk_multiple_realms(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -632,6 +667,7 @@ def test_fils_sk_multiple_realms(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
 # DHCP message op codes
@@ -775,9 +811,11 @@ def run_fils_sk_hlp(dev, apdev, rapid_commit_server, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -834,6 +872,7 @@ def run_fils_sk_hlp(dev, apdev, rapid_commit_server, params):
         raise Exception("DHCPACK not in HLP response")
 
     dev[0].wait_connected()
+    hapd.wait_sta()
 
     dev[0].request("FILS_HLP_REQ_FLUSH")
 
@@ -865,9 +904,11 @@ def test_fils_sk_hlp_timeout(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -877,6 +918,7 @@ def test_fils_sk_hlp_timeout(dev, apdev, params):
     # Wait for HLP wait timeout to hit
     # FILS: HLP response timeout - continue with association response
     dev[0].wait_connected()
+    hapd.wait_sta()
 
     dev[0].request("FILS_HLP_REQ_FLUSH")
 
@@ -909,30 +951,38 @@ def test_fils_sk_hlp_oom(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     with alloc_fail(hapd, 1, "fils_process_hlp"):
         dev[0].select_network(id, freq=2412)
         dev[0].wait_connected()
+        hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     with alloc_fail(hapd, 1, "fils_process_hlp_dhcp"):
         dev[0].select_network(id, freq=2412)
         dev[0].wait_connected()
+        hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     with alloc_fail(hapd, 1, "wpabuf_alloc;fils_process_hlp_dhcp"):
         dev[0].select_network(id, freq=2412)
         dev[0].wait_connected()
+        hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     with alloc_fail(hapd, 1, "wpabuf_alloc;fils_dhcp_handler"):
@@ -943,8 +993,10 @@ def test_fils_sk_hlp_oom(dev, apdev, params):
                               chaddr=dev[0].own_addr(), giaddr="127.0.0.3")
         sock.sendto(dhcpdisc[2+20+8:], addr)
         dev[0].wait_connected()
+        hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     with alloc_fail(hapd, 1, "wpabuf_resize;fils_dhcp_handler"):
@@ -955,8 +1007,10 @@ def test_fils_sk_hlp_oom(dev, apdev, params):
                               chaddr=dev[0].own_addr(), giaddr="127.0.0.3")
         sock.sendto(dhcpdisc[2+20+8:], addr)
         dev[0].wait_connected()
+        hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -967,8 +1021,10 @@ def test_fils_sk_hlp_oom(dev, apdev, params):
     with alloc_fail(hapd, 1, "wpabuf_resize;fils_dhcp_request"):
         sock.sendto(dhcpoffer[2+20+8:], addr)
         dev[0].wait_connected()
+        hapd.wait_sta()
         dev[0].request("DISCONNECT")
         dev[0].wait_disconnected()
+        hapd.wait_sta_disconnect()
 
     dev[0].request("FILS_HLP_REQ_FLUSH")
 
@@ -1417,17 +1473,21 @@ def test_fils_sk_pfs_30(dev, apdev, params):
     """FILS SK with PFS (DH group 30)"""
     run_fils_sk_pfs(dev, apdev, "30", params)
 
+def check_ec_group(dev, group):
+    tls = dev.request("GET tls_library")
+    if tls.startswith("wolfSSL"):
+        return
+    if int(group) in [25]:
+        if not (tls.startswith("OpenSSL") and ("build=OpenSSL 1.0.2" in tls or "build=OpenSSL 1.1" in tls or "build=OpenSSL 3." in tls) and ("run=OpenSSL 1.0.2" in tls or "run=OpenSSL 1.1" in tls or "run=OpenSSL 3." in tls)):
+            raise HwsimSkip("EC group not supported")
+    if int(group) in [27, 28, 29, 30]:
+        if not (tls.startswith("OpenSSL") and ("build=OpenSSL 1.0.2" in tls or "build=OpenSSL 1.1" in tls or "build=OpenSSL 3." in tls) and ("run=OpenSSL 1.0.2" in tls or "run=OpenSSL 1.1" in tls or "run=OpenSSL 3." in tls)):
+                raise HwsimSkip("Brainpool EC group not supported")
+
 def run_fils_sk_pfs(dev, apdev, group, params):
     check_fils_sk_pfs_capa(dev[0])
     check_erp_capa(dev[0])
-
-    tls = dev[0].request("GET tls_library")
-    if int(group) in [25]:
-        if not (tls.startswith("OpenSSL") and ("build=OpenSSL 1.0.2" in tls or "build=OpenSSL 1.1" in tls or "build=OpenSSL 3.0" in tls) and ("run=OpenSSL 1.0.2" in tls or "run=OpenSSL 1.1" in tls or "run=OpenSSL 3.0" in tls)):
-            raise HwsimSkip("EC group not supported")
-    if int(group) in [27, 28, 29, 30]:
-        if not (tls.startswith("OpenSSL") and ("build=OpenSSL 1.0.2" in tls or "build=OpenSSL 1.1" in tls or "build=OpenSSL 3.0" in tls) and ("run=OpenSSL 1.0.2" in tls or "run=OpenSSL 1.1" in tls or "run=OpenSSL 3.0" in tls)):
-            raise HwsimSkip("Brainpool EC group not supported")
+    check_ec_group(dev[0], group)
 
     start_erp_as(msk_dump=os.path.join(params['logdir'], "msk.lst"))
 
@@ -1447,9 +1507,11 @@ def run_fils_sk_pfs(dev, apdev, group, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", fils_dh_group=group, scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -1462,6 +1524,7 @@ def run_fils_sk_pfs(dev, apdev, group, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
 def test_fils_sk_pfs_group_mismatch(dev, apdev, params):
@@ -1522,12 +1585,14 @@ def test_fils_sk_pfs_pmksa_caching(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", fils_dh_group="19", scan_freq="2412")
+    hapd.wait_sta()
     pmksa = dev[0].get_pmksa(bssid)
     if pmksa is None:
         raise Exception("No PMKSA cache entry created")
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     # FILS authentication with PMKSA caching and PFS
     dev[0].dump_monitor()
@@ -1538,6 +1603,7 @@ def test_fils_sk_pfs_pmksa_caching(dev, apdev, params):
         raise Exception("Connection using PMKSA caching timed out")
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
     pmksa2 = dev[0].get_pmksa(bssid)
     if pmksa2 is None:
@@ -1553,11 +1619,15 @@ def test_fils_sk_pfs_pmksa_caching(dev, apdev, params):
     ev = dev[0].wait_event(["CTRL-EVENT-EAP-SUCCESS"], timeout=5)
     if ev is None:
         raise Exception("EAP authentication did not succeed")
+    ev = hapd.wait_event(["CTRL-EVENT-EAP-SUCCESS2"], timeout=1)
+    if ev is None:
+        raise Exception("EAP authentication did not succeed (AP)")
     time.sleep(0.1)
     hwsim_utils.test_connectivity(dev[0], hapd)
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     # FILS authentication with ERP and PFS
     dev[0].request("PMKSA_FLUSH")
@@ -1581,6 +1651,7 @@ def test_fils_sk_pfs_pmksa_caching(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "SME: Trying to authenticate" in ev:
         raise Exception("Unexpected extra authentication round with ERP and PFS")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
     pmksa3 = dev[0].get_pmksa(bssid)
     if pmksa3 is None:
@@ -1590,6 +1661,7 @@ def test_fils_sk_pfs_pmksa_caching(dev, apdev, params):
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     # FILS authentication with PMKSA caching and PFS
     dev[0].dump_monitor()
@@ -1600,6 +1672,7 @@ def test_fils_sk_pfs_pmksa_caching(dev, apdev, params):
         raise Exception("Connection using PMKSA caching timed out")
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
     pmksa4 = dev[0].get_pmksa(bssid)
     if pmksa4 is None:
@@ -1676,9 +1749,11 @@ def setup_fils_rekey(dev, apdev, params, wpa_ptk_rekey=0, wpa_group_rekey=0,
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -1689,6 +1764,7 @@ def setup_fils_rekey(dev, apdev, params, wpa_ptk_rekey=0, wpa_group_rekey=0,
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
     dev[0].dump_monitor()
+    hapd.wait_sta()
 
     hwsim_utils.test_connectivity(dev[0], hapd)
     return hapd
@@ -1696,7 +1772,7 @@ def setup_fils_rekey(dev, apdev, params, wpa_ptk_rekey=0, wpa_group_rekey=0,
 def test_fils_auth_gtk_rekey(dev, apdev, params):
     """GTK rekeying after FILS authentication"""
     hapd = setup_fils_rekey(dev, apdev, params, wpa_group_rekey=1)
-    ev = dev[0].wait_event(["WPA: Group rekeying completed"], timeout=2)
+    ev = dev[0].wait_event(["RSN: Group rekeying completed"], timeout=2)
     if ev is None:
         raise Exception("GTK rekey timed out")
     hwsim_utils.test_connectivity(dev[0], hapd)
@@ -1755,9 +1831,11 @@ def test_fils_and_ft(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
     hapd.disable()
     dev[0].flush_scan_cache()
     if "FAIL" in dev[0].request("PMKSA_FLUSH"):
@@ -1800,6 +1878,7 @@ def test_fils_and_ft(dev, apdev, params):
         raise Exception("Authentication failed")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
     er.disable()
@@ -1820,6 +1899,7 @@ def test_fils_and_ft(dev, apdev, params):
     # FIX: Cannot use FT-over-DS without the FTE MIC issue addressed
     #dev[0].roam_over_ds(apdev[1]['bssid'])
     dev[0].roam(apdev[1]['bssid'])
+    hapd2.wait_sta()
 
 def test_fils_and_ft_over_air(dev, apdev, params):
     """FILS SK using ERP and FT-over-air (SHA256)"""
@@ -1840,19 +1920,23 @@ def run_fils_and_ft_over_air(dev, apdev, params, key_mgmt):
     dev[0].scan_for_bss(apdev[1]['bssid'], freq="2412", force_scan=True)
     hapd.request("NOTE FT protocol to AP2 using FT keys established during FILS FILS authentication")
     dev[0].roam(apdev[1]['bssid'])
+    hapd2.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd2)
 
     logger.info("FT protocol using the previously established FT key hierarchy from FILS authentication")
     hapd.request("NOTE FT protocol back to AP1 using FT keys established during FILS FILS authentication")
     dev[0].roam(apdev[0]['bssid'])
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
     hapd.request("NOTE FT protocol back to AP2 using FT keys established during FILS FILS authentication")
     dev[0].roam(apdev[1]['bssid'])
+    hapd2.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd2)
 
     hapd.request("NOTE FT protocol back to AP1 using FT keys established during FILS FILS authentication (2)")
     dev[0].roam(apdev[0]['bssid'])
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
 def test_fils_and_ft_over_ds(dev, apdev, params):
@@ -1870,16 +1954,20 @@ def run_fils_and_ft_over_ds(dev, apdev, params, key_mgmt):
     dev[0].scan_for_bss(apdev[1]['bssid'], freq="2412", force_scan=True)
     hapd.request("NOTE FT protocol to AP2 using FT keys established during FILS FILS authentication")
     dev[0].roam_over_ds(apdev[1]['bssid'])
+    hapd2.wait_sta()
 
     logger.info("FT protocol using the previously established FT key hierarchy from FILS authentication")
     hapd.request("NOTE FT protocol back to AP1 using FT keys established during FILS FILS authentication")
     dev[0].roam_over_ds(apdev[0]['bssid'])
+    hapd.wait_sta()
 
     hapd.request("NOTE FT protocol back to AP2 using FT keys established during FILS FILS authentication")
     dev[0].roam_over_ds(apdev[1]['bssid'])
+    hapd2.wait_sta()
 
     hapd.request("NOTE FT protocol back to AP1 using FT keys established during FILS FILS authentication (2)")
     dev[0].roam_over_ds(apdev[0]['bssid'])
+    hapd.wait_sta()
 
 def run_fils_and_ft_setup(dev, apdev, params, key_mgmt):
     check_fils_capa(dev[0])
@@ -1910,6 +1998,7 @@ def run_fils_and_ft_setup(dev, apdev, params, key_mgmt):
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
     hapd.disable()
     dev[0].flush_scan_cache()
     if "FAIL" in dev[0].request("PMKSA_FLUSH"):
@@ -1989,9 +2078,11 @@ def test_fils_assoc_replay(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     hapd.set("ext_mgmt_frame_handling", "1")
     dev[0].dump_monitor()
@@ -2017,6 +2108,7 @@ def test_fils_assoc_replay(dev, apdev, params):
     if assocreq is None:
         raise Exception("No Association Request frame seen")
     dev[0].wait_connected()
+    hapd.wait_sta()
     dev[0].dump_monitor()
     hapd.dump_monitor()
 
@@ -2079,9 +2171,11 @@ def test_fils_sk_erp_server_flush(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -2094,9 +2188,11 @@ def test_fils_sk_erp_server_flush(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     hapd_as.request("ERP_FLUSH")
     dev[0].dump_monitor()
@@ -2118,9 +2214,11 @@ def test_fils_sk_erp_server_flush(dev, apdev, params):
     if "CTRL-EVENT-EAP-STARTED" not in ev:
         raise Exception("New EAP exchange not seen")
     dev[0].wait_connected(error="Connection timeout after ERP flush")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
     ev = dev[0].wait_event(["CTRL-EVENT-EAP-STARTED",
@@ -2135,6 +2233,7 @@ def test_fils_sk_erp_server_flush(dev, apdev, params):
         raise Exception("Association failed with new ERP keys")
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
+    hapd.wait_sta()
 
 def test_fils_sk_erp_radius_ext(dev, apdev, params):
     """FILS SK using ERP and external RADIUS server"""
@@ -2169,9 +2268,11 @@ def run_fils_sk_erp_radius_ext(dev, apdev, params):
                         eap="PWD", identity="pwd@erp.example.com",
                         password="secret password",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
 
     dev[0].dump_monitor()
     dev[0].select_network(id, freq=2412)
@@ -2184,6 +2285,7 @@ def run_fils_sk_erp_radius_ext(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if "EVENT-ASSOC-REJECT" in ev:
         raise Exception("Association failed")
+    hapd.wait_sta()
     hwsim_utils.test_connectivity(dev[0], hapd)
 
 def test_fils_sk_erp_radius_roam(dev, apdev):
@@ -2219,6 +2321,7 @@ def run_fils_sk_erp_radius_roam(dev, apdev):
                         eap="PWD", identity="erp-pwd@example.com",
                         password="secret password",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
 
     bssid2 = apdev[1]['bssid']
     params = hostapd.wpa2_eap_params(ssid="fils")
@@ -2267,8 +2370,10 @@ def test_fils_sk_erp_roam_diff_akm(dev, apdev, params):
                         eap="PSK", identity="psk.user@example.com",
                         password_hex="0123456789abcdef0123456789abcdef",
                         erp="1", scan_freq="2412")
+    hapd.wait_sta()
     dev[0].request("DISCONNECT")
     dev[0].wait_disconnected()
+    hapd.wait_sta_disconnect()
     dev[0].request("RECONNECT")
     ev = dev[0].wait_event(["CTRL-EVENT-EAP-STARTED",
                             "CTRL-EVENT-CONNECTED"], timeout=10)
@@ -2276,6 +2381,7 @@ def test_fils_sk_erp_roam_diff_akm(dev, apdev, params):
         raise Exception("Connection using FILS timed out")
     if "CTRL-EVENT-EAP-STARTED" in ev:
         raise Exception("Unexpected EAP exchange")
+    hapd.wait_sta()
 
     bssid2 = apdev[1]['bssid']
     params = hostapd.wpa2_eap_params(ssid="fils")
@@ -2299,6 +2405,7 @@ def test_fils_sk_erp_roam_diff_akm(dev, apdev, params):
         raise Exception("Unexpected EAP exchange")
     if bssid2 not in ev:
         raise Exception("Failed to connect to the second AP")
+    hapd2.wait_sta()
 
     hwsim_utils.test_connectivity(dev[0], hapd2)
 
@@ -2370,6 +2477,7 @@ def test_fils_offload_to_driver(dev, apdev, params):
 
 def test_fils_offload_to_driver2(dev, apdev, params):
     """FILS offload to driver"""
+    check_fils_capa(dev[0])
     wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
     wpas.interface_add("wlan5", drv_params="force_connect_cmd=1")
     run_fils_offload_to_driver(wpas, apdev, params)
@@ -2461,3 +2569,42 @@ def test_fils_sk_okc(dev, apdev, params):
         raise Exception("OKC not indicated in PMKSA entry")
     if pmksa['pmkid'] != pmksa2['pmkid']:
         raise Exception("Unexpected PMKID change")
+
+def test_fils_sk_ptk_rekey_request(dev, apdev, params):
+    """FILS SK and STA requesting PTK rekeying"""
+    check_fils_capa(dev[0])
+    check_erp_capa(dev[0])
+
+    start_erp_as(msk_dump=os.path.join(params['logdir'], "msk.lst"))
+
+    bssid = apdev[0]['bssid']
+    params = hostapd.wpa2_eap_params(ssid="fils")
+    params['wpa_key_mgmt'] = "FILS-SHA256"
+    params['auth_server_port'] = "18128"
+    params['erp_send_reauth_start'] = '1'
+    params['erp_domain'] = 'example.com'
+    params['fils_realm'] = 'example.com'
+    hapd = hostapd.add_ap(apdev[0]['ifname'], params)
+
+    dev[0].flush_scan_cache()
+    dev[0].scan_for_bss(bssid, freq=2412)
+    dev[0].request("ERP_FLUSH")
+    dev[0].connect("fils", key_mgmt="FILS-SHA256",
+                   eap="PSK", identity="psk.user@example.com",
+                   password_hex="0123456789abcdef0123456789abcdef",
+                   erp="1", scan_freq="2412")
+    hapd.wait_sta()
+
+    time.sleep(0.1)
+    anonce1 = dev[0].request("GET anonce")
+    if "OK" not in dev[0].request("KEY_REQUEST 0 1"):
+        raise Exception("KEY_REQUEST failed")
+    ev = dev[0].wait_event(["WPA: Key negotiation completed"])
+    if ev is None:
+        raise Exception("PTK rekey timed out")
+    anonce2 = dev[0].request("GET anonce")
+    if anonce1 == anonce2:
+        raise Exception("AP did not update ANonce in requested PTK rekeying")
+
+    time.sleep(0.1)
+    hwsim_utils.test_connectivity(dev[0], hapd)

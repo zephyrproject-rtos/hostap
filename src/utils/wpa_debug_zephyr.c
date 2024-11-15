@@ -415,3 +415,13 @@ int str_to_debug_level(const char *s)
 		return MSG_ERROR;
 	return -1;
 }
+
+void wpa_debug_stop_log(void)
+{
+#ifdef CONFIG_DEBUG_FILE
+	if (!out_file)
+		return;
+	fclose(out_file);
+	out_file = NULL;
+#endif /* CONFIG_DEBUG_FILE */
+}

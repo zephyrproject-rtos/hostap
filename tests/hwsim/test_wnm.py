@@ -19,26 +19,28 @@ from wlantest import Wlantest
 from datetime import datetime
 
 def clear_regdom_state(dev, hapd, hapd2):
-        for i in range(0, 3):
-            ev = dev[0].wait_event(["CTRL-EVENT-REGDOM-CHANGE"], timeout=0.5)
-            if ev is None or "init=COUNTRY_IE" in ev:
-                break
-        if hapd:
-            hapd.request("DISABLE")
-        if hapd2:
-            hapd2.request("DISABLE")
-        subprocess.call(['iw', 'reg', 'set', '00'])
-        dev[0].disconnect_and_stop_scan()
-        subprocess.call(['iw', 'reg', 'set', '00'])
-        dev[0].wait_event(["CTRL-EVENT-REGDOM-CHANGE"], timeout=0.5)
-        dev[0].flush_scan_cache()
+    for i in range(0, 3):
+        ev = dev[0].wait_event(["CTRL-EVENT-REGDOM-CHANGE"], timeout=0.5)
+        if ev is None or "init=COUNTRY_IE" in ev:
+            break
+    if hapd:
+        hapd.request("DISABLE")
+    if hapd2:
+        hapd2.request("DISABLE")
+    subprocess.call(['iw', 'reg', 'set', '00'])
+    dev[0].disconnect_and_stop_scan()
+    subprocess.call(['iw', 'reg', 'set', '00'])
+    dev[0].wait_event(["CTRL-EVENT-REGDOM-CHANGE"], timeout=0.5)
+    dev[0].flush_scan_cache()
 
 def start_wnm_ap(apdev, bss_transition=True, time_adv=False, ssid=None,
                  wnm_sleep_mode=False, wnm_sleep_mode_no_keys=False, rsn=False,
                  ocv=False, ap_max_inactivity=0, coloc_intf_reporting=False,
                  hw_mode=None, channel=None, country_code=None, country3=None,
                  pmf=True, passphrase=None, ht=True, vht=False, mbo=False,
-                 beacon_prot=False):
+                 beacon_prot=False, he=False, bss_max_idle=None,
+                 wpa_group_rekey=None, no_disconnect_on_group_keyerror=False,
+                 max_acceptable_idle_period=None):
     if rsn:
         if not ssid:
             ssid = "test-wnm-rsn"
@@ -82,8 +84,19 @@ def start_wnm_ap(apdev, bss_transition=True, time_adv=False, ssid=None,
         params['ieee80211ac'] = "1"
         params["vht_oper_chwidth"] = "0"
         params["vht_oper_centr_freq_seg0_idx"] = "0"
+    if he:
+        params["ieee80211ax"] = "1"
+        params["he_bss_color"] = "42"
     if mbo:
         params["mbo"] = "1"
+    if bss_max_idle is not None:
+        params["bss_max_idle"] = str(bss_max_idle)
+    if wpa_group_rekey:
+        params["wpa_group_rekey"] = str(wpa_group_rekey)
+    if no_disconnect_on_group_keyerror:
+        params["no_disconnect_on_group_keyerror"] = "1"
+    if max_acceptable_idle_period is not None:
+        params["max_acceptable_idle_period"] = str(max_acceptable_idle_period)
     try:
         hapd = hostapd.add_ap(apdev, params)
     except Exception as e:
@@ -127,6 +140,36 @@ def test_wnm_disassoc_imminent(dev, apdev):
     ev = dev[0].wait_event(["CTRL-EVENT-SCAN-RESULTS"])
     if ev is None:
         raise Exception("Timeout while waiting for re-connection scan")
+
+def test_wnm_disassoc_imminent_bssid_set(dev, apdev):
+    """WNM Disassociation Imminent and bssid set"""
+    hapd = start_wnm_ap(apdev[0], time_adv=True, wnm_sleep_mode=True)
+    hapd2 = start_wnm_ap(apdev[1], time_adv=True, wnm_sleep_mode=True)
+    dev[0].connect("test-wnm", key_mgmt="NONE", bssid=hapd.own_addr(),
+                   scan_freq="2412")
+    addr = dev[0].own_addr()
+    cmd = "BSS_TM_REQ " + addr + " pref=1 disassoc_imminent=1 disassoc_timer=100 neighbor=" + apdev[1]['bssid'] + ",0x0000," + "81,1,7,0301ff"
+    if "OK" not in hapd.request(cmd):
+        raise Exception("BSS_TM_REQ command failed")
+
+    ev = dev[0].wait_event(["WNM: Disassociation Imminent"])
+    if ev is None:
+        raise Exception("Timeout while waiting for disassociation imminent")
+    if "Disassociation Timer 100" not in ev:
+        raise Exception("Unexpected disassociation imminent contents")
+
+    ev = hapd.wait_event(['BSS-TM-RESP'], timeout=10)
+    if ev is None:
+        raise Exception("No BSS Transition Management Response")
+    if "status_code=7" not in ev:
+        raise Exception("Unexpected BSS TM response status: " + ev)
+
+    ev = dev[0].wait_event(["CTRL-EVENT-SCAN-STARTED"], timeout=2)
+    if ev is not None:
+        raise Exception("Unexpected scan started")
+
+    dev[0].request("DISCONNECT")
+    dev[0].wait_disconnected()
 
 def test_wnm_disassoc_imminent_fail(dev, apdev):
     """WNM Disassociation Imminent failure"""
@@ -188,6 +231,7 @@ def test_wnm_ess_disassoc_imminent_pmf(dev, apdev):
     dev[0].connect("test-wnm-rsn", psk="12345678", ieee80211w="2",
                    key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412")
     addr = dev[0].p2p_interface_addr()
+    hapd.wait_sta(wait_4way_hs=True)
     hapd.request("ESS_DISASSOC " + addr + " 10 http://example.com/session-info")
     ev = dev[0].wait_event(["ESS-DISASSOC-IMMINENT"])
     if ev is None:
@@ -227,7 +271,7 @@ def check_wnm_sleep_mode_enter_exit(hapd, dev, interval=None, tfs_req=None,
         time.sleep(0.1)
         if "OK" not in hapd.request("REKEY_GTK"):
             raise Exception("REKEY_GTK failed")
-        ev = dev.wait_event(["WPA: Group rekeying completed"], timeout=0.1)
+        ev = dev.wait_event(["RSN: Group rekeying completed"], timeout=0.1)
         if ev is not None:
                 raise Exception("Unexpected report of GTK rekey during WNM-Sleep Mode")
 
@@ -247,7 +291,7 @@ def check_wnm_sleep_mode_enter_exit(hapd, dev, interval=None, tfs_req=None,
         time.sleep(0.1)
         if "OK" not in hapd.request("REKEY_GTK"):
             raise Exception("REKEY_GTK failed")
-        ev = dev.wait_event(["WPA: Group rekeying completed"], timeout=2)
+        ev = dev.wait_event(["RSN: Group rekeying completed"], timeout=2)
         if ev is None:
                 raise Exception("GTK rekey timed out")
 
@@ -439,6 +483,7 @@ def test_wnm_sleep_mode_rsn_ocv_failure(dev, apdev):
 
     dev[0].connect("test-wnm-rsn", psk="12345678", ieee80211w="2", ocv="1",
                    key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412")
+    hapd.wait_sta()
     # Failed to allocate buffer for OCI element in WNM-Sleep Mode frame
     with alloc_fail(hapd, 2, "ieee802_11_send_wnmsleep_resp"):
             if "OK" not in dev[0].request("WNM_SLEEP enter"):
@@ -481,6 +526,7 @@ def test_wnm_sleep_mode_proto(dev, apdev):
 
 MGMT_SUBTYPE_ACTION = 13
 ACTION_CATEG_WNM = 10
+WNM_ACT_EVENT_REPORT = 1
 WNM_ACT_BSS_TM_REQ = 7
 WNM_ACT_BSS_TM_RESP = 8
 WNM_ACT_SLEEP_MODE_REQ = 16
@@ -489,6 +535,7 @@ WNM_ACT_NOTIFICATION_REQ = 26
 WNM_ACT_NOTIFICATION_RESP = 27
 WNM_NOTIF_TYPE_FW_UPGRADE = 0
 WNM_NOTIF_TYPE_WFA = 1
+WLAN_EID_EVENT_REPORT = 79
 WLAN_EID_TFS_REQ = 91
 WLAN_EID_TFS_RESP = 92
 WLAN_EID_WNMSLEEP = 93
@@ -740,11 +787,21 @@ def test_wnm_bss_tm_req(dev, apdev):
     dev[0].dump_monitor()
 
 @remote_compatible
+@disable_ipv6
 def test_wnm_bss_keep_alive(dev, apdev):
     """WNM keep-alive"""
-    hapd = start_wnm_ap(apdev[0], bss_transition=False, ap_max_inactivity=1)
+    run_wnm_bss_keep_alive(dev, apdev, False)
+
+def test_wnm_bss_protected_keep_alive(dev, apdev):
+    """WNM protected keep-alive"""
+    run_wnm_bss_keep_alive(dev, apdev, True)
+
+def run_wnm_bss_keep_alive(dev, apdev, protected):
+    hapd = start_wnm_ap(apdev[0], bss_transition=False, ap_max_inactivity=1,
+                        bss_max_idle=2 if protected else 1, rsn=True)
     addr = dev[0].p2p_interface_addr()
-    dev[0].connect("test-wnm", key_mgmt="NONE", scan_freq="2412")
+    dev[0].connect("test-wnm-rsn", psk="12345678", ieee80211w="2",
+                   key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412")
     start = hapd.get_sta(addr)
     ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED"], timeout=2)
     if ev is not None:
@@ -768,6 +825,79 @@ def test_wnm_bss_keep_alive(dev, apdev):
         dev[0].request("SET no_keep_alive 0")
     if int(sta['tx_packets']) <= int(end['tx_packets']):
         raise Exception("No client poll packet seen")
+
+def test_wnm_bss_max_idle_period_management(dev, apdev):
+    """WNM BSS max idle period management"""
+    hapd = start_wnm_ap(apdev[0], bss_transition=False, ap_max_inactivity=10,
+                        max_acceptable_idle_period=1000, rsn=True)
+    addr = dev[0].own_addr()
+    dev[0].connect("test-wnm-rsn", psk="12345678", ieee80211w="2",
+                   key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412",
+                   max_idle="1500")
+    addr1 = dev[1].own_addr()
+    dev[1].connect("test-wnm-rsn", psk="12345678", ieee80211w="2",
+                   key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412")
+
+    ap_val = hapd.get_sta(addr)['max_idle_period']
+    if ap_val != '1000':
+        raise Exception("AP reported unexpected value: " + ap_val)
+
+    sta_val = dev[0].get_status_field("bss_max_idle_period")
+    if sta_val != '1000':
+        raise Exception("STA reported unexpected value: " + sta_val)
+
+    sta = hapd.get_sta(addr1)
+    if 'max_idle_period' in sta:
+        raise Exception("AP reported unexpected value(2): " + sta['max_idle_period'])
+
+    sta_val = dev[1].get_status_field("bss_max_idle_period")
+    if sta_val != '9':
+        raise Exception("STA reported unexpected value(2): " + sta_val)
+
+def test_wnm_bss_group_rekey(dev, apdev):
+    """WNM BSS max idle period and group rekey"""
+    hapd = start_wnm_ap(apdev[0], bss_transition=False, ap_max_inactivity=100,
+                        wpa_group_rekey=2, rsn=True)
+    addr = dev[0].own_addr()
+    dev[0].connect("test-wnm-rsn", psk="12345678", ieee80211w="2",
+                   key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412")
+    start = hapd.get_sta(addr)
+    ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED",
+                            "RSN: Group rekeying completed"], timeout=3)
+    if ev is None:
+        raise Exception("No group rekeying")
+    if "CTRL-EVENT-DISCONNECTED" in ev:
+        raise Exception("Unexpected disconnection")
+
+    hapd.set("ext_eapol_frame_io", "1")
+    ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED",
+                            "RSN: Group rekeying completed"], timeout=20)
+    if ev is None or "CTRL-EVENT-DISCONNECTED" not in ev:
+        raise Exception("No disconnection reported on missing group rekeying")
+    dev[0].request("DISCONNECT")
+
+def test_wnm_bss_group_rekey_skip(dev, apdev):
+    """WNM BSS max idle period and group rekey skip allowed"""
+    hapd = start_wnm_ap(apdev[0], bss_transition=False, ap_max_inactivity=100,
+                        wpa_group_rekey=2, rsn=True,
+                        no_disconnect_on_group_keyerror=True)
+    addr = dev[0].own_addr()
+    dev[0].connect("test-wnm-rsn", psk="12345678", ieee80211w="2",
+                   key_mgmt="WPA-PSK-SHA256", proto="WPA2", scan_freq="2412")
+    start = hapd.get_sta(addr)
+    ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED",
+                            "RSN: Group rekeying completed"], timeout=3)
+    if ev is None:
+        raise Exception("No group rekeying")
+    if "CTRL-EVENT-DISCONNECTED" in ev:
+        raise Exception("Unexpected disconnection")
+
+    hapd.set("ext_eapol_frame_io", "1")
+    ev = dev[0].wait_event(["CTRL-EVENT-DISCONNECTED",
+                            "RSN: Group rekeying completed"], timeout=20)
+    if ev:
+        raise Exception("Unexpected event reported: " + ev)
+    dev[0].request("DISCONNECT")
 
 def test_wnm_bss_tm(dev, apdev):
     """WNM BSS Transition Management"""
@@ -1986,3 +2116,126 @@ def test_wnm_time_adv_restart(dev, apdev):
     hapd.disable()
     hapd.enable()
     dev[0].connect("test-wnm", key_mgmt="NONE", scan_freq="2412")
+
+def test_wnm_event_report(dev, apdev):
+    """WNM event report"""
+    ssid = "test-wnm-rsn"
+    hapd = start_wnm_ap(apdev[0], rsn=True, he=True)
+    bssid = apdev[0]['bssid']
+    dev[0].connect(ssid, psk="12345678", key_mgmt="WPA-PSK-SHA256",
+                   proto="WPA2", ieee80211w="2", scan_freq="2412")
+    hapd.wait_sta()
+
+    msg = {'fc': MGMT_SUBTYPE_ACTION << 4,
+           'da': bssid,
+           'sa': dev[0].own_addr(),
+           'bssid': bssid}
+    cmd = "MGMT_TX {} {} freq=2412 wait_time=200 no_cck=1=".format(bssid, bssid)
+    cmd += " action="
+
+    for i in range(10):
+        hapd.note("Event Type %d" % i)
+        payload = struct.pack("<3B5B",
+                              ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                              WLAN_EID_EVENT_REPORT, 3, 0, i, 0)
+        mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Too short Event Report element")
+    payload = struct.pack("<3B4B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 2, 0, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Truncated Event Report element")
+    payload = struct.pack("<3B4B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3, 0, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Request failed")
+    payload = struct.pack("<3B5B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3, 0, 0, 1)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Unexpected element ID")
+    payload = struct.pack("<3B5B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT + 1, 3, 0, 0, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Too short BSS color collision report")
+    payload = struct.pack("<3B5B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3, 0, 4, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Too short BSS color collision report")
+    payload = struct.pack("<3B5BQ7B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 7, 0, 4, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("BSS color collision report")
+    payload = struct.pack("<3B5BQQ",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 8, 0, 4, 0,
+                          0x1122334455667788, 0x123456789)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Too short BSS color in use report")
+    payload = struct.pack("<3B5B",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3, 0, 5, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("Too short BSS color in use report")
+    payload = struct.pack("<3B5BQ",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8, 0, 5, 0, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("BSS color in use report for color 1")
+    payload = struct.pack("<3B5BQB",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 1, 0, 5, 0, 0, 1)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("BSS color in use report for canceling")
+    payload = struct.pack("<3B5BQB",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 1, 0, 5, 0, 0, 0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    hapd.note("BSS color in use report for invalid color")
+    payload = struct.pack("<3B5BQB",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 1, 0, 5, 0, 0, 64)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    time.sleep(51)
+    hapd.note("BSS color collision report for more colors")
+    payload = struct.pack("<3B5BQQ",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 8, 0, 4, 0,
+                          0x1122334455667788, 0xfffffffffffffff0)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    time.sleep(11)
+    hapd.note("BSS color collision report")
+    payload = struct.pack("<3B5BQQ",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 8, 0, 4, 0,
+                          0x1122334455667788, 0xf)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    time.sleep(51)
+    hapd.note("BSS color collision report for all colors")
+    payload = struct.pack("<3B5BQQ",
+                          ACTION_CATEG_WNM, WNM_ACT_EVENT_REPORT, 0,
+                          WLAN_EID_EVENT_REPORT, 3 + 8 + 8, 0, 4, 0,
+                          0x1122334455667788, 0xffffffffffffffff)
+    mgmt_tx(dev[0], cmd + binascii.hexlify(payload).decode())
+
+    time.sleep(11)

@@ -20,6 +20,13 @@ from tshark import run_tshark
 from test_ap_csa import switch_channel, wait_channel_switch
 
 def check_scan(dev, params, other_started=False, test_busy=False):
+    if other_started:
+        ev = dev.wait_event(["CTRL-EVENT-SCAN-STARTED"])
+        if ev is None:
+            raise Exception("Other scan did not start")
+        if "id=" in ev:
+            raise Exception("Scan id unexpectedly included in start event")
+
     if not other_started:
         dev.dump_monitor()
     id = dev.request("SCAN " + params)
@@ -32,12 +39,6 @@ def check_scan(dev, params, other_started=False, test_busy=False):
             raise Exception("SCAN command while already scanning not rejected")
 
     if other_started:
-        ev = dev.wait_event(["CTRL-EVENT-SCAN-STARTED"])
-        if ev is None:
-            raise Exception("Other scan did not start")
-        if "id=" + str(id) in ev:
-            raise Exception("Own scan id unexpectedly included in start event")
-
         ev = dev.wait_event(["CTRL-EVENT-SCAN-RESULTS"])
         if ev is None:
             raise Exception("Other scan did not complete")
@@ -90,6 +91,9 @@ def test_scan(dev, apdev):
 
     logger.info("Active single-channel scan on AP's operating channel")
     check_scan_retry(dev[0], "freq=2412 passive=0 use_id=1", bssid)
+
+    logger.info("Disable collocated 6 GHz scanning")
+    check_scan(dev[0], "freq=2457 non_coloc_6ghz=1 use_id=1")
 
 @remote_compatible
 def test_scan_tsf(dev, apdev):
@@ -692,7 +696,7 @@ def test_scan_setband(dev, apdev):
                 d.request("SCAN only_new=1")
 
             for d in devs:
-                ev = d.wait_event(["CTRL-EVENT-SCAN-RESULTS"], 15)
+                ev = d.wait_event(["CTRL-EVENT-SCAN-RESULTS"], 30)
                 if ev is None:
                     raise Exception("Scan timed out")
 
@@ -1028,7 +1032,7 @@ def _test_scan_dfs(dev, apdev, params):
 
     if "OK" not in dev[0].request("SCAN"):
         raise Exception("SCAN command failed")
-    ev = dev[0].wait_event(["CTRL-EVENT-SCAN-RESULTS"])
+    ev = dev[0].wait_event(["CTRL-EVENT-SCAN-RESULTS"], timeout=30)
     if ev is None:
         raise Exception("Scan did not complete")
 
