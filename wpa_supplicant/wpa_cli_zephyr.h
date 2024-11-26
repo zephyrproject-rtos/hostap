@@ -18,6 +18,7 @@ struct add_network_resp {
 
 struct signal_poll_resp {
 	int rssi;
+	int current_txrate;
 };
 
 struct status_resp {

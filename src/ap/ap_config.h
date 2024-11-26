@@ -416,9 +416,15 @@ struct hostapd_bss_config {
 	int ctrl_interface_gid_set;
 
 	char *ca_cert;
+	const u8 *ca_cert_blob;
+	size_t ca_cert_blob_len;
 	char *server_cert;
+	const u8 *server_cert_blob;
+	size_t server_cert_blob_len;
 	char *server_cert2;
 	char *private_key;
+	const u8 *private_key_blob;
+	size_t private_key_blob_len;
 	char *private_key2;
 	char *private_key_passwd;
 	char *private_key_passwd2;
@@ -433,6 +439,8 @@ struct hostapd_bss_config {
 	char *ocsp_stapling_response;
 	char *ocsp_stapling_response_multi;
 	char *dh_file;
+	const u8 *dh_blob;
+	size_t dh_blob_len;
 	char *openssl_ciphers;
 	char *openssl_ecdh_curves;
 	u8 *pac_opaque_encr_key;

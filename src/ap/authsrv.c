@@ -287,8 +287,8 @@ int authsrv_init(struct hostapd_data *hapd)
 
 #ifdef EAP_TLS_FUNCS
 	if (hapd->conf->eap_server &&
-	    (hapd->conf->ca_cert || hapd->conf->server_cert ||
-	     hapd->conf->private_key || hapd->conf->dh_file ||
+	    (hapd->conf->ca_cert || hapd->conf->ca_cert_blob || hapd->conf->server_cert || hapd->conf->server_cert_blob ||
+	     hapd->conf->private_key || hapd->conf->private_key_blob || hapd->conf->dh_file ||
 	     hapd->conf->server_cert2 || hapd->conf->private_key2)) {
 		struct tls_config conf;
 		struct tls_connection_params params;
@@ -317,13 +317,21 @@ int authsrv_init(struct hostapd_data *hapd)
 
 		os_memset(&params, 0, sizeof(params));
 		params.ca_cert = hapd->conf->ca_cert;
+		params.ca_cert_blob = hapd->conf->ca_cert_blob;
+		params.ca_cert_blob_len = hapd->conf->ca_cert_blob_len;
 		params.client_cert = hapd->conf->server_cert;
+		params.client_cert_blob = hapd->conf->server_cert_blob;
+		params.client_cert_blob_len = hapd->conf->server_cert_blob_len;
 		params.client_cert2 = hapd->conf->server_cert2;
 		params.private_key = hapd->conf->private_key;
+		params.private_key_blob = hapd->conf->private_key_blob;
+		params.private_key_blob_len = hapd->conf->private_key_blob_len;
 		params.private_key2 = hapd->conf->private_key2;
 		params.private_key_passwd = hapd->conf->private_key_passwd;
 		params.private_key_passwd2 = hapd->conf->private_key_passwd2;
 		params.dh_file = hapd->conf->dh_file;
+		params.dh_blob = hapd->conf->dh_blob;
+		params.dh_blob_len = hapd->conf->dh_blob_len;
 		params.openssl_ciphers = hapd->conf->openssl_ciphers;
 		params.openssl_ecdh_curves = hapd->conf->openssl_ecdh_curves;
 		params.ocsp_stapling_response =
