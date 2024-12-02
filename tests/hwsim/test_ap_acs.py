@@ -19,11 +19,29 @@ def force_prev_ap_on_24g(ap):
     time.sleep(0.1)
     hostapd.remove_bss(ap)
 
-def force_prev_ap_on_5g(ap):
+def force_prev_ap_on_5g(ap, country="US"):
     # For now, make sure the last operating channel was on 5 GHz band to get
     # sufficient survey data from mac80211_hwsim.
     hostapd.add_ap(ap, {"ssid": "open", "hw_mode": "a",
-                        "channel": "36", "country_code": "US"})
+                        "channel": "36", "country_code": country})
+    time.sleep(0.1)
+    hostapd.remove_bss(ap)
+
+def force_prev_ap_on_6g(ap):
+    # For now, make sure the last operating channel was on 6 GHz band to get
+    # sufficient survey data from mac80211_hwsim.
+    ssid = "eht_6ghz_sae"
+    passphrase = "12345678"
+    params = hostapd.he_wpa2_params(ssid=ssid, passphrase=passphrase)
+    params["hw_mode"] = "a"
+    params["ieee80211ax"] = "1"
+    params["ieee80211be"] = "1"
+    params["op_class"] = "131"
+    params["channel"] = "5"
+    params["he_oper_centr_freq_seg0_idx"] = "5"
+    params["eht_oper_centr_freq_seg0_idx"] = "5"
+    params["country_code"] = "CA"
+    hostapd.add_ap(ap, params)
     time.sleep(0.1)
     hostapd.remove_bss(ap)
 
@@ -145,16 +163,23 @@ def test_ap_acs_40mhz(dev, apdev):
     """Automatic channel selection for 40 MHz channel"""
     run_ap_acs_40mhz(dev, apdev, '[HT40+]')
 
+def test_ap_acs_40mhz_he(dev, apdev):
+    """Automatic channel selection for 40 MHz channel (HE)"""
+    run_ap_acs_40mhz(dev, apdev, '[HT40+]', he=True, allow20=True)
+
 def test_ap_acs_40mhz_plus_or_minus(dev, apdev):
     """Automatic channel selection for 40 MHz channel (plus or minus)"""
     run_ap_acs_40mhz(dev, apdev, '[HT40+][HT40-]')
 
-def run_ap_acs_40mhz(dev, apdev, ht_capab):
+def run_ap_acs_40mhz(dev, apdev, ht_capab, he=False, allow20=False):
     clear_scan_cache(apdev[0])
     force_prev_ap_on_24g(apdev[0])
     params = hostapd.wpa2_params(ssid="test-acs", passphrase="12345678")
     params['channel'] = '0'
     params['ht_capab'] = ht_capab
+    if he:
+        params['ieee80211ax'] = '1'
+        params['he_oper_chwidth'] = '0'
     hapd = hostapd.add_ap(apdev[0], params, wait_enabled=False)
     wait_acs(hapd)
 
@@ -163,7 +188,10 @@ def run_ap_acs_40mhz(dev, apdev, ht_capab):
         raise Exception("Unexpected frequency")
     sec = hapd.get_status_field("secondary_channel")
     if int(sec) == 0:
-        raise Exception("Secondary channel not set")
+        if allow20:
+            logger.info("Fallback to 20 MHz detected")
+        else:
+            raise Exception("Secondary channel not set")
 
     dev[0].connect("test-acs", psk="12345678", scan_freq=freq)
 
@@ -177,11 +205,20 @@ def test_ap_acs_40mhz_minus(dev, apdev):
     params['acs_num_scans'] = '1'
     params['chanlist'] = '1 11'
     hapd = hostapd.add_ap(apdev[0], params, wait_enabled=False)
-    ev = hapd.wait_event(["AP-ENABLED", "AP-DISABLED"], timeout=10)
-    if not ev:
-        raise Exception("ACS start timed out")
-    # HT40- is not currently supported in hostapd ACS, so do not try to connect
-    # or verify that this operation succeeded.
+    wait_acs(hapd)
+
+    freq = hapd.get_status_field("freq")
+    if int(freq) < 2400:
+        raise Exception("Unexpected frequency")
+    sec = hapd.get_status_field("secondary_channel")
+    if int(sec) != -1:
+        raise Exception("Unexpected secondary_channel: " + sec)
+
+    dev[0].connect("test-acs", psk="12345678", scan_freq=freq)
+    sig = dev[0].request("SIGNAL_POLL").splitlines()
+    logger.info("SIGNAL_POLL: " + str(sig))
+    if "WIDTH=40 MHz" not in sig:
+        raise Exception("Station did not report 40 MHz bandwidth")
 
 def test_ap_acs_5ghz(dev, apdev):
     """Automatic channel selection on 5 GHz"""
@@ -312,11 +349,12 @@ def test_ap_acs_vht160(dev, apdev):
     """Automatic channel selection for VHT160"""
     try:
         hapd = None
-        force_prev_ap_on_5g(apdev[0])
+        force_prev_ap_on_5g(apdev[0], country="ZA")
         params = hostapd.wpa2_params(ssid="test-acs", passphrase="12345678")
         params['hw_mode'] = 'a'
         params['channel'] = '0'
         params['ht_capab'] = '[HT40+]'
+        params["vht_capab"] = "[VHT160]"
         params['country_code'] = 'ZA'
         params['ieee80211ac'] = '1'
         params['vht_oper_chwidth'] = '2'
@@ -324,24 +362,26 @@ def test_ap_acs_vht160(dev, apdev):
         params['ieee80211h'] = '1'
         params['chanlist'] = '100'
         params['acs_num_scans'] = '1'
-        hapd = hostapd.add_ap(apdev[0], params, wait_enabled=False)
-        ev = hapd.wait_event(["AP-ENABLED", "AP-DISABLED"], timeout=10)
-        if not ev:
-            raise Exception("ACS start timed out")
-        # VHT160 is not currently supported in hostapd ACS, so do not try to
-        # enforce successful AP start.
-        if "AP-ENABLED" in ev:
-            freq = hapd.get_status_field("freq")
-            if int(freq) < 5000:
-                raise Exception("Unexpected frequency")
-            dev[0].connect("test-acs", psk="12345678", scan_freq=freq)
-            dev[0].wait_regdom(country_ie=True)
+        hapd = hostapd.add_ap(apdev[0], params)
+        freq = hapd.get_status_field("freq")
+        if int(freq) < 5000:
+            raise Exception("Unexpected frequency")
+        dev[0].connect("test-acs", psk="12345678", scan_freq=freq)
+        dev[0].wait_regdom(country_ie=True)
+        hapd.wait_sta()
+        sig = dev[0].request("SIGNAL_POLL").splitlines()
+        logger.info("SIGNAL_POLL: " + str(sig))
+        if "WIDTH=160 MHz" not in sig:
+            raise Exception("Station did not report 160 MHz bandwidth")
+        dev[0].request("DISCONNECT")
+        dev[0].wait_disconnected()
+        hapd.wait_sta_disconnect()
     finally:
         clear_regdom(hapd, dev)
 
 def test_ap_acs_vht160_scan_disable(dev, apdev):
     """Automatic channel selection for VHT160 and DISABLE during scan"""
-    force_prev_ap_on_5g(apdev[0])
+    force_prev_ap_on_5g(apdev[0], country="ZA")
     params = hostapd.wpa2_params(ssid="test-acs", passphrase="12345678")
     params['hw_mode'] = 'a'
     params['channel'] = '0'
@@ -686,3 +726,94 @@ def test_ap_acs_he_24g_overlap(dev, apdev):
         raise Exception("Unexpected frequency")
 
     dev[0].connect("test-acs", psk="12345678", scan_freq=freq)
+
+def test_ap_acs_chan14(dev, apdev):
+    """Automatic channel selection and 2.4 GHz channel 14"""
+    try:
+        hapd = None
+        force_prev_ap_on_24g(apdev[0])
+        params = hostapd.wpa2_params(ssid="test-acs", passphrase="12345678")
+        params['hw_mode'] = 'g'
+        params['channel'] = '0'
+        params['country_code'] = 'JP'
+        params['acs_chan_bias'] = '14:0.01'
+        hapd = hostapd.add_ap(apdev[0], params, wait_enabled=False)
+        wait_acs(hapd)
+        freq = hapd.get_status_field("freq")
+        if int(freq) != 2484:
+            raise Exception("Unexpected frequency: " + str(freq))
+        if hapd.get_status_field("ieee80211n") != "0":
+            raise Exception("HT enabled unexpectedly")
+
+        dev[0].connect("test-acs", psk="12345678", scan_freq=freq)
+        dev[0].wait_regdom(country_ie=True)
+    finally:
+        clear_regdom(hapd, dev)
+
+def test_ap_acs_eht320(dev, apdev):
+    """Automatic channel selection for EHT320 (offset 0)"""
+    run_ap_acs_eht320(dev, apdev, 0)
+
+def test_ap_acs_eht320_1(dev, apdev):
+    """Automatic channel selection for EHT320 (offset 1)"""
+    run_ap_acs_eht320(dev, apdev, 1)
+
+def test_ap_acs_eht320_2(dev, apdev):
+    """Automatic channel selection for EHT320 (offset 2)"""
+    run_ap_acs_eht320(dev, apdev, 2)
+
+def run_ap_acs_eht320(dev, apdev, bw32_offset):
+    check_sae_capab(dev[0])
+    try:
+        hapd = None
+        force_prev_ap_on_6g(apdev[0])
+        params = hostapd.he_wpa2_params(ssid="test-acs", passphrase="12345678")
+        params['hw_mode'] = 'a'
+        params["ieee80211ax"] = "1"
+        params["ieee80211be"] = "1"
+        params['channel'] = '0'
+        params['op_class'] = '137'
+        params['eht_bw320_offset'] = str(bw32_offset)
+        params['ieee80211w'] = '2'
+        params['country_code'] = 'CA'
+        params['acs_num_scans'] = '1'
+        params['ieee80211w'] = '2'
+        params['wpa_key_mgmt'] = 'SAE-EXT-KEY'
+        hapd = hostapd.add_ap(apdev[0], params)
+        freq = hapd.get_status_field("freq")
+        if int(freq) < 5900:
+            raise Exception("Unexpected frequency")
+        dev[0].set("sae_groups", "")
+        dev[0].connect("test-acs", psk="12345678", key_mgmt="SAE-EXT-KEY",
+                       ieee80211w="2", scan_freq=freq)
+        hapd.wait_sta()
+        dev[0].wait_regdom(country_ie=True)
+        sig = dev[0].request("SIGNAL_POLL").splitlines()
+        logger.info("SIGNAL_POLL: " + str(sig))
+        if "WIDTH=320 MHz" not in sig:
+            raise Exception("Station did not report 320 MHz bandwidth")
+        seg0 = int(hapd.get_status_field("eht_oper_centr_freq_seg0_idx"))
+        offset = int(hapd.get_status_field("eht_bw320_offset"))
+        chan_1 = [31, 95, 159]
+        chan_2 = [63, 127, 191]
+        if bw32_offset == 0:
+            if offset != 1 and offset != 2:
+                raise Exception("Unexpected eht_bw320_offset: %d" % offset)
+            if seg0 not in chan_1 and seg0 not in chan_2:
+                raise Exception("Unexpected seg0: %d" % seg0)
+        if bw32_offset == 1:
+            if offset != 1:
+                raise Exception("Unexpected eht_bw320_offset: %d" % offset)
+            if seg0 not in chan_1:
+                raise Exception("Unexpected seg0: %d" % seg0)
+        if bw32_offset == 2:
+            if offset != 2:
+                raise Exception("Unexpected eht_bw320_offset: %d" % offset)
+            if seg0 not in chan_2:
+                raise Exception("Unexpected seg0: %d" % seg0)
+
+        dev[0].request("DISCONNECT")
+        dev[0].wait_disconnected()
+        hapd.wait_sta_disconnect()
+    finally:
+        clear_regdom(hapd, dev)

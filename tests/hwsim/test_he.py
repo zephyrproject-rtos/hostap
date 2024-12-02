@@ -14,6 +14,7 @@ import hostapd
 from wpasupplicant import WpaSupplicant
 from utils import *
 from test_dfs import wait_dfs_event
+from test_ap_acs import wait_acs
 
 def test_he_open(dev, apdev):
     """HE AP with open mode configuration"""
@@ -195,7 +196,6 @@ def test_he80(dev, apdev):
         clear_regdom(hapd, dev)
 
 def _test_he_wifi_generation(dev, apdev, conf, scan_freq):
-    """HE and wifi_generation"""
     try:
         hapd = None
         params = {"ssid": "he",
@@ -235,6 +235,7 @@ def _test_he_wifi_generation(dev, apdev, conf, scan_freq):
         clear_regdom(hapd, dev)
 
 def test_he_wifi_generation(dev, apdev):
+    """HE and wifi_generation (5 GHz)"""
     conf = {
         "vht_oper_chwidth": "1",
         "hw_mode": "a",
@@ -249,6 +250,7 @@ def test_he_wifi_generation(dev, apdev):
     _test_he_wifi_generation(dev, apdev, conf, "5180")
 
 def test_he_wifi_generation_24(dev, apdev):
+    """HE and wifi_generation (2.4 GHz)"""
     conf = {
         "hw_mode": "g",
         "channel": "1",
@@ -313,6 +315,7 @@ def test_he80_params(dev, apdev):
                   "vht_capab": "[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1][MAX-A-MPDU-LEN-EXP0]",
                   "vht_oper_centr_freq_seg0_idx": "42",
                   "require_vht": "1",
+                  "require_he": "1",
                   "he_oper_chwidth": "1",
                   "he_oper_centr_freq_seg0_idx": "42",
                   "he_su_beamformer": "1",
@@ -334,6 +337,10 @@ def test_he80_params(dev, apdev):
         if "status_code=104" not in ev:
             raise Exception("Unexpected rejection status code")
         dev[1].request("DISCONNECT")
+        dev[1].request("REMOVE_NETWORK all")
+        dev[1].dump_monitor()
+        dev[1].connect("he", key_mgmt="NONE", scan_freq="5180",
+                       disable_he="1", wait_connect=False)
         hwsim_utils.test_connectivity(dev[0], hapd)
         sta0 = hapd.get_sta(dev[0].own_addr())
         sta2 = hapd.get_sta(dev[2].own_addr())
@@ -343,6 +350,11 @@ def test_he80_params(dev, apdev):
             raise Exception("dev[0] did not support SGI")
         if capab2 & 0x60 != 0:
             raise Exception("dev[2] claimed support for SGI")
+        ev = dev[1].wait_event(["CTRL-EVENT-ASSOC-REJECT"])
+        if ev is None:
+            raise Exception("Association rejection timed out (2)")
+        if "status_code=124" not in ev:
+            raise Exception("Unexpected rejection status code (2): " + ev)
     except Exception as e:
         if isinstance(e, Exception) and str(e) == "AP startup failed":
             if not he_supported():
@@ -1151,6 +1163,186 @@ def test_he_twt(dev, apdev):
     if "OK" not in dev[0].request("TWT_TEARDOWN flags=255"):
         raise Exception("TWT_SETUP failed")
 
+def test_he_6ghz(dev, apdev):
+    """HE with 20 MHz channel width on 6 GHz"""
+    check_sae_capab(dev[0])
+
+    try:
+        dev[0].set("sae_pwe", "1")
+        hapd = None
+        params = {"ssid": "he",
+                  "country_code": "DE",
+                  "op_class": "131",
+                  "channel": "5",
+                  "ieee80211ax": "1",
+                  "wpa": "2",
+                  "rsn_pairwise": "CCMP",
+                  "wpa_key_mgmt": "SAE",
+                  "sae_pwe": "1",
+                  "sae_password": "password",
+                  "ieee80211w": "2"}
+        hapd = hostapd.add_ap(apdev[0], params, set_channel=False)
+        bssid = apdev[0]['bssid']
+
+        dev[0].set("sae_groups", "")
+        dev[0].connect("he", sae_password="password", key_mgmt="SAE",
+                       ieee80211w="2", scan_freq="5975")
+        hwsim_utils.test_connectivity(dev[0], hapd)
+        sig = dev[0].request("SIGNAL_POLL").splitlines()
+        if "FREQUENCY=5975" not in sig:
+            raise Exception("Unexpected SIGNAL_POLL value(1): " + str(sig))
+        if "WIDTH=20 MHz" not in sig:
+            raise Exception("Unexpected SIGNAL_POLL value(2): " + str(sig))
+        status = dev[0].get_status()
+        if 'wifi_generation' not in status:
+            # For now, assume this is because of missing kernel support
+            raise HwsimSkip("Association Request IE reporting not supported")
+            #raise Exception("Missing wifi_generation information")
+        if status['wifi_generation'] != "6":
+            raise Exception("Unexpected wifi_generation value: " + status['wifi_generation'])
+        status = hapd.get_status()
+        logger.info("hostapd STATUS: " + str(status))
+        if status["ieee80211ax"] != "1":
+            raise Exception("Unexpected STATUS ieee80211ax value")
+        if status["he_oper_chwidth"] != "0":
+            raise Exception("Unexpected STATUS he_oper_chwidth value")
+
+        sta = hapd.get_sta(dev[0].own_addr())
+        logger.info("hostapd STA: " + str(sta))
+        if "[HE]" not in sta['flags']:
+            raise Exception("Missing STA flag: HE")
+
+    except Exception as e:
+        if isinstance(e, Exception) and str(e) == "AP startup failed":
+            if not he_supported():
+                raise HwsimSkip("HE 6 GHz channel not supported in regulatory information")
+        raise
+    finally:
+        dev[0].request("DISCONNECT")
+        dev[0].set("sae_pwe", "0")
+        clear_regdom(hapd, dev)
+
+def test_he_6ghz_auto_security(dev, apdev):
+    """HE on 6 GHz and automatic security settings on STA"""
+    check_sae_capab(dev[0])
+    try:
+        hapd = None
+        params = {"ssid": "he",
+                  "country_code": "DE",
+                  "op_class": "131",
+                  "channel": "5",
+                  "ieee80211ax": "1",
+                  "wpa": "2",
+                  "ieee80211w": "2",
+                  "rsn_pairwise": "CCMP",
+                  "wpa_key_mgmt": "SAE",
+                  "sae_password": "password"}
+        hapd = hostapd.add_ap(apdev[0], params, set_channel=False)
+        bssid = apdev[0]['bssid']
+
+        dev[0].set("sae_groups", "")
+        dev[0].connect("he", psk="password", key_mgmt="SAE WPA-PSK",
+                       ieee80211w="1", scan_freq="5975")
+        status = dev[0].get_status()
+        if "pmf" not in status:
+            raise Exception("pmf missing from status")
+        if status["pmf"] != "2":
+            raise Exception("Unexpected pmf status value: " + status["pmf"])
+
+        hapd.wait_sta()
+        sta = hapd.get_sta(dev[0].own_addr())
+        if sta["hostapdMFPR"] != "1":
+            raise Exception("STA did not indicate MFPR=1")
+    except Exception as e:
+        if isinstance(e, Exception) and str(e) == "AP startup failed":
+            if not he_supported():
+                raise HwsimSkip("HE 6 GHz channel not supported in regulatory information")
+        raise
+    finally:
+        dev[0].request("DISCONNECT")
+        clear_regdom(hapd, dev)
+
+    params = hostapd.wpa2_params(ssid="he", passphrase="password")
+    hapd = hostapd.add_ap(apdev[1], params)
+    bssid = apdev[1]['bssid']
+    dev[0].scan_for_bss(bssid, freq=2412)
+    dev[0].request("RECONNECT")
+    dev[0].wait_connected()
+    status = dev[0].get_status()
+    if "pmf" in status:
+        raise Exception("Unexpected pmf status value(2): " + status["pmf"])
+    hapd.wait_sta()
+    sta = hapd.get_sta(dev[0].own_addr())
+    if "[MFP]" in sta["flags"]:
+        raise Exception("MFP reported unexpectedly(2)")
+
+def he_6ghz_acs(dev, apdev, op_class, bw):
+    check_sae_capab(dev[0])
+
+    try:
+        dev[0].set("sae_pwe", "1")
+        hapd = None
+        params = {"ssid": "he",
+                  "country_code": "DE",
+                  "op_class": str(op_class),
+                  "hw_mode": "a",
+                  "channel": "0",
+                  "ieee80211ax": "1",
+                  "wpa": "2",
+                  "rsn_pairwise": "CCMP",
+                  "wpa_key_mgmt": "SAE",
+                  "sae_pwe": "1",
+                  "sae_password": "password",
+                  "ieee80211w": "2"}
+        hapd = hostapd.add_ap(apdev[0], params, wait_enabled=False)
+        wait_acs(hapd)
+        bssid = apdev[0]['bssid']
+
+        freq = hapd.get_status_field("freq")
+        if int(freq) < 5955:
+            raise Exception("Unexpected frequency: " + freq)
+
+        sec = hapd.get_status_field("secondary_channel")
+        if bw > 20 and int(sec) == 0:
+            raise Exception("Secondary channel not set")
+        if bw == 20 and int(sec) != 0:
+            raise Exception("Secondary channel set")
+
+        dev[0].set("sae_groups", "")
+        dev[0].connect("he", sae_password="password", key_mgmt="SAE",
+                       ieee80211w="2", scan_freq=freq)
+        hwsim_utils.test_connectivity(dev[0], hapd)
+        sig = dev[0].request("SIGNAL_POLL").splitlines()
+        if "FREQUENCY=" + freq not in sig:
+            raise Exception("Unexpected SIGNAL_POLL value(1): " + str(sig))
+        if "WIDTH=" + str(bw) + " MHz" not in sig:
+            raise Exception("Unexpected SIGNAL_POLL value(2): " + str(sig))
+    except Exception as e:
+        if isinstance(e, Exception) and str(e) == "AP startup failed":
+            if not he_supported():
+                raise HwsimSkip("HE 6 GHz channel not supported in regulatory information")
+        raise
+    finally:
+        dev[0].request("DISCONNECT")
+        dev[0].set("sae_pwe", "0")
+        clear_regdom(hapd, dev)
+
+def test_he_6ghz_acs_20mhz(dev, apdev):
+    """HE with ACS on 6 GHz using a 20 MHz channel"""
+    he_6ghz_acs(dev, apdev, 131, 20)
+
+def test_he_6ghz_acs_40mhz(dev, apdev):
+    """HE with ACS on 6 GHz using a 40 MHz channel"""
+    he_6ghz_acs(dev, apdev, 132, 40)
+
+def test_he_6ghz_acs_80mhz(dev, apdev):
+    """HE with ACS on 6 GHz using an 80 MHz channel"""
+    he_6ghz_acs(dev, apdev, 133, 80)
+
+def test_he_6ghz_acs_160mhz(dev, apdev):
+    """HE with ACS on 6 GHz using a 160 MHz channel"""
+    he_6ghz_acs(dev, apdev, 134, 160)
+
 def test_he_6ghz_security(dev, apdev):
     """HE AP and 6 GHz security parameter validation"""
     params = {"ssid": "he",
@@ -1345,3 +1537,310 @@ def test_he_capab_parsing(dev, apdev):
             raise Exception("MGMT_RX_PROCESS failed")
 
         hapd.dump_monitor()
+
+def test_he_cw_change_notification(dev, apdev):
+    """HE AP on 80 MHz channel and CW change notification"""
+    try:
+        hapd = None
+        params = {"ssid": "he",
+                  "country_code": "FI",
+                  "hw_mode": "a",
+                  "channel": "36",
+                  "ht_capab": "[HT40+]",
+                  "ieee80211n": "1",
+                  "ieee80211ac": "1",
+                  "ieee80211ax": "1",
+                  "vht_oper_chwidth": "1",
+                  "vht_oper_centr_freq_seg0_idx": "42",
+                  "he_oper_chwidth": "1",
+                  "he_oper_centr_freq_seg0_idx": "42"}
+        hapd = hostapd.add_ap(apdev[0], params)
+        bssid = apdev[0]['bssid']
+
+        dev[0].connect("he", key_mgmt="NONE", scan_freq="5180")
+        dev[1].connect("he", key_mgmt="NONE", scan_freq="5180",
+                       disable_he="1")
+        dev[2].connect("he", key_mgmt="NONE", scan_freq="5180",
+                       disable_he="1", disable_vht="1")
+
+        sta = hapd.get_sta(dev[0].own_addr())
+        logger.info("hostapd STA0: " + str(sta))
+        if "[HT]" not in sta['flags']:
+            raise Exception("Missing STA0 flag: HT")
+        if "[VHT]" not in sta['flags']:
+            raise Exception("Missing STA0 flag: VHT")
+        if "[HE]" not in sta['flags']:
+            raise Exception("Missing STA0 flag: HE")
+
+        sta = hapd.get_sta(dev[1].own_addr())
+        logger.info("hostapd STA1: " + str(sta))
+        if "[HT]" not in sta['flags']:
+            raise Exception("Missing STA1 flag: HT")
+        if "[VHT]" not in sta['flags']:
+            raise Exception("Missing STA1 flag: VHT")
+        if "[HE]" in sta['flags']:
+            raise Exception("Unexpected STA1 flag: HE")
+
+        sta = hapd.get_sta(dev[2].own_addr())
+        logger.info("hostapd STA1: " + str(sta))
+        if "[HT]" not in sta['flags']:
+            raise Exception("Missing STA2 flag: HT")
+        if "[VHT]" in sta['flags']:
+            raise Exception("Unxpected STA2 flag: VHT")
+        if "[HE]" in sta['flags']:
+            raise Exception("Unexpected STA2 flag: HE")
+
+        for i in [2, 1, 0]:
+            if "OK" not in hapd.request("NOTIFY_CW_CHANGE %d" % i):
+                raise Exception("NOTIFY_CW_CHANGE %d failed" % i)
+
+            time.sleep(1)
+            hwsim_utils.test_connectivity(dev[0], hapd)
+            hwsim_utils.test_connectivity(dev[1], hapd)
+            hwsim_utils.test_connectivity(dev[2], hapd)
+    except Exception as e:
+        if isinstance(e, Exception) and str(e) == "AP startup failed":
+            if not he_supported():
+                raise HwsimSkip("80 MHz channel not supported in regulatory information")
+        raise
+    finally:
+        dev[0].request("DISCONNECT")
+        dev[1].request("DISCONNECT")
+        dev[2].request("DISCONNECT")
+        clear_regdom(hapd, dev)
+
+def he_verify_status(wpas, hapd, freq, bw, is_6ghz=True):
+    status = hapd.get_status()
+    logger.info("hostapd STATUS: " + str(status))
+
+    if status["ieee80211n"] != "1":
+        raise Exception("Unexpected STATUS ieee80211n value")
+    if status["ieee80211ac"] != "1":
+        raise Exception("Unexpected STATUS ieee80211ac value")
+    if status["ieee80211ax"] != "1":
+        raise Exception("Unexpected STATUS ieee80211ax value")
+
+    sta = hapd.get_sta(wpas.own_addr())
+    if "[HE]" not in sta['flags']:
+        raise Exception("Missing STA flag: HE")
+    if is_6ghz and "[6GHZ]" not in sta['flags']:
+        raise Exception("Missing STA flag: 6GHZ")
+
+    sig = wpas.request("SIGNAL_POLL").splitlines()
+    if "FREQUENCY=%s" % freq not in sig:
+        raise Exception("Unexpected SIGNAL_POLL value(1): " + str(sig))
+    if "WIDTH=%s MHz" % bw not in sig:
+        raise Exception("Unexpected SIGNAL_POLL value(2): " + str(sig))
+
+def he_verify_wifi_version(dev):
+    status = dev.get_status()
+    logger.info("station status: " + str(status))
+
+    # For now, assume this is because of missing kernel support
+    if 'wifi_generation' not in status:
+        raise HwsimSkip("Association Request IE reporting not supported")
+        #raise Exception("Missing wifi_generation information")
+
+    if status['wifi_generation'] != "6":
+        raise Exception("Unexpected wifi_generation value: " + status['wifi_generation'])
+
+def test_he_6ghz_reg(dev, apdev):
+    """TX power control on 6 GHz"""
+    try:
+        ssid = "HE_6GHz_regulatory"
+        freq = 5975
+        bw = "20"
+        hapd = None
+        params = {"ssid": ssid,
+                  "country_code": "DE",
+                  "hw_mode": "a",
+                  "ieee80211ax": "1",
+                  "wpa": "2",
+                  "rsn_pairwise": "CCMP",
+                  "wpa_key_mgmt": "SAE",
+                  "sae_pwe": "1",
+                  "sae_password": "password",
+                  "ieee80211w": "2",
+                  "channel": "5",
+                  "op_class": "131",
+                  "he_oper_centr_freq_seg0_idx": "5",
+                  "ieee80211d": "1",
+                  "ieee80211h": "1",
+                  "ieee80211n": "1",
+                  "ieee80211ac": "1",
+                  "local_pwr_constraint": "4",
+                  # Set the 6 GHz regulatory power configuration
+                  "he_6ghz_reg_pwr_type": "0",
+                  # Note: hostapd uses "Maximum Transmit Power Interpretation"
+                  # set to "Regulatory client EIRP PSD", so the values should
+                  # be set accordingly.
+                  "reg_def_cli_eirp_psd": "3",
+                  "reg_sub_cli_eirp_psd": "2"}
+
+        hapd = hostapd.add_ap(apdev[0], params, set_channel=False)
+
+        dev[0].set("sae_pwe", "1")
+        dev[0].set("sae_groups", "")
+        dev[0].connect(ssid, sae_password="password", key_mgmt="SAE",
+                       ieee80211w="2", scan_freq=str(freq))
+        hapd.wait_sta()
+
+        he_verify_status(dev[0], hapd, freq, bw)
+        he_verify_wifi_version(dev[0])
+        hwsim_utils.test_connectivity(dev[0], hapd)
+
+        # Configure different values related to power constraints and update
+        # the Beacon frame contents.
+        hapd.set("local_pwr_constraint", "2")
+        hapd.set("he_6ghz_reg_pwr_type", "2")
+        hapd.set("reg_def_cli_eirp_psd", "2")
+        hapd.set("reg_sub_cli_eirp_psd", "1")
+
+        # In addition, inject a Transmit Power Envelope as an vendor element
+        hapd.set("vendor_elements", "c303190202")
+
+        if "OK" not in hapd.request("UPDATE_BEACON"):
+            raise Exception("UPDATE_BEACON failed")
+
+        # Allow few more Beacon frames
+        time.sleep(0.5)
+
+        # Modify the regulatory power type to SP and provide the client EIRP
+        # limit
+        # EIRP = PSD + 10 * log(channel width)
+        # 16 = 3 + 10 * log(20)
+        hapd.set("vendor_elements", "")
+        hapd.set("he_6ghz_reg_pwr_type", "1")
+        hapd.set("reg_def_cli_eirp", "14")
+
+        if "OK" not in hapd.request("UPDATE_BEACON"):
+            raise Exception("UPDATE_BEACON failed")
+
+        # Allow few more Beacon frames
+        time.sleep(0.5)
+    except Exception as e:
+        if isinstance(e, Exception) and str(e) == "AP startup failed":
+            if not he_supported():
+                raise HwsimSkip("HE 6 GHz channel not supported in regulatory information")
+        raise
+    finally:
+        dev[0].request("DISCONNECT")
+        dev[0].set("sae_pwe", "0")
+        dev[0].wait_disconnected()
+        clear_regdom(hapd, dev)
+
+def test_he_downgrade_40mhz_to_20mhz(dev, apdev):
+    """HE AP and downgrade from 40 MHz to 20 MHz due to regulatory constraints"""
+    # Try to configure 40 MHz channel when the regdb limits this frequency to
+    # 20 MHz.
+    params = {"ssid": "he",
+              "country_code": "AM",
+              "channel": "36",
+              "op_class": "116",
+              "ieee80211n": "1",
+              "ieee80211ac": "1",
+              "ieee80211ax": "1",
+              "hw_mode": "a",
+              "ht_capab": "[HT40+]",
+              "vht_oper_chwidth": "0",
+              "he_oper_chwidth": "0" }
+    run_he_downgrade_to_20_mhz(dev, apdev, params)
+
+def test_he_downgrade_40mhz_plus_minus_to_20mhz(dev, apdev):
+    """HE AP and downgrade from 40 MHz (+/-) to 20 MHz due to regulatory constraints"""
+    # Try to configure 40 MHz channel when the regdb limits this frequency to
+    # 20 MHz.
+    params = {"ssid": "he",
+              "country_code": "AM",
+              "channel": "36",
+              "op_class": "116",
+              "ieee80211n": "1",
+              "ieee80211ac": "1",
+              "ieee80211ax": "1",
+              "hw_mode": "a",
+              "ht_capab": "[HT40+][HT40-]",
+              "vht_oper_chwidth": "0",
+              "he_oper_chwidth": "0" }
+    run_he_downgrade_to_20_mhz(dev, apdev, params)
+
+def test_he_downgrade_80mhz_to_20mhz(dev, apdev):
+    """HE AP and downgrade from 80 MHz to 20 MHz due to regulatory constraints"""
+    # Try to configure 80 MHz channel when the regdb limits this frequency to
+    # 20 MHz.
+    params = {"ssid": "he",
+              "country_code": "AM",
+              "channel": "36",
+              "op_class": "128",
+              "ieee80211n": "1",
+              "ieee80211ac": "1",
+              "ieee80211ax": "1",
+              "hw_mode": "a",
+              "ht_capab": "[HT40+]",
+              "vht_oper_centr_freq_seg0_idx": "42",
+              "he_oper_centr_freq_seg0_idx": "42",
+              "vht_oper_chwidth": "1",
+              "he_oper_chwidth": "1" }
+    run_he_downgrade_to_20_mhz(dev, apdev, params)
+
+def run_he_downgrade_to_20_mhz(dev, apdev, params):
+    try:
+        hapd = None
+        hapd = hostapd.add_ap(apdev[0], params)
+        dev[0].connect("he", key_mgmt="NONE", scan_freq="5180")
+        sig = dev[0].request("SIGNAL_POLL").splitlines()
+        logger.info("SIGNAL_POLL: " + str(sig))
+        if "WIDTH=20 MHz" not in sig:
+            raise Exception("20 MHz channel width not reported")
+        dev[0].request("DISCONNECT")
+        dev[0].wait_disconnected()
+        hapd.wait_sta_disconnect()
+    finally:
+        dev[0].request("DISCONNECT")
+        clear_regdom(hapd, dev)
+
+def test_he_bss_color_change(dev, apdev):
+    """HE AP with color change"""
+    params = {"ssid": "test_he",
+              "ieee80211ax": "1",
+              "he_bss_color": "42",
+              "he_mu_edca_ac_be_ecwmin": "7",
+              "he_mu_edca_ac_be_ecwmax": "15"}
+    hapd = hostapd.add_ap(apdev[0], params)
+    if hapd.get_status_field("ieee80211ax") != "1":
+        raise Exception("STATUS did not indicate ieee80211ax=1")
+
+    color = hapd.get_status_field("he_bss_color")
+    if color != "42":
+        raise Exception("Expected current he_bss_color to be 42; was " + color)
+
+    # Small sleep to capture Beacon frames before the change
+    time.sleep(0.5)
+
+    # Change color by doing CCA
+    if "OK" not in hapd.request("COLOR_CHANGE 20"):
+        raise Exception("COLOR_CHANGE failed")
+    time.sleep(1.5)
+
+    color = hapd.get_status_field("he_bss_color")
+    if color != "20":
+        raise Exception("Expected current he_bss_color to be 20")
+
+    # Disable color by setting value to 0
+    if "OK" not in hapd.request("COLOR_CHANGE 0"):
+        raise Exception("COLOR_CHANGE failed")
+    time.sleep(1.5)
+
+    color = hapd.get_status_field("he_bss_color")
+    if color is not None:
+        raise Exception("Expected he_bss_color to get disabled but found " + color)
+
+    # Enable color back by setting same previous color value
+    if "OK" not in hapd.request("COLOR_CHANGE 20"):
+        raise Exception("COLOR_CHANGE failed")
+    time.sleep(1.5)
+
+    color = hapd.get_status_field("he_bss_color")
+    if color != "20":
+        raise Exception("Expected current he_bss_color to be 20")
+
+    hapd.dump_monitor()

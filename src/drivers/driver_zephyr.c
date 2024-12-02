@@ -25,7 +25,7 @@
 
 int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
 	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
-	unsigned int wait);
+	unsigned int wait, int link_id);
 
 const struct zep_wpa_supp_dev_ops *get_dev_ops(const struct device *dev)
 {
@@ -1842,7 +1842,7 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 		net_dhcpv4_restart(iface);
 #endif
 	}
-	
+
 #endif
 
 	return ret;
@@ -2225,11 +2225,14 @@ out:
 	return ret;
 }
 
-int wpa_drv_zep_stop_ap(void *priv)
+int wpa_drv_zep_stop_ap(void *priv, int link_id)
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	int ret = -1;
+
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
 
 	if (!priv) {
 		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
@@ -2358,12 +2361,16 @@ out:
 	return ret;
 }
 
-int wpa_drv_zep_sta_deauth(void *priv, const u8 *own_addr, const u8 *addr, u16 reason_code)
+int wpa_drv_zep_sta_deauth(void *priv, const u8 *own_addr, const u8 *addr, u16 reason_code,
+		int link_id)
 {
 	struct zep_drv_if_ctx *if_ctx = priv;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	int ret = -1;
 	struct ieee80211_mgmt mgmt;
+
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
 
 	if ((!priv) || (!addr)) {
 		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
@@ -2386,7 +2393,7 @@ int wpa_drv_zep_sta_deauth(void *priv, const u8 *own_addr, const u8 *addr, u16 r
 	return wpa_drv_zep_send_mlme(priv, (u8 *) &mgmt,
 					    IEEE80211_HDRLEN +
 					    sizeof(mgmt.u.deauth), 0, if_ctx->freq, 0, 0,
-					    0, 0);
+					    0, 0, -1);
 out:
 	return ret;
 }
@@ -2419,7 +2426,7 @@ int wpa_drv_zep_sta_disassoc(void *priv, const u8 *own_addr, const u8 *addr, u16
 	return wpa_drv_zep_send_mlme(priv, (u8 *) &mgmt,
 					    IEEE80211_HDRLEN +
 					    sizeof(mgmt.u.disassoc), 0, if_ctx->freq, 0, 0,
-					    0, 0);
+					    0, 0, -1);
 out:
 	return ret;
 }
@@ -2458,11 +2465,14 @@ out:
 
 int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
 	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
-	unsigned int wait)
+	unsigned int wait, int link_id)
 {
 	struct zep_drv_if_ctx *if_ctx = priv;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	int ret = -1;
+
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
 
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
@@ -2490,7 +2500,7 @@ out:
 }
 
 int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t data_len,
-                            int encrypt, const u8 *own_addr, u32 flags)
+                            int encrypt, const u8 *own_addr, u32 flags, int link_id)
 {
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	struct zep_drv_if_ctx *if_ctx = priv;
@@ -2501,6 +2511,8 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 	(void)own_addr;
 	(void)flags;
 	(void)encrypt;
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
 
 	hapd = if_ctx->hapd;
 

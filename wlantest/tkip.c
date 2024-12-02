@@ -329,7 +329,7 @@ u8 * tkip_decrypt(const u8 *tk, const struct ieee80211_hdr *hdr,
 		return NULL;
 	wep_crypt(rc4key, plain, plain_len);
 
-	icv = crc32(plain, plain_len - 4);
+	icv = ieee80211_crc32(plain, plain_len - 4);
 	rx_icv = WPA_GET_LE32(plain + plain_len - 4);
 	if (icv != rx_icv) {
 		wpa_printf(MSG_INFO, "TKIP ICV mismatch in frame from " MACSTR,
@@ -362,8 +362,8 @@ u8 * tkip_decrypt(const u8 *tk, const struct ieee80211_hdr *hdr,
 
 		if (frag->buf && (fn || (fc & WLAN_FC_MOREFRAG)) &&
 		    sn == frag->sn && fn == frag->fn + 1 &&
-		    os_memcmp(frag->ra, hdr->addr1, ETH_ALEN) == 0 &&
-		    os_memcmp(frag->ta, hdr->addr2, ETH_ALEN) == 0) {
+		    ether_addr_equal(frag->ra, hdr->addr1) &&
+		    ether_addr_equal(frag->ta, hdr->addr2)) {
 			/* Add the next fragment */
 			if (wpabuf_resize(&frag->buf, plain_len) == 0) {
 				wpabuf_put_data(frag->buf, plain, plain_len);
@@ -482,7 +482,7 @@ u8 * tkip_encrypt(const u8 *tk, u8 *frame, size_t len, size_t hdrlen, u8 *qos,
 	os_memcpy(pos, frame + hdrlen, len - hdrlen);
 	os_memcpy(pos + len - hdrlen, mic, sizeof(mic));
 	WPA_PUT_LE32(pos + len - hdrlen + sizeof(mic),
-		     crc32(pos, len - hdrlen + sizeof(mic)));
+		     ieee80211_crc32(pos, len - hdrlen + sizeof(mic)));
 	wep_crypt(rc4key, pos, len - hdrlen + sizeof(mic) + 4);
 
 	*encrypted_len = len + 8 + sizeof(mic) + 4;

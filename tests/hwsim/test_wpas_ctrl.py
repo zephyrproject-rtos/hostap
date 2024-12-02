@@ -301,8 +301,10 @@ def test_wpas_ctrl_network_oom(dev):
 @remote_compatible
 def test_wpas_ctrl_many_networks(dev, apdev):
     """wpa_supplicant ctrl_iface LIST_NETWORKS with huge number of networks"""
-    for i in range(1000):
-        id = dev[0].add_network()
+    for i in range(999):
+        dev[0].add_network()
+        dev[0].dump_monitor()
+    id = dev[0].add_network()
     ev = dev[0].wait_event(["CTRL-EVENT-NETWORK-ADDED %d" % id])
     if ev is None:
         raise Exception("Network added event not seen for the last network")
@@ -320,12 +322,24 @@ def test_wpas_ctrl_many_networks(dev, apdev):
     # power CPU, so increase the command timeout significantly to avoid issues
     # with the test case failing and following reset operation timing out.
     dev[0].request("REMOVE_NETWORK all", timeout=60)
-    ev = dev[0].wait_event(["CTRL-EVENT-NETWORK-REMOVED %d" % id])
-    if ev is None:
-        raise Exception("Network removed event not seen for the last network")
-    ev = dev[0].wait_global_event(["CTRL-EVENT-NETWORK-REMOVED %d" % id], timeout=10)
-    if ev is None:
-        raise Exception("Network removed event (global) not seen for the last network")
+    seen = seen_global = False
+
+    for i in range(1000):
+        ev = dev[0].wait_event(["CTRL-EVENT-NETWORK-REMOVED"])
+        if ev is None:
+            raise Exception("Network removed event not seen for the last network")
+        if str(id) in ev:
+            seen = True
+        ev = dev[0].wait_global_event(["CTRL-EVENT-NETWORK-REMOVED"],
+                                      timeout=10)
+        if ev is None:
+            raise Exception("Network removed event (global) not seen for the last network")
+        if str(id) in ev:
+            seen_global = True
+    if not seen:
+            raise Exception("Network removed event not seen for the last network")
+    if not seen_global:
+            raise Exception("Network removed event (global) not seen for the last network")
     dev[0].dump_monitor()
 
 @remote_compatible
@@ -467,6 +481,14 @@ def test_wpas_ctrl_cred(dev):
     for i in ("11", "1122", "112233445566778899aabbccddeeff00"):
         if "FAIL" not in dev[0].request("SET_CRED " + str(id) + " roaming_consortium " + i):
             raise Exception("Unexpected success on invalid roaming_consortium")
+        if "FAIL" not in dev[0].request("SET_CRED " + str(id) + " home_ois " + '"' + i + '"'):
+            raise Exception("Unexpected success on invalid home_ois")
+        if "FAIL" not in dev[0].request("SET_CRED " + str(id) + " required_home_ois " + '"' + i + '"'):
+            raise Exception("Unexpected success on invalid required_home_ois")
+    if "FAIL" not in dev[0].request("SET_CRED " + str(id) + " home_ois " + '"112233' + 36*",112233" + '"'):
+            raise Exception("Unexpected success on invalid home_ois")
+    if "FAIL" in dev[0].request("SET_CRED " + str(id) + " home_ois " + '"112233' + 35*",112233" + '"'):
+            raise Exception("Unexpected failure on maximum number of home_ois")
 
     dev[0].set_cred(id, "excluded_ssid", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
     if "FAIL" not in dev[0].request("SET_CRED " + str(id) + " excluded_ssid 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00"):
@@ -1858,8 +1880,6 @@ def test_wpas_ctrl_error(dev):
               1, 'wpa_supplicant_ctrl_iface_wps_nfc_token'),
              ('WPS_NFC_TOKEN NDEF', 'FAIL',
               2, 'wpa_supplicant_ctrl_iface_wps_nfc_token'),
-             ('NFC_GET_HANDOVER_REQ NDEF P2P-CR', None,
-              1, 'wpas_p2p_nfc_handover'),
              ('NFC_GET_HANDOVER_REQ NDEF P2P-CR', None,
               1, 'wps_build_nfc_handover_req_p2p')]
     for cmd, exp, count, func in tests:

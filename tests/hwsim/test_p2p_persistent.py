@@ -96,12 +96,15 @@ def test_persistent_group_per_sta_psk(dev):
         raise Exception("Joining client did not recognize persistent group")
     if r_res['psk'] == c_res['psk']:
         raise Exception("Same PSK assigned for both clients")
+    dev[0].wait_sta(addr=dev[2].p2p_interface_addr(), wait_4way_hs=True)
     hwsim_utils.test_connectivity_p2p(dev[1], dev[2])
 
     logger.info("Remove persistent group and re-start it manually")
     dev[0].remove_group()
     dev[1].wait_go_ending_session()
     dev[2].wait_go_ending_session()
+    dev[0].wait_sta_disconnect()
+    dev[0].wait_sta_disconnect()
     dev[0].dump_monitor()
     dev[1].dump_monitor()
     dev[2].dump_monitor()
@@ -124,11 +127,15 @@ def test_persistent_group_per_sta_psk(dev):
             raise Exception("Timeout on group restart")
         dev[i].group_form_result(ev)
 
+    dev[0].wait_sta()
+    dev[0].wait_sta()
+
     logger.info("Leave persistent group and rejoin it")
     dev[2].remove_group()
     ev = dev[2].wait_global_event(["P2P-GROUP-REMOVED"], timeout=3)
     if ev is None:
         raise Exception("Group removal event timed out")
+    dev[0].wait_sta_disconnect(addr=dev[2].p2p_interface_addr())
     if not dev[2].discover_peer(addr0, social=True):
         raise Exception("Peer " + addr0 + " not found")
     dev[2].dump_monitor()
@@ -140,11 +147,13 @@ def test_persistent_group_per_sta_psk(dev):
     cli_res = dev[2].group_form_result(ev)
     if not cli_res['persistent']:
         raise Exception("Persistent group not restarted as persistent (cli)")
+    dev[0].wait_sta(addr=dev[2].p2p_interface_addr(), wait_4way_hs=True)
     hwsim_utils.test_connectivity_p2p(dev[1], dev[2])
 
     logger.info("Remove one of the clients from the group without removing persistent group information for the client")
     dev[0].global_request("P2P_REMOVE_CLIENT iface=" + dev[2].p2p_interface_addr())
     dev[2].wait_go_ending_session()
+    dev[0].wait_sta_disconnect(addr=dev[2].p2p_interface_addr())
 
     logger.info("Try to reconnect after having been removed from group (but persistent group info still present)")
     if not dev[2].discover_peer(addr0, social=True):
@@ -158,9 +167,11 @@ def test_persistent_group_per_sta_psk(dev):
         raise Exception("Timeout on group restart (on client)")
     if "P2P-GROUP-STARTED" not in ev:
         raise Exception("Connection failed")
+    dev[0].wait_sta(addr=dev[2].p2p_interface_addr(), wait_4way_hs=True)
 
     logger.info("Remove one of the clients from the group")
     dev[0].global_request("P2P_REMOVE_CLIENT " + addr2)
+    dev[0].wait_sta_disconnect(addr=dev[2].p2p_interface_addr())
     dev[2].wait_go_ending_session()
 
     logger.info("Try to reconnect after having been removed from group")
@@ -178,6 +189,7 @@ def test_persistent_group_per_sta_psk(dev):
 
     logger.info("Remove the remaining client from the group")
     dev[0].global_request("P2P_REMOVE_CLIENT " + addr1)
+    dev[0].wait_sta_disconnect(addr=dev[1].p2p_interface_addr())
     dev[1].wait_go_ending_session()
 
     logger.info("Terminate persistent group")
@@ -219,6 +231,7 @@ def test_persistent_group_invite_removed_client(dev):
 
     logger.info("Remove client from the group")
     dev[0].global_request("P2P_REMOVE_CLIENT " + addr1)
+    dev[0].wait_sta_disconnect(dev[1].p2p_interface_addr())
     dev[1].wait_go_ending_session()
 
     logger.info("Re-invite the removed client to join the group")
@@ -245,6 +258,7 @@ def test_persistent_group_invite_removed_client(dev):
     dev[1].global_request("REMOVE_NETWORK " + id)
 
     logger.info("Re-invite after client removed persistent group info")
+    dev[0].dump_monitor()
     dev[1].p2p_listen()
     if not dev[0].discover_peer(addr1, social=True):
         raise Exception("Peer " + peer + " not found")
@@ -262,6 +276,7 @@ def test_persistent_group_invite_removed_client(dev):
         raise Exception("Joining client did not recognize persistent group")
     if r_res['psk'] == c_res['psk']:
         raise Exception("Same PSK assigned on both times")
+    dev[0].wait_sta(addr=dev[1].p2p_interface_addr(), wait_4way_hs=True)
     hwsim_utils.test_connectivity_p2p(dev[0], dev[1])
 
     terminate_group(dev[0], dev[1])
@@ -337,7 +352,7 @@ def test_persistent_go_client_list(dev):
         raise Exception("Timeout on group restart (on client)")
     dev[1].group_form_result(ev)
     clients = dev[0].global_request("GET_NETWORK " + id + " p2p_client_list").rstrip()
-    if clients != addr1 + " " + addr2:
+    if set(clients.split()) != set((addr1, addr2)):
         raise Exception("Unexpected p2p_client_list entry(4): " + clients)
 
     dev[2].remove_group()
@@ -598,6 +613,28 @@ def test_persistent_group_cancel_on_cli(dev):
 def test_persistent_group_cancel_on_cli2(dev):
     """P2P persistent group formation, re-invocation, and cancel (2)"""
     form(dev[0], dev[1])
+    invite_from_go(dev[0], dev[1], terminate=False)
+    if "FAIL" not in dev[1].global_request("P2P_CANCEL"):
+        raise Exception("P2P_CANCEL succeeded unexpectedly on CLI")
+    if "FAIL" not in dev[0].global_request("P2P_CANCEL"):
+        raise Exception("P2P_CANCEL succeeded unexpectedly on GO")
+    terminate_group(dev[0], dev[1])
+
+    invite_from_cli(dev[0], dev[1], terminate=False)
+    if "FAIL" not in dev[1].global_request("P2P_CANCEL"):
+        raise Exception("P2P_CANCEL succeeded unexpectedly on CLI")
+    if "FAIL" not in dev[0].global_request("P2P_CANCEL"):
+        raise Exception("P2P_CANCEL succeeded unexpectedly on GO")
+    terminate_group(dev[0], dev[1])
+
+@remote_compatible
+def test_persistent_group_cancel_on_cli3(dev):
+    """P2P persistent group formation, re-invocation, and cancel"""
+    dev[0].global_request("SET p2p_no_group_iface 0")
+    dev[1].global_request("SET p2p_no_group_iface 1")
+    dev[1].p2p_ext_listen(30,30)
+    form(dev[0], dev[1])
+
     invite_from_go(dev[0], dev[1], terminate=False)
     if "FAIL" not in dev[1].global_request("P2P_CANCEL"):
         raise Exception("P2P_CANCEL succeeded unexpectedly on CLI")

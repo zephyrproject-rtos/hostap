@@ -96,6 +96,7 @@ def vm_read_stdout(vm, test_queue):
     global total_started, total_passed, total_failed, total_skipped
     global rerun_failures
     global first_run_failures
+    global all_failed
 
     ready = False
     try:
@@ -136,6 +137,7 @@ def vm_read_stdout(vm, test_queue):
                 name = vals[1]
             logger.debug("VM[%d] test case failed: %s" % (vm['idx'], name))
             vm['failed'].append(name)
+            all_failed.append(name)
             if name != vm['current_name']:
                 logger.info("VM[%d] test result mismatch: %s (expected %s)" % (vm['idx'], name, vm['current_name']))
             else:
@@ -199,12 +201,18 @@ def vm_read_stderr(vm):
             raise
 
 def vm_next_step(_vm, scr, test_queue):
-    scr.move(_vm['idx'] + 1, 10)
-    scr.clrtoeol()
+    max_y, max_x = scr.getmaxyx()
+    status_line = num_servers + 1
+    if status_line >= max_y:
+        status_line = max_y - 1
+    if _vm['idx'] + 1 < status_line:
+        scr.move(_vm['idx'] + 1, 10)
+        scr.clrtoeol()
     if not test_queue:
         _vm['proc'].stdin.write(b'\n')
         _vm['proc'].stdin.flush()
-        scr.addstr("shutting down")
+        if _vm['idx'] + 1 < status_line:
+            scr.addstr("shutting down")
         logger.info("VM[%d] shutting down" % _vm['idx'])
         return
     (name, count) = test_queue.pop(0)
@@ -212,11 +220,16 @@ def vm_next_step(_vm, scr, test_queue):
     _vm['current_count'] = count
     _vm['proc'].stdin.write(name.encode() + b'\n')
     _vm['proc'].stdin.flush()
-    scr.addstr(name)
+    if _vm['idx'] + 1 < status_line:
+        scr.addstr(name)
     logger.debug("VM[%d] start test %s" % (_vm['idx'], name))
 
 def check_vm_start(scr, sel, test_queue):
     running = False
+    max_y, max_x = scr.getmaxyx()
+    status_line = num_servers + 1
+    if status_line >= max_y:
+        status_line = max_y - 1
     for i in range(num_servers):
         if vm[i]['proc']:
             running = True
@@ -229,9 +242,10 @@ def check_vm_start(scr, sel, test_queue):
         num_starting = num_vm_starting()
         if vm[i]['cmd'] and len(test_queue) > num_starting and \
            num_starting < max_start:
-            scr.move(i + 1, 10)
-            scr.clrtoeol()
-            scr.addstr(i + 1, 10, "starting VM")
+            if i + 1 < status_line:
+                scr.move(i + 1, 10)
+                scr.clrtoeol()
+                scr.addstr(i + 1, 10, "starting VM")
             start_vm(vm[i], sel)
             return True, True
 
@@ -242,12 +256,18 @@ def vm_terminated(_vm, scr, sel, test_queue):
     for stream in [_vm['proc'].stdout, _vm['proc'].stderr]:
         sel.unregister(stream)
     _vm['proc'] = None
-    scr.move(_vm['idx'] + 1, 10)
-    scr.clrtoeol()
+    max_y, max_x = scr.getmaxyx()
+    status_line = num_servers + 1
+    if status_line >= max_y:
+        status_line = max_y - 1
+    if _vm['idx'] + 1 < status_line:
+        scr.move(_vm['idx'] + 1, 10)
+        scr.clrtoeol()
     log = '{}/{}.srv.{}/console'.format(dir, timestamp, _vm['idx'] + 1)
     with open(log, 'r') as f:
         if "Kernel panic" in f.read():
-            scr.addstr("kernel panic")
+            if _vm['idx'] + 1 < status_line:
+                scr.addstr("kernel panic")
             logger.info("VM[%d] kernel panic" % _vm['idx'])
             updated = True
     if test_queue:
@@ -256,31 +276,38 @@ def vm_terminated(_vm, scr, sel, test_queue):
             if _vm['proc']:
                 num_vm += 1
         if len(test_queue) > num_vm:
-            scr.addstr("unexpected exit")
+            if _vm['idx'] + 1 < status_line:
+                scr.addstr("unexpected exit")
             logger.info("VM[%d] unexpected exit" % i)
             updated = True
     return updated
 
 def update_screen(scr, total_tests):
-    scr.move(num_servers + 1, 10)
+    max_y, max_x = scr.getmaxyx()
+    status_line = num_servers + 1
+    if status_line >= max_y:
+        status_line = max_y - 1
+    scr.move(status_line, 10)
     scr.clrtoeol()
     scr.addstr("{} %".format(int(100.0 * (total_passed + total_failed + total_skipped) / total_tests)))
-    scr.addstr(num_servers + 1, 20,
+    scr.addstr(status_line, 20,
                "TOTAL={} STARTED={} PASS={} FAIL={} SKIP={}".format(total_tests, total_started, total_passed, total_failed, total_skipped))
-    failed = get_failed(vm)
-    if len(failed) > 0:
+    global all_failed
+    max_y, max_x = scr.getmaxyx()
+    max_lines = max_y - num_servers - 3
+    if len(all_failed) > 0 and max_lines > 0 and num_servers + 2 < max_y - 1:
         scr.move(num_servers + 2, 0)
-        scr.clrtoeol()
-        scr.addstr("Failed test cases: ")
+        scr.addstr("Last failed test cases:")
+        if max_lines >= len(all_failed):
+            max_lines = len(all_failed)
         count = 0
-        for f in failed:
+        for i in range(len(all_failed) - max_lines, len(all_failed)):
             count += 1
-            if count > 30:
-                scr.addstr('...')
-                scr.clrtoeol()
+            if num_servers + 2 + count >= max_y:
                 break
-            scr.addstr(f)
-            scr.addstr(' ')
+            scr.move(num_servers + 2 + count, 0)
+            scr.addstr(all_failed[i])
+            scr.clrtoeol()
     scr.refresh()
 
 def show_progress(scr):
@@ -300,13 +327,18 @@ def show_progress(scr):
     start_vm(vm[0], sel)
 
     scr.leaveok(1)
+    max_y, max_x = scr.getmaxyx()
+    status_line = num_servers + 1
+    if status_line >= max_y:
+        status_line = max_y - 1
     scr.addstr(0, 0, "Parallel test execution status", curses.A_BOLD)
     for i in range(0, num_servers):
-        scr.addstr(i + 1, 0, "VM %d:" % (i + 1), curses.A_BOLD)
-        status = "starting VM" if vm[i]['proc'] else "not yet started"
-        scr.addstr(i + 1, 10, status)
-    scr.addstr(num_servers + 1, 0, "Total:", curses.A_BOLD)
-    scr.addstr(num_servers + 1, 20, "TOTAL={} STARTED=0 PASS=0 FAIL=0 SKIP=0".format(total_tests))
+        if i + 1 < status_line:
+            scr.addstr(i + 1, 0, "VM %d:" % (i + 1), curses.A_BOLD)
+            status = "starting VM" if vm[i]['proc'] else "not yet started"
+            scr.addstr(i + 1, 10, status)
+    scr.addstr(status_line, 0, "Total:", curses.A_BOLD)
+    scr.addstr(status_line, 20, "TOTAL={} STARTED=0 PASS=0 FAIL=0 SKIP=0".format(total_tests))
     scr.refresh()
 
     while True:
@@ -366,6 +398,7 @@ def main():
     import os
     global num_servers
     global vm
+    global all_failed
     global dir
     global timestamp
     global tests
@@ -380,7 +413,8 @@ def main():
 
     debug_level = logging.INFO
     rerun_failures = True
-    timestamp = int(time.time())
+    start_time = time.time()
+    timestamp = int(start_time)
 
     scriptsdir = os.path.dirname(os.path.realpath(sys.argv[0]))
 
@@ -484,6 +518,7 @@ def main():
     log_handler.setFormatter(log_formatter)
     logger.addHandler(log_handler)
 
+    all_failed = []
     vm = {}
     for i in range(0, num_servers):
         cmd = [os.path.join(scriptsdir, 'vm-run.sh'),
@@ -520,6 +555,9 @@ def main():
                 pass
             def clrtoeol(self):
                 pass
+            def getmaxyx(self):
+                return (25, 80)
+
         show_progress(FakeScreen())
 
     with open('{}/{}-parallel.log'.format(dir, timestamp), 'w') as f:
@@ -656,6 +694,15 @@ def main():
                                logdir])
         print("file://%s/index.html" % logdir)
         logger.info("Code coverage report: file://%s/index.html" % logdir)
+
+    end_time = time.time()
+    try:
+        cmd = subprocess.Popen(['git', 'describe'], stdout=subprocess.PIPE)
+        ver = cmd.stdout.read().decode().strip()
+    except:
+        ver = "unknown"
+        pass
+    logger.info("Tests run: {}  Tests failed: {}  Total time: {}  Version: {}".format(total_started, total_failed, end_time - start_time, ver))
 
     if double_failed or (failed and not rerun_failures):
         logger.info("Test run complete - failures found")

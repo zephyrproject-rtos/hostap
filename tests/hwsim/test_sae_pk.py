@@ -227,9 +227,11 @@ def test_sae_pk_modes(dev, apdev):
         val = dev[0].get_status_field("sae_pk")
         if val != str(expected):
             raise Exception("Unexpected sae_pk=%d result %s" % (sae_pk, val))
+        hapd.wait_sta()
         dev[0].request("REMOVE_NETWORK *")
         dev[0].wait_disconnected()
         dev[0].dump_monitor()
+        hapd.wait_sta_disconnect()
 
 def test_sae_pk_not_on_ap(dev, apdev):
     """SAE-PK password, but no PK on AP"""
@@ -259,8 +261,8 @@ def test_sae_pk_transition_disable(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     id = dev[0].connect(SAE_PK_SSID, sae_password=SAE_PK_SEC3_PW,
-                        key_mgmt="SAE", scan_freq="2412")
-    ev = dev[0].wait_event(["TRANSITION-DISABLE"], timeout=1)
+                        key_mgmt="SAE", scan_freq="2412", wait_connect=False)
+    ev = dev[0].wait_event(["TRANSITION-DISABLE"], timeout=15)
     if ev is None:
         raise Exception("Transition disable not indicated")
     if ev.split(' ')[1] != "02":
