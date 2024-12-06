@@ -25,6 +25,7 @@
 #include "hw_features.h"
 
 #ifdef __ZEPHYR__
+#include <hapd_events.h>
 #include <supp_events.h>
 #endif /* __ZEPHYR__ */
 
@@ -1141,9 +1142,15 @@ hostapd_check_chans(struct hostapd_iface *iface)
 		err = hostapd_is_usable_chans(iface);
 		if (err <= 0) {
 #ifdef __ZEPHYR__
-			supplicant_send_wifi_mgmt_ap_status(iface->owner,
-				NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
-				WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+			if (IS_ENABLED(CONFIG_WIFI_NM_HOSTAPD_AP)) {
+				hostapd_send_wifi_mgmt_ap_status(iface,
+					NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+			} else {
+				supplicant_send_wifi_mgmt_ap_status(iface->owner,
+					NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+			}
 #endif /* __ZEPHYR__ */			
 			if (!err)
 				return HOSTAPD_CHAN_INVALID;
@@ -1166,9 +1173,15 @@ hostapd_check_chans(struct hostapd_iface *iface)
 	case HOSTAPD_CHAN_INVALID:
 	default:
 #ifdef __ZEPHYR__
-		supplicant_send_wifi_mgmt_ap_status(iface->owner,
-			NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
-			WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+		if (IS_ENABLED(CONFIG_WIFI_NM_HOSTAPD_AP)) {
+			hostapd_send_wifi_mgmt_ap_status(iface,
+				NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+				WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+		} else {
+			supplicant_send_wifi_mgmt_ap_status(iface->owner,
+				NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+				WIFI_STATUS_AP_CHANNEL_NOT_ALLOWED);
+		}
 #endif /* __ZEPHYR__ */
 		return HOSTAPD_CHAN_INVALID;
 	}
@@ -1318,9 +1331,15 @@ int hostapd_select_hw_mode(struct hostapd_iface *iface)
 				       "Hardware does not support configured mode (%d) (hw_mode in hostapd.conf)",
 				       (int) iface->conf->hw_mode);
 #ifdef __ZEPHYR__
-			supplicant_send_wifi_mgmt_ap_status(iface->owner,
-				NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
-				WIFI_STATUS_AP_CHANNEL_NOT_SUPPORTED);
+			if (IS_ENABLED(CONFIG_WIFI_NM_HOSTAPD_AP)) {
+				hostapd_send_wifi_mgmt_ap_status(iface,
+					NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					WIFI_STATUS_AP_CHANNEL_NOT_SUPPORTED);
+			} else {
+				supplicant_send_wifi_mgmt_ap_status(iface->owner,
+					NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					WIFI_STATUS_AP_CHANNEL_NOT_SUPPORTED);
+			}
 #endif /* __ZEPHYR__ */
 			return -2;
 		}

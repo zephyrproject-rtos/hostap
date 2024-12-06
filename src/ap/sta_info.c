@@ -41,6 +41,7 @@
 #include "wps_hostapd.h"
 
 #ifdef __ZEPHYR__
+#include <hapd_events.h>
 #include <supp_events.h>
 #endif /* __ZEPHYR__ */
 
@@ -1589,15 +1590,15 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 	}
 
 #ifdef __ZEPHYR__
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
-		supplicant_send_wifi_mgmt_ap_sta_event(hapd->iface,
-						       event,
-						       sta);
-#else
+	if (IS_ENABLED(CONFIG_WIFI_NM_HOSTAPD_AP)) {
+		hostapd_send_wifi_mgmt_ap_sta_event(hapd->iface,
+						    event,
+						    sta);
+	} else {
 		supplicant_send_wifi_mgmt_ap_sta_event(hapd->iface->owner,
                                                        event,
                                                        sta);
-#endif
+	}
 #endif /* __ZEPHYR__ */
 	if (hapd->sta_authorized_cb)
 		hapd->sta_authorized_cb(hapd->sta_authorized_cb_ctx,
