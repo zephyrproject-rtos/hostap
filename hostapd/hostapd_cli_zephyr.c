@@ -19,7 +19,7 @@
 #include "common/version.h"
 #include "common/ieee802_11_defs.h"
 #include "supp_main.h"
-#include "supp_events.h"
+#include "hapd_events.h"
 #include "ctrl_iface_zephyr.h"
 #include "hostapd_cli_zephyr.h"
 

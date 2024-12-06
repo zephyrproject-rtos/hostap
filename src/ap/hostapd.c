@@ -58,7 +58,7 @@
 #include "wpa_auth_kay.h"
 #include "hw_features.h"
 #ifdef __ZEPHYR__
-#include <supp_events.h>
+#include <hapd_events.h>
 #endif /* __ZEPHYR__ */
 
 
@@ -2696,11 +2696,11 @@ dfs_offload:
 	for (j = 0; j < iface->num_bss; j++)
 		hostapd_neighbor_set_own_report(iface->bss[j]);
 
-#if defined(__ZEPHYR__) && defined(CONFIG_WIFI_NM_HOSTAPD_AP)
-	supplicant_send_wifi_mgmt_ap_status(iface,
-					    NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
-					    WIFI_STATUS_AP_SUCCESS);
-#endif /* __ZEPHYR__ && CONFIG_WIFI_NM_HOSTAPD_AP */
+#ifdef __ZEPHYR__
+	hostapd_send_wifi_mgmt_ap_status(iface,
+					 NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					 WIFI_STATUS_AP_SUCCESS);
+#endif /* __ZEPHYR__ */
 	if (iface->interfaces && iface->interfaces->count > 1)
 		ieee802_11_set_beacons(iface);
 
