@@ -743,7 +743,7 @@ int crypto_ecdh(
 
 	if (*secret_len > DPP_MAX_SHARED_SECRET_LEN) {
 		wpa_printf(
-		    MSG_ERROR, "secret len=%d is too big\n", *secret_len);
+		    MSG_ERROR, "secret len=%zu is too big\n", *secret_len);
 		goto fail;
 	}
 
