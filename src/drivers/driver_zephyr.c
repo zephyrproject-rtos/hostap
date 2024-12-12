@@ -1215,7 +1215,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	if_ctx->drv_ctx = global_priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->init) {
+	if ((!dev_ops) || (!dev_ops->init)) {
 		wpa_printf(MSG_ERROR,
 			   "%s: No op registered for init",
 			   __func__);
