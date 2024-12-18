@@ -45,6 +45,8 @@ static void hostapd_wpa_auth_conf(struct hostapd_bss_config *conf,
 	wconf->wpa = conf->wpa;
 	wconf->extended_key_id = conf->extended_key_id;
 	wconf->wpa_key_mgmt = conf->wpa_key_mgmt;
+	wconf->rsn_override_key_mgmt = conf->rsn_override_key_mgmt;
+	wconf->rsn_override_key_mgmt_2 = conf->rsn_override_key_mgmt_2;
 	wconf->wpa_pairwise = conf->wpa_pairwise;
 	wconf->wpa_group = conf->wpa_group;
 	wconf->wpa_group_rekey = conf->wpa_group_rekey;
@@ -56,6 +58,8 @@ static void hostapd_wpa_auth_conf(struct hostapd_bss_config *conf,
 		conf->wpa_disable_eapol_key_retries;
 	wconf->wpa_pairwise_update_count = conf->wpa_pairwise_update_count;
 	wconf->rsn_pairwise = conf->rsn_pairwise;
+	wconf->rsn_override_pairwise = conf->rsn_override_pairwise;
+	wconf->rsn_override_pairwise_2 = conf->rsn_override_pairwise_2;
 	wconf->rsn_preauth = conf->rsn_preauth;
 	wconf->eapol_version = conf->eapol_version;
 #ifdef CONFIG_MACSEC
@@ -70,6 +74,8 @@ static void hostapd_wpa_auth_conf(struct hostapd_bss_config *conf,
 #endif /* CONFIG_OCV */
 	wconf->okc = conf->okc;
 	wconf->ieee80211w = conf->ieee80211w;
+	wconf->rsn_override_mfp = conf->rsn_override_mfp;
+	wconf->rsn_override_mfp_2 = conf->rsn_override_mfp_2;
 	wconf->beacon_prot = conf->beacon_prot;
 	wconf->group_mgmt_cipher = conf->group_mgmt_cipher;
 	wconf->sae_require_mfp = conf->sae_require_mfp;
@@ -125,6 +131,46 @@ static void hostapd_wpa_auth_conf(struct hostapd_bss_config *conf,
 		os_memcpy(wconf->own_ie_override,
 			  wpabuf_head(conf->own_ie_override),
 			  wconf->own_ie_override_len);
+	}
+	if (conf->rsne_override &&
+	    wpabuf_len(conf->rsne_override) <= MAX_OWN_IE_OVERRIDE) {
+		wconf->rsne_override_len = wpabuf_len(conf->rsne_override);
+		os_memcpy(wconf->rsne_override,
+			  wpabuf_head(conf->rsne_override),
+			  wconf->rsne_override_len);
+		wconf->rsne_override_set = true;
+	}
+	if (conf->rsnoe_override &&
+	    wpabuf_len(conf->rsnoe_override) <= MAX_OWN_IE_OVERRIDE) {
+		wconf->rsnoe_override_len = wpabuf_len(conf->rsnoe_override);
+		os_memcpy(wconf->rsnoe_override,
+			  wpabuf_head(conf->rsnoe_override),
+			  wconf->rsnoe_override_len);
+		wconf->rsnoe_override_set = true;
+	}
+	if (conf->rsno2e_override &&
+	    wpabuf_len(conf->rsno2e_override) <= MAX_OWN_IE_OVERRIDE) {
+		wconf->rsno2e_override_len = wpabuf_len(conf->rsno2e_override);
+		os_memcpy(wconf->rsno2e_override,
+			  wpabuf_head(conf->rsno2e_override),
+			  wconf->rsno2e_override_len);
+		wconf->rsno2e_override_set = true;
+	}
+	if (conf->rsnxe_override &&
+	    wpabuf_len(conf->rsnxe_override) <= MAX_OWN_IE_OVERRIDE) {
+		wconf->rsnxe_override_len = wpabuf_len(conf->rsnxe_override);
+		os_memcpy(wconf->rsnxe_override,
+			  wpabuf_head(conf->rsnxe_override),
+			  wconf->rsnxe_override_len);
+		wconf->rsnxe_override_set = true;
+	}
+	if (conf->rsnxoe_override &&
+	    wpabuf_len(conf->rsnxoe_override) <= MAX_OWN_IE_OVERRIDE) {
+		wconf->rsnxoe_override_len = wpabuf_len(conf->rsnxoe_override);
+		os_memcpy(wconf->rsnxoe_override,
+			  wpabuf_head(conf->rsnxoe_override),
+			  wconf->rsnxoe_override_len);
+		wconf->rsnxoe_override_set = true;
 	}
 	if (conf->rsne_override_eapol &&
 	    wpabuf_len(conf->rsne_override_eapol) <= MAX_OWN_IE_OVERRIDE) {
@@ -228,6 +274,8 @@ static void hostapd_wpa_auth_conf(struct hostapd_bss_config *conf,
 	wconf->no_disconnect_on_group_keyerror =
 		conf->bss_max_idle && conf->ap_max_inactivity &&
 		conf->no_disconnect_on_group_keyerror;
+
+	wconf->rsn_override_omit_rsnxe = conf->rsn_override_omit_rsnxe;
 }
 
 
