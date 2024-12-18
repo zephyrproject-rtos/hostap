@@ -1662,6 +1662,9 @@ static mbedtls_ecp_group_id crypto_mbedtls_ecp_group_id_from_ike_id(int group)
     }
 }
 
+#endif /* CRYPTO_MBEDTLS_CRYPTO_ECDH || CRYPTO_MBEDTLS_CRYPTO_EC */
+
+#ifdef CRYPTO_MBEDTLS_CRYPTO_EC
 static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 {
     /* https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml */
@@ -1713,7 +1716,7 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
     }
 }
 
-#endif /* CRYPTO_MBEDTLS_CRYPTO_ECDH || CRYPTO_MBEDTLS_CRYPTO_EC */
+#endif /* CRYPTO_MBEDTLS_CRYPTO_EC */
 
 #if defined(CRYPTO_MBEDTLS_CRYPTO_ECDH) || defined(CRYPTO_MBEDTLS_CRYPTO_EC_DPP)
 
