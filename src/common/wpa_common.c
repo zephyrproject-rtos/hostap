@@ -1890,6 +1890,14 @@ int wpa_parse_wpa_ie_rsn(const u8 *rsn_ie, size_t rsn_ie_len,
 		data->has_group = 1;
 		data->key_mgmt = WPA_KEY_MGMT_OSEN;
 		data->proto = WPA_PROTO_OSEN;
+	} else if (rsn_ie_len >= 2 + 4 + 2 && rsn_ie[1] >= 4 + 2 &&
+		   rsn_ie[1] == rsn_ie_len - 2 &&
+		   (WPA_GET_BE32(&rsn_ie[2]) == RSNE_OVERRIDE_IE_VENDOR_TYPE ||
+		    WPA_GET_BE32(&rsn_ie[2]) ==
+		    RSNE_OVERRIDE_2_IE_VENDOR_TYPE) &&
+		   WPA_GET_LE16(&rsn_ie[2 + 4]) == RSN_VERSION) {
+		pos = rsn_ie + 2 + 4 + 2;
+		left = rsn_ie_len - 2 - 4 - 2;
 	} else {
 		const struct rsn_ie_hdr *hdr;
 
@@ -3440,7 +3448,7 @@ static int wpa_parse_generic(const u8 *pos, struct wpa_eapol_ie_parse *ie)
 	const u8 *p;
 	size_t left;
 	u8 link_id;
-	char title[50];
+	char title[100];
 	int ret;
 
 	if (len == 0)
@@ -3618,6 +3626,57 @@ static int wpa_parse_generic(const u8 *pos, struct wpa_eapol_ie_parse *ie)
 				  link_id);
 		if (!os_snprintf_error(sizeof(title), ret))
 			wpa_hexdump(MSG_DEBUG, title, pos, dlen);
+		return 0;
+	}
+
+	if (left >= 1 && selector == WFA_KEY_DATA_RSN_OVERRIDE_LINK) {
+		link_id = p[0];
+		if (link_id >= MAX_NUM_MLD_LINKS)
+			return 2;
+
+		ie->rsn_override_link[link_id] = p;
+		ie->rsn_override_link_len[link_id] = left;
+		ret = os_snprintf(title, sizeof(title),
+				  "RSN: Link ID %u - RSN Override Link KDE in EAPOL-Key",
+				  link_id);
+		if (!os_snprintf_error(sizeof(title), ret))
+			wpa_hexdump(MSG_DEBUG, title, pos, dlen);
+		return 0;
+	}
+
+	if (selector == RSNE_OVERRIDE_IE_VENDOR_TYPE) {
+		ie->rsne_override = pos;
+		ie->rsne_override_len = dlen;
+		wpa_hexdump(MSG_DEBUG,
+			    "RSN: RSNE Override element in EAPOL-Key",
+			    ie->rsne_override, ie->rsne_override_len);
+		return 0;
+	}
+
+	if (selector == RSNE_OVERRIDE_2_IE_VENDOR_TYPE) {
+		ie->rsne_override_2 = pos;
+		ie->rsne_override_2_len = dlen;
+		wpa_hexdump(MSG_DEBUG,
+			    "RSN: RSNE Override 2 element in EAPOL-Key",
+			    ie->rsne_override_2, ie->rsne_override_2_len);
+		return 0;
+	}
+
+	if (selector == RSNXE_OVERRIDE_IE_VENDOR_TYPE) {
+		ie->rsnxe_override = pos;
+		ie->rsnxe_override_len = dlen;
+		wpa_hexdump(MSG_DEBUG,
+			    "RSN: RSNXE Override element in EAPOL-Key",
+			    ie->rsnxe_override, ie->rsnxe_override_len);
+		return 0;
+	}
+
+	if (selector == RSN_SELECTION_IE_VENDOR_TYPE) {
+		ie->rsn_selection = p;
+		ie->rsn_selection_len = left;
+		wpa_hexdump(MSG_DEBUG,
+			    "RSN: RSN Selection element in EAPOL-Key",
+			    ie->rsn_selection, ie->rsn_selection_len);
 		return 0;
 	}
 
@@ -4260,3 +4319,24 @@ int wpa_pasn_add_extra_ies(struct wpabuf *buf, const u8 *extra_ies, size_t len)
 }
 
 #endif /* CONFIG_PASN */
+
+
+void rsn_set_snonce_cookie(u8 *snonce)
+{
+	u8 *pos;
+
+	pos = snonce + WPA_NONCE_LEN - 6;
+	WPA_PUT_BE24(pos, OUI_WFA);
+	pos += 3;
+	WPA_PUT_BE24(pos, 0x000029);
+}
+
+
+bool rsn_is_snonce_cookie(const u8 *snonce)
+{
+	const u8 *pos;
+
+	pos = snonce + WPA_NONCE_LEN - 6;
+	return WPA_GET_BE24(pos) == OUI_WFA &&
+		WPA_GET_BE24(pos + 3) == 0x000029;
+}
