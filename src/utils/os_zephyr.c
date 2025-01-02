@@ -18,6 +18,13 @@ int clock_gettime(clockid_t clock_id, struct timespec *ts);
 #include "includes.h"
 #include "os.h"
 
+#if defined(CONFIG_NOCACHE_MEMORY)
+K_HEAP_DEFINE_NOCACHE(wifi_nm_wpa_supplicant_mem_pool, CONFIG_WIFI_NM_WPA_SUPPLICANT_HEAP);
+#else
+K_HEAP_DEFINE(wifi_nm_wpa_supplicant_mem_pool, CONFIG_WIFI_NM_WPA_SUPPLICANT_HEAP);
+#endif /* CONFIG_NOCACHE_MEMORY */
+#define WORD_SIZE 4
+
 void os_sleep(os_time_t sec, os_time_t usec)
 {
 	k_sleep(K_USEC(usec + USEC_PER_SEC * sec));
@@ -220,12 +227,14 @@ void *os_memdup(const void *src, size_t len)
 
 void *os_malloc(size_t size)
 {
-	return k_malloc(size);
+	return k_heap_aligned_alloc(&wifi_nm_wpa_supplicant_mem_pool, WORD_SIZE, size, K_FOREVER);
 }
 
 void os_free(void *ptr)
 {
-	k_free(ptr);
+	if (ptr) {
+		k_heap_free(&wifi_nm_wpa_supplicant_mem_pool, ptr);
+	}
 }
 
 void *os_realloc(void *ptr, size_t newsize)
@@ -255,7 +264,7 @@ void *os_realloc(void *ptr, size_t newsize)
 
 void *os_zalloc(size_t size)
 {
-	void *p = k_malloc(size);
+	void *p = os_malloc(size);
 
 	if (p != NULL) {
 		(void)memset(p, 0, size);
