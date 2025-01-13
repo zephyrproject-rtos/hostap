@@ -1314,7 +1314,7 @@ static int hostapd_ctrl_iface_set(struct hostapd_data *hapd, char *cmd)
 			hostapd_disassoc_accept_mac(hapd);
 		} else if (os_strcasecmp(cmd, "ssid") == 0) {
 			hostapd_neighbor_sync_own_report(hapd);
-#ifdef CONFIG_WMM_AC
+#ifndef CONFIG_NO_WMM_AC
 		} else if (os_strncmp(cmd, "wme_ac_", 7) == 0 ||
 			   os_strncmp(cmd, "wmm_ac_", 7) == 0) {
 			hapd->parameter_set_count++;
