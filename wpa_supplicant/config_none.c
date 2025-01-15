@@ -32,6 +32,7 @@ struct wpa_config * wpa_config_read(const char *name, struct wpa_config *cfgp,
 		return NULL;
 	/* TODO: fill in configuration data */
 	config->dpp_config_processing = 2;
+	config->rsn_overriding = 2;
 	return config;
 }
 

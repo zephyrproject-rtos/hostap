@@ -436,6 +436,14 @@ static void rx_mgmt_beacon(struct wlantest *wt, const u8 *data, size_t len)
 		bss->rsnxe_len = 0;
 	}
 
+	if (elems.rsnxe_override) {
+		os_memcpy(bss->rsnxoe, elems.rsnxe_override + 4,
+			  elems.rsnxe_override_len - 4);
+		bss->rsnxoe_len = elems.rsnxe_override_len;
+	} else {
+		bss->rsnxoe_len = 0;
+	}
+
 	if (!bss->proberesp_seen)
 		bss_update(wt, bss, &elems, 1);
 
@@ -534,6 +542,11 @@ static void rx_mgmt_beacon(struct wlantest *wt, const u8 *data, size_t len)
 				merged.rsnxe = m_elems.rsnxe;
 				merged.rsnxe_len = m_elems.rsnxe_len;
 			}
+			if (m_elems.rsnxe_override) {
+				merged.rsnxe_override = m_elems.rsnxe_override;
+				merged.rsnxe_override_len =
+					m_elems.rsnxe_override_len;
+			}
 
 			if (merged.rsnxe) {
 				os_memcpy(m_bss->rsnxe, merged.rsnxe,
@@ -541,6 +554,16 @@ static void rx_mgmt_beacon(struct wlantest *wt, const u8 *data, size_t len)
 				m_bss->rsnxe_len = merged.rsnxe_len;
 			} else {
 				m_bss->rsnxe_len = 0;
+			}
+
+			if (merged.rsnxe_override) {
+				os_memcpy(m_bss->rsnxoe,
+					  merged.rsnxe_override + 4,
+					  merged.rsnxe_override_len - 4);
+				m_bss->rsnxoe_len =
+					merged.rsnxe_override_len - 4;
+			} else {
+				m_bss->rsnxoe_len = 0;
 			}
 
 			if (!m_bss->proberesp_seen)
@@ -702,6 +725,8 @@ static void process_ft_auth(struct wlantest *wt, struct wlantest_bss *bss,
 	struct ieee802_11_elems elems;
 	const u8 *ie;
 	size_t ie_len;
+	const u8 *rsnxe;
+	size_t rsnxe_len;
 
 	if (sta->auth_alg != WLAN_AUTH_FT ||
 	    len < IEEE80211_HDRLEN + sizeof(mgmt->u.auth))
@@ -774,6 +799,16 @@ static void process_ft_auth(struct wlantest *wt, struct wlantest_bss *bss,
 			      sta->pmk_r1_name) < 0)
 		goto out;
 	sta->pmk_r1_len = sta->pmk_r0_len;
+
+	if ((sta->rsn_selection == RSN_SELECTION_RSNE_OVERRIDE ||
+	     sta->rsn_selection == RSN_SELECTION_RSNE_OVERRIDE_2) &&
+	    bss->rsnxoe_len) {
+		rsnxe = bss->rsnxoe;
+		rsnxe_len = bss->rsnxoe_len;
+	} else {
+		rsnxe = bss->rsnxe;
+		rsnxe_len = bss->rsnxe_len;
+	}
 
 	if (!parse.fte_anonce || !parse.fte_snonce ||
 	    wpa_pmk_r1_to_ptk(sta->pmk_r1, sta->pmk_r1_len, parse.fte_snonce,
@@ -1175,6 +1210,14 @@ static void rx_mgmt_assoc_req(struct wlantest *wt, const u8 *data, size_t len)
 		add_note(wt, MSG_INFO, "Invalid IEs in Association Request "
 			 "frame from " MACSTR, MAC2STR(mgmt->sa));
 		return;
+	}
+
+	if (elems.rsn_selection) {
+		sta->rsn_selection = elems.rsn_selection[0];
+		wpa_printf(MSG_DEBUG, "RSNO: RSN Selection %u",
+			   sta->rsn_selection);
+	} else {
+		sta->rsn_selection = RSN_SELECTION_RSNE;
 	}
 
 	if (elems.rsnxe) {
@@ -2621,6 +2664,8 @@ static void rx_mgmt_action_ft_response(struct wlantest *wt,
 	struct wpa_ft_ies parse;
 	struct wpa_ptk ptk;
 	u8 ptk_name[WPA_PMK_NAME_LEN];
+	const u8 *rsnxe;
+	size_t rsnxe_len;
 
 	if (len < 24 + 2 + 2 * ETH_ALEN + 2) {
 		add_note(wt, MSG_INFO, "Too short FT Response frame from "
@@ -2680,6 +2725,17 @@ static void rx_mgmt_action_ft_response(struct wlantest *wt,
 	new_sta->pmk_r1_len = sta->pmk_r1_len;
 	os_memcpy(new_sta->pmk_r1_name, sta->pmk_r1_name,
 		  sizeof(sta->pmk_r1_name));
+
+	if ((sta->rsn_selection == RSN_SELECTION_RSNE_OVERRIDE ||
+	     sta->rsn_selection == RSN_SELECTION_RSNE_OVERRIDE_2) &&
+	    bss->rsnxoe_len) {
+		rsnxe = bss->rsnxoe;
+		rsnxe_len = bss->rsnxoe_len;
+	} else {
+		rsnxe = bss->rsnxe;
+		rsnxe_len = bss->rsnxe_len;
+	}
+
 	if (!parse.fte_anonce || !parse.fte_snonce ||
 	    wpa_pmk_r1_to_ptk(sta->pmk_r1, sta->pmk_r1_len, parse.fte_snonce,
 			      parse.fte_anonce, spa, aa,
