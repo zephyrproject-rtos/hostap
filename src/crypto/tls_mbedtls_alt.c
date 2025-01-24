@@ -59,6 +59,9 @@
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crt.h>
 
+extern int (*hostap_rng_fn)(void*, unsigned char*, size_t);
+extern void* hostap_rng_ctx;
+
 #ifdef MBEDTLS_DEBUG_C
 #define DEBUG_THRESHOLD 4
 #include <mbedtls/debug.h>
@@ -345,7 +348,7 @@ struct tls_conf *tls_conf_init(void *tls_ctx)
     tls_conf->refcnt = 1;
 
     mbedtls_ssl_config_init(&tls_conf->conf);
-    mbedtls_ssl_conf_rng(&tls_conf->conf, mbedtls_ctr_drbg_random, tls_ctx_global.ctr_drbg);
+    mbedtls_ssl_conf_rng(&tls_conf->conf, hostap_rng_fn, hostap_rng_ctx);
     mbedtls_x509_crt_init(&tls_conf->ca_cert);
     mbedtls_x509_crt_init(&tls_conf->client_cert);
     mbedtls_pk_init(&tls_conf->private_key);
@@ -383,7 +386,9 @@ struct tls_conf *tls_conf_deinit(struct tls_conf *tls_conf)
     return NULL;
 }
 
+#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
 mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void); /*(not in header)*/
+#endif
 
 __attribute_cold__ void *tls_init(const struct tls_config *conf)
 {
@@ -392,10 +397,12 @@ __attribute_cold__ void *tls_init(const struct tls_config *conf)
     if (++tls_ctx_global.refcnt > 1)
         return &tls_ctx_global;
 
+#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
     tls_ctx_global.ctr_drbg = crypto_mbedtls_ctr_drbg();
+#endif
 #ifdef MBEDTLS_SSL_SESSION_TICKETS
     mbedtls_ssl_ticket_init(&tls_ctx_global.ticket_ctx);
-    mbedtls_ssl_ticket_setup(&tls_ctx_global.ticket_ctx, mbedtls_ctr_drbg_random, tls_ctx_global.ctr_drbg,
+    mbedtls_ssl_ticket_setup(&tls_ctx_global.ticket_ctx, hostap_rng_fn, hostap_rng_ctx,
                              MBEDTLS_CIPHER_AES_256_GCM, 43200); /* ticket timeout: 12 hours */
 #endif
     /* copy struct for future use */
@@ -1608,7 +1615,7 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf, const struct tls_con
         const char *pwd = params->private_key_passwd;
 #if MBEDTLS_VERSION_NUMBER >= 0x03000000 /* mbedtls 3.0.0 */
         ret = mbedtls_pk_parse_key(&tls_conf->private_key, data, len, (const unsigned char *)pwd,
-                                   pwd ? os_strlen(pwd) : 0, mbedtls_ctr_drbg_random, tls_ctx_global.ctr_drbg);
+                                   pwd ? os_strlen(pwd) : 0, hostap_rng_fn, hostap_rng_ctx);
 #else
         ret = mbedtls_pk_parse_key(&tls_conf->private_key, data, len, (const unsigned char *)pwd,
                                    pwd ? os_strlen(pwd) : 0);
