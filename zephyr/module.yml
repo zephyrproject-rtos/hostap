@@ -1,3 +1,7 @@
 build:
   cmake-ext: True
   kconfig-ext: True
+security:
+  external-references:
+    - cpe:2.3:a:w1.fi:hostapd:2.11:*:*:*:*:*:*:*
+    - pkg:generic/hostap@hostap_2_11?vcs_url=git://w1.fi/hostap.git
