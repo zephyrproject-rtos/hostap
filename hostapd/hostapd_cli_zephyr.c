@@ -19,7 +19,6 @@
 #include "common/version.h"
 #include "common/ieee802_11_defs.h"
 #include "supp_main.h"
-#include "hapd_events.h"
 #include "ctrl_iface_zephyr.h"
 #include "hostapd_cli_zephyr.h"
 
@@ -28,9 +27,7 @@
 #define MAX_ARGS 32
 
 int hapd_sockpair[2];
-int hapd_mon_sockpair[2];
 struct wpa_ctrl *hapd_ctrl_conn = NULL;
-struct wpa_ctrl *hapd_mon_conn = NULL;
 
 static inline uint16_t supp_strlen(const char *str)
 {
@@ -247,57 +244,8 @@ int zephyr_hostapd_cli_cmd_v(const char *fmt, ...)
 	return zephyr_hostapd_ctrl_zephyr_cmd(argc, argv);
 }
 
-static void hostapd_cli_recv_pending(struct wpa_ctrl *ctrl, struct hostapd_data *hapd)
-{
-	while (wpa_ctrl_pending(ctrl) > 0) {
-		char buf[sizeof(struct conn_msg)];
-		size_t hlen = sizeof(int);
-		size_t plen = MAX_CTRL_MSG_LEN;
-
-		if (wpa_ctrl_recv(ctrl, buf, &hlen) == 0 &&
-		    hlen == sizeof(int)) {
-			plen = *((int *)buf);
-		} else {
-			wpa_printf(MSG_ERROR, "Could not read pending message header len %d.\n", hlen);
-			continue;
-		}
-
-		if (wpa_ctrl_recv(ctrl, buf + sizeof(int), &plen) == 0) {
-			struct conn_msg *msg = (struct conn_msg *)buf;
-
-			msg->msg[msg->msg_len] = '\0';
-			wpa_printf(MSG_DEBUG, "Received len: %d, msg_len:%d - %s->END\n",
-				   plen, msg->msg_len, msg->msg);
-			if (msg->msg_len >= MAX_CTRL_MSG_LEN) {
-				wpa_printf(MSG_DEBUG, "Too long message received.\n");
-				continue;
-			}
-
-			if (msg->msg_len > 0) {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_DPP
-				if (strncmp(msg->msg, "DPP", 3) == 0) {
-					hostapd_handle_dpp_event(hapd, msg->msg, msg->msg_len);
-				}
-#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_DPP */
-			}
-		} else {
-			wpa_printf(MSG_INFO, "Could not read pending message.\n");
-		}
-	}
-}
-
-static void hostapd_cli_mon_receive(int sock, void *eloop_ctx,
-				    void *sock_ctx)
-{
-	struct hostapd_data *hapd = (struct hostapd_data *)eloop_ctx;
-
-	hostapd_cli_recv_pending(hapd_mon_conn, hapd);
-}
-
 static int hostapd_cli_open_connection(struct hostapd_data *hapd)
 {
-	int ret;
-
 	if (!hapd_ctrl_conn) {
 		hapd_ctrl_conn = wpa_ctrl_open(hapd_sockpair[0]);
 		if (hapd_ctrl_conn == NULL) {
@@ -307,25 +255,7 @@ static int hostapd_cli_open_connection(struct hostapd_data *hapd)
 		}
 	}
 
-	if (!hapd_mon_conn) {
-		ret = socketpair(AF_UNIX, SOCK_STREAM, 0, hapd_mon_sockpair);
-		if (ret != 0) {
-			wpa_printf(MSG_ERROR, "Failed to open monitor connection: %s",
-				   strerror(errno));
-			goto fail;
-		}
-
-		hapd_mon_conn = wpa_ctrl_open(hapd_mon_sockpair[0]);
-		if (hapd_mon_conn) {
-			eloop_register_read_sock(hapd_mon_sockpair[0],
-						 hostapd_cli_mon_receive, hapd, NULL);
-		}
-	}
-
 	return 0;
-fail:
-	wpa_ctrl_close(hapd_ctrl_conn);
-	return -1;
 }
 
 static void hostapd_cli_close_connection(struct hostapd_data *hapd)
@@ -342,13 +272,6 @@ static void hostapd_cli_close_connection(struct hostapd_data *hapd)
 	}
 	wpa_ctrl_close(hapd_ctrl_conn);
 	hapd_ctrl_conn = NULL;
-
-	eloop_unregister_read_sock(hapd_mon_sockpair[0]);
-	wpa_ctrl_close(hapd_mon_conn);
-	hapd_mon_conn = NULL;
-
-	close(hapd_mon_sockpair[1]);
-	hapd_mon_sockpair[1] = -1;
 }
 
 int zephyr_hostapd_ctrl_init(void *ctx)
