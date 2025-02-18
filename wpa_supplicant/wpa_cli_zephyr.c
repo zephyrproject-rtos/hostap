@@ -31,7 +31,6 @@
 #define MAX_ARGS 32
 
 struct wpa_ctrl *ctrl_conn;
-struct wpa_ctrl *mon_conn;
 struct wpa_ctrl *global_ctrl_conn;
 char *ifname_prefix = NULL;
 extern struct wpa_global *global;
@@ -113,78 +112,10 @@ static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 	}
 	wpa_ctrl_close(ctrl_conn);
 	ctrl_conn = NULL;
-
-	eloop_unregister_read_sock(wpa_s->ctrl_iface->mon_sock_pair[0]);
-
-	wpa_ctrl_close(mon_conn);
-	mon_conn = NULL;
-
-	close(wpa_s->ctrl_iface->mon_sock_pair[1]);
-	wpa_s->ctrl_iface->mon_sock_pair[1] = -1;
-}
-
-static void wpa_cli_recv_pending(struct wpa_ctrl *ctrl, struct wpa_supplicant *wpa_s)
-{
-	while (wpa_ctrl_pending(ctrl) > 0) {
-		char buf[sizeof(struct conn_msg)];
-		size_t hlen = sizeof(int);
-		size_t plen = MAX_CTRL_MSG_LEN;
-
-		if (wpa_ctrl_recv(ctrl, buf, &hlen) == 0 &&
-		    hlen == sizeof(int)) {
-			plen = *((int *)buf);
-		} else {
-			wpa_printf(MSG_ERROR, "Could not read pending message header len %d.\n", hlen);
-			continue;
-		}
-
-		if (wpa_ctrl_recv(ctrl, buf + sizeof(int), &plen) == 0) {
-			struct conn_msg *msg = (struct conn_msg *)buf;
-
-			msg->msg[msg->msg_len] = '\0';
-			wpa_printf(MSG_DEBUG, "Received len: %d, msg_len:%d - %s->END\n",
-				   plen, msg->msg_len, msg->msg);
-			if (msg->msg_len >= MAX_CTRL_MSG_LEN) {
-				wpa_printf(MSG_DEBUG, "Too long message received.\n");
-				continue;
-			}
-
-			if (msg->msg_len > 0) {
-				/* Only interested in CTRL-EVENTs */
-				if (strncmp(msg->msg, "CTRL-EVENT", 10) == 0) {
-					if (strncmp(msg->msg, "CTRL-EVENT-SIGNAL-CHANGE", 24) == 0) {
-						supplicant_send_wifi_mgmt_event(wpa_s->ifname,
-									NET_EVENT_WIFI_CMD_SIGNAL_CHANGE,
-									msg->msg, msg->msg_len);
-					} else {
-						supplicant_send_wifi_mgmt_event(wpa_s->ifname,
-									NET_EVENT_WIFI_CMD_SUPPLICANT,
-									msg->msg, msg->msg_len);
-					}
-				} else if (strncmp(msg->msg, "RRM-NEIGHBOR-REP-RECEIVED", 25) == 0) {
-						supplicant_send_wifi_mgmt_event(wpa_s->ifname,
-									NET_EVENT_WIFI_CMD_NEIGHBOR_REP_RECEIVED,
-									msg->msg, msg->msg_len);
-				}
-			}
-		} else {
-			wpa_printf(MSG_INFO, "Could not read pending message.\n");
-		}
-	}
-}
-
-static void wpa_cli_mon_receive(int sock, void *eloop_ctx,
-					      void *sock_ctx)
-{
-	struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)eloop_ctx;
-
-	wpa_cli_recv_pending(mon_conn, wpa_s);
 }
 
 static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 {
-	int ret;
-
 	ctrl_conn = wpa_ctrl_open(wpa_s->ctrl_iface->sock_pair[0]);
 	if (ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to open control connection to %d",
@@ -192,24 +123,7 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 		return -1;
 	}
 
-	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, wpa_s->ctrl_iface->mon_sock_pair);
-	if (ret != 0) {
-		wpa_printf(MSG_ERROR, "Failed to open monitor connection: %s",
-			    strerror(errno));
-		goto fail;
-	}
-	mon_conn = wpa_ctrl_open(wpa_s->ctrl_iface->mon_sock_pair[0]);
-	if (mon_conn) {
-		if (wpa_ctrl_attach(ctrl_conn) == 0) {
-			eloop_register_read_sock(wpa_s->ctrl_iface->mon_sock_pair[0],
-						wpa_cli_mon_receive, wpa_s, NULL);
-		}
-	}
-
 	return 0;
-fail:
-	wpa_ctrl_close(ctrl_conn);
-	return -1;
 }
 
 static int wpa_cli_open_global_ctrl(void)
