@@ -154,7 +154,6 @@
 /* Setting ctr_drbg_init_state to 1 to allow unload_crypto to run */
 static int ctr_drbg_init_state = 1;
 int (*hostap_rng_fn)(void*, unsigned char*, size_t) = mbedtls_psa_get_random;
-void *hostap_rng_ctx = MBEDTLS_PSA_RANDOM_STATE;
 #else
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
@@ -162,7 +161,6 @@ static int ctr_drbg_init_state;
 static mbedtls_ctr_drbg_context ctr_drbg;
 static mbedtls_entropy_context entropy;
 int(*hostap_rng_fn)(void*, unsigned char*, size_t) = mbedtls_ctr_drbg_random;
-void *hostap_rng_ctx = &ctr_drbg;
 #endif
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
@@ -227,6 +225,15 @@ inline mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void)
     return ctr_drbg_init_state ? &ctr_drbg : ctr_drbg_init();
 }
 #endif
+
+void *hostap_rng_ctx(void)
+{
+#if defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
+    return MBEDTLS_PSA_RANDOM_STATE;
+#else
+    return (mbedtls_ctr_drbg_context *) crypto_mbedtls_ctr_drbg();
+#endif /* MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG */
+}
 
 /* tradeoff: slightly smaller code size here at cost of slight increase
  * in instructions and function calls at runtime versus the expanded
@@ -1213,7 +1220,7 @@ int crypto_bignum_rand(struct crypto_bignum *r, const struct crypto_bignum *m)
 
         /*assert(r != m);*/              /* r must not be same as m for mbedtls_mpi_random()*/
 #if MBEDTLS_VERSION_NUMBER >= 0x021B0000 /* mbedtls 2.27.0 */
-    return mbedtls_mpi_random((mbedtls_mpi *)r, 0, (mbedtls_mpi *)m, hostap_rng_fn, hostap_rng_ctx) ?
+    return mbedtls_mpi_random((mbedtls_mpi *)r, 0, (mbedtls_mpi *)m, hostap_rng_fn, hostap_rng_ctx()) ?
                -1 :
                0;
 #else
@@ -1441,7 +1448,7 @@ __attribute_noinline__ static int crypto_mbedtls_dh_init_public(
     mbedtls_dhm_context *ctx, u8 generator, const u8 *prime, size_t prime_len, u8 *privkey, u8 *pubkey)
 {
     if (crypto_mbedtls_dh_set_bin_pg(ctx, generator, prime, prime_len) ||
-        mbedtls_dhm_make_public(ctx, (int)prime_len, pubkey, prime_len, hostap_rng_fn, hostap_rng_ctx))
+        mbedtls_dhm_make_public(ctx, (int)prime_len, pubkey, prime_len, hostap_rng_fn, hostap_rng_ctx()))
         return -1;
 
     return mbedtls_mpi_write_binary(&ctx->MBEDTLS_PRIVATE(X), privkey, prime_len) ? -1 : 0;
@@ -1506,7 +1513,7 @@ int crypto_dh_derive_secret(u8 generator,
     int ret =
         mbedtls_dhm_read_params(&ctx, &p, p + 2 + prime_len + 5 + pubkey_len) ||
                 mbedtls_mpi_read_binary(&ctx.MBEDTLS_PRIVATE(X), privkey, privkey_len) ||
-                mbedtls_dhm_calc_secret(&ctx, secret, *len, len, hostap_rng_fn, hostap_rng_ctx) ?
+                mbedtls_dhm_calc_secret(&ctx, secret, *len, len, hostap_rng_fn, hostap_rng_ctx()) ?
             -1 :
             0;
     mbedtls_dhm_free(&ctx);
@@ -1598,7 +1605,7 @@ struct wpabuf *dh5_derive_shared(void *ctx, const struct wpabuf *peer_public, co
     if (buf == NULL)
         return NULL;
     if (mbedtls_dhm_read_public((mbedtls_dhm_context *)ctx, wpabuf_head(peer_public), wpabuf_len(peer_public)) == 0 &&
-        mbedtls_dhm_calc_secret(ctx, wpabuf_mhead(buf), olen, &olen, hostap_rng_fn, hostap_rng_ctx) == 0)
+        mbedtls_dhm_calc_secret(ctx, wpabuf_mhead(buf), olen, &olen, hostap_rng_fn, hostap_rng_ctx()) == 0)
     {
         wpabuf_put(buf, olen);
         return buf;
@@ -1748,7 +1755,7 @@ static int crypto_mbedtls_keypair_gen(int group, mbedtls_pk_context *pk)
     if (pk_info == NULL)
         return -1;
     return mbedtls_pk_setup(pk, pk_info) ||
-                   mbedtls_ecp_gen_key(grp_id, mbedtls_pk_ec(*pk), hostap_rng_fn, hostap_rng_ctx) ?
+                   mbedtls_ecp_gen_key(grp_id, mbedtls_pk_ec(*pk), hostap_rng_fn, hostap_rng_ctx()) ?
                -1 :
                0;
 }
@@ -1956,7 +1963,7 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
     if (buf == NULL)
         return NULL;
 
-    if (mbedtls_ecdh_calc_secret(&ecdh->ctx, &len, wpabuf_mhead(buf), len, hostap_rng_fn, hostap_rng_ctx) == 0)
+    if (mbedtls_ecdh_calc_secret(&ecdh->ctx, &len, wpabuf_mhead(buf), len, hostap_rng_fn, hostap_rng_ctx()) == 0)
     {
         wpabuf_put(buf, len);
         return buf;
@@ -2255,7 +2262,7 @@ int crypto_ec_point_mul(struct crypto_ec *e,
         return -1;
 
     return mbedtls_ecp_mul((mbedtls_ecp_group *)e, (mbedtls_ecp_point *)res, (const mbedtls_mpi *)b,
-                           (const mbedtls_ecp_point *)p, hostap_rng_fn, hostap_rng_ctx) ?
+                           (const mbedtls_ecp_point *)p, hostap_rng_fn, hostap_rng_ctx()) ?
                -1 :
                0;
 }
@@ -2376,7 +2383,7 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
 #if MBEDTLS_VERSION_NUMBER < 0x03000000 /* mbedtls 3.0.0 */
     if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0) == 0)
 #else
-    if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0, hostap_rng_fn, hostap_rng_ctx) == 0)
+    if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0, hostap_rng_fn, hostap_rng_ctx()) == 0)
 #endif
         return (struct crypto_ec_key *)ctx;
 
@@ -2536,7 +2543,7 @@ static struct crypto_ec_key *crypto_ec_key_set_pub_point_for_group(mbedtls_ecp_g
     {
         /* (Is private key generation necessary for callers?)
          * alt: gen key then overwrite Q
-         *   mbedtls_ecp_gen_key(grp_id, ecp_kp, hostap_rng_fn, hostap_rng_ctx) == 0
+         *   mbedtls_ecp_gen_key(grp_id, ecp_kp, hostap_rng_fn, hostap_rng_ctx()) == 0
          */
         mbedtls_ecp_keypair *ecp_kp   = mbedtls_pk_ec(*ctx);
         mbedtls_ecp_group *ecp_kp_grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
@@ -2545,7 +2552,7 @@ static struct crypto_ec_key *crypto_ec_key_set_pub_point_for_group(mbedtls_ecp_g
         if (mbedtls_ecp_group_load(ecp_kp_grp, grp_id) == 0 &&
             (pub ? mbedtls_ecp_copy(ecp_kp_Q, pub) == 0 :
                    mbedtls_ecp_point_read_binary(ecp_kp_grp, ecp_kp_Q, buf, len) == 0) &&
-            mbedtls_ecp_gen_privkey(ecp_kp_grp, ecp_kp_d, hostap_rng_fn, hostap_rng_ctx) == 0)
+            mbedtls_ecp_gen_privkey(ecp_kp_grp, ecp_kp_d, hostap_rng_fn, hostap_rng_ctx()) == 0)
         {
             return (struct crypto_ec_key *)ctx;
         }
@@ -2815,7 +2822,7 @@ struct wpabuf *crypto_ec_key_sign(struct crypto_ec_key *key, const u8 *data, siz
 #if MBEDTLS_VERSION_NUMBER >= 0x03000000 /* mbedtls 3.0.0 */
                         sig_len,
 #endif
-                        &sig_len, hostap_rng_fn, hostap_rng_ctx) == 0)
+                        &sig_len, hostap_rng_fn, hostap_rng_ctx()) == 0)
     {
         wpabuf_put(buf, sig_len);
         return buf;
@@ -2838,7 +2845,7 @@ struct wpabuf *crypto_ec_key_sign_r_s(struct crypto_ec_key *key, const u8 *data,
 #if MBEDTLS_VERSION_NUMBER >= 0x03000000 /* mbedtls 3.0.0 */
                                       sig_len,
 #endif
-                                      &sig_len, hostap_rng_fn, hostap_rng_ctx))
+                                      &sig_len, hostap_rng_fn, hostap_rng_ctx()))
     {
         return NULL;
     }
@@ -3204,7 +3211,7 @@ struct wpabuf *crypto_csr_sign(struct crypto_csr *csr, struct crypto_ec_key *key
     mbedtls_x509write_csr_set_md_alg((mbedtls_x509write_csr *)csr, sig_md);
 
     unsigned char buf[4096]; /* XXX: large enough?  too large? */
-    int len = mbedtls_x509write_csr_der((mbedtls_x509write_csr *)csr, buf, sizeof(buf), hostap_rng_fn, hostap_rng_ctx);
+    int len = mbedtls_x509write_csr_der((mbedtls_x509write_csr *)csr, buf, sizeof(buf), hostap_rng_fn, hostap_rng_ctx());
     if (len < 0)
         return NULL;
     /*  Note: data is written at the end of the buffer! Use the
