@@ -8,119 +8,6 @@
 
 #include "ctrl_iface_zephyr.h"
 
-
-static int wpa_supplicant_ctrl_mon_iface_attach(struct wpa_ctrl_mon **head, int sock)
-{
-	struct wpa_ctrl_mon *dst;
-
-	dst = os_zalloc(sizeof(*dst));
-	if (dst == NULL)
-		return -1;
-
-	dst->sock = sock;
-	dst->debug_level = MSG_INFO;
-	dst->next = *head;
-	*head = dst;
-	return 0;
-}
-
-
-static int wpa_supplicant_ctrl_mon_iface_detach(struct wpa_ctrl_mon **head, int sock)
-{
-	struct wpa_ctrl_mon *dst, *prev = NULL;
-
-	dst = *head;
-	while (dst) {
-		if (dst->sock == sock) {
-			if (prev == NULL) {
-				*head = dst->next;
-			} else {
-				prev->next = dst->next;
-			}
-			os_free(dst);
-			return 0;
-		}
-		prev = dst;
-		dst = dst->next;
-	}
-	return -1;
-}
-
-static void wpa_supplicant_ctrl_iface_send(struct wpa_supplicant *wpa_s,
-					   const char *ifname, int sock,
-					   struct wpa_ctrl_mon **head,
-					   int level, const char *buf,
-					   size_t len)
-{
-	struct wpa_ctrl_mon *dst, *next;
-	char levelstr[64];
-	int idx;
-	struct conn_msg msg;
-
-	dst = *head;
-	if (sock < 0 || dst == NULL)
-		return;
-
-	if (ifname)
-		os_snprintf(levelstr, sizeof(levelstr), "IFNAME=%s <%d>",
-			    ifname, level);
-	else
-		os_snprintf(levelstr, sizeof(levelstr), "<%d>", level);
-
-	idx = 0;
-	if (len > MAX_CTRL_MSG_LEN) {
-		wpa_printf(MSG_DEBUG, "CTRL_MSG too long");
-		return;
-	}
-
-	while (dst) {
-		next = dst->next;
-		if (level >= dst->debug_level) {
-			memcpy(&msg.msg, buf, len);
-			msg.msg_len = len;
-			if (send(dst->sock, &msg, len + 4, 0) < 0) {
-				wpa_printf(MSG_ERROR,
-					   "sendto(CTRL_IFACE monitor): %s",
-					   strerror(errno));
-				dst->errors++;
-			} else {
-				dst->errors = 0;
-			}
-		}
-		idx++;
-		dst = next;
-	}
-}
-
-static void wpa_supplicant_ctrl_iface_msg_cb(void *ctx, int level,
-					     enum wpa_msg_type type,
-					     const char *txt, size_t len)
-{
-	struct wpa_supplicant *wpa_s = ctx;
-
-	if (!wpa_s)
-		return;
-
-	if (type != WPA_MSG_NO_GLOBAL && wpa_s->global->ctrl_iface) {
-		struct ctrl_iface_global_priv *priv = wpa_s->global->ctrl_iface;
-
-		if (priv->ctrl_dst) {
-			wpa_supplicant_ctrl_iface_send(wpa_s, type != WPA_MSG_PER_INTERFACE ?
-							NULL : wpa_s->ifname,
-							priv->sock_pair[0],
-							 &priv->ctrl_dst, level, txt, len);
-		}
-	}
-
-	if (type == WPA_MSG_ONLY_GLOBAL || !wpa_s->ctrl_iface)
-		return;
-
-	wpa_supplicant_ctrl_iface_send(wpa_s, NULL, wpa_s->ctrl_iface->sock_pair[0],
-				       &wpa_s->ctrl_iface->ctrl_dst,
-				       level, txt, len);
-}
-
-
 static void wpa_supplicant_ctrl_iface_receive(int sock, void *eloop_ctx,
 					      void *sock_ctx)
 {
@@ -155,27 +42,8 @@ static void wpa_supplicant_ctrl_iface_receive(int sock, void *eloop_ctx,
 	while (*pos == ' ')
 		pos++;
 
-	if (os_strcmp(pos, "ATTACH") == 0) {
-		if (wpa_supplicant_ctrl_mon_iface_attach(&wpa_s->ctrl_iface->ctrl_dst,
-						    wpa_s->ctrl_iface->mon_sock_pair[1])){
-			reply_len = 1;
-		}
-		else {
-			reply_len = 2;
-		}
-	} else if (os_strcmp(pos, "DETACH") == 0) {
-		if (wpa_supplicant_ctrl_mon_iface_detach(&wpa_s->ctrl_iface->ctrl_dst,
-						    wpa_s->ctrl_iface->mon_sock_pair[1])) {
-			reply_len = 1;
-		}
-		else {
-			reply_len = 2;
-		}
-	} else {
-		reply = wpa_supplicant_ctrl_iface_process(wpa_s, pos,
-							&reply_len);
-	}
-
+	reply = wpa_supplicant_ctrl_iface_process(wpa_s, pos,
+						  &reply_len);
 	if (reply) {
 		send(sock, reply, reply_len, 0);
 	} else if (reply_len == 1) {
@@ -216,8 +84,6 @@ wpa_supplicant_ctrl_iface_init(struct wpa_supplicant *wpa_s)
 
 	eloop_register_read_sock(priv->sock_pair[1], wpa_supplicant_ctrl_iface_receive,
 				 wpa_s, priv);
-
-	wpa_msg_register_cb(wpa_supplicant_ctrl_iface_msg_cb);
 
 	return priv;
 
@@ -287,27 +153,8 @@ static void wpa_supplicant_global_ctrl_iface_receive(int sock, void *eloop_ctx,
 	while (*pos == ' ')
 		pos++;
 
-	if (os_strcmp(pos, "ATTACH") == 0) {
-		if (wpa_supplicant_ctrl_mon_iface_attach(&global->ctrl_iface->ctrl_dst,
-						    global->ctrl_iface->mon_sock_pair[1])) {
-			reply_len = 1;
-		}
-		else {
-			reply_len = 2;
-		}
-	} else if (os_strcmp(pos, "DETACH") == 0) {
-		if (wpa_supplicant_ctrl_mon_iface_detach(&global->ctrl_iface->ctrl_dst,
-						    global->ctrl_iface->mon_sock_pair[1])) {
-			reply_len = 1;
-		}
-		else {
-			reply_len = 2;
-		}
-	} else {
 	reply = wpa_supplicant_global_ctrl_iface_process(global, pos,
-							&reply_len);
-	}
-
+							 &reply_len);
 	if (reply) {
 		send(sock, reply, reply_len, 0);
 	} else if (reply_len == 1) {
