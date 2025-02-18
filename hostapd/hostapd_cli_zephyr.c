@@ -351,30 +351,6 @@ static void hostapd_cli_close_connection(struct hostapd_data *hapd)
 	hapd_mon_sockpair[1] = -1;
 }
 
-void hostapd_msg_send(void *hapd, int level,
-		      enum wpa_msg_type type,
-		      const char *buf, size_t len)
-{
-	struct conn_msg msg;
-
-	if (len > MAX_CTRL_MSG_LEN)
-	{
-		wpa_printf(MSG_ERROR, "CTRL_MSG too long");
-		return;
-	}
-
-	if (type == WPA_MSG_PER_INTERFACE && level >= MSG_INFO &&
-	    hapd_mon_sockpair[1] > 0) {
-		memcpy(&msg.msg, buf, len);
-		msg.msg_len = len;
-		if (send(hapd_mon_sockpair[1], &msg, len + 4, 0) < 0) {
-			wpa_printf(MSG_ERROR,
-				   "sendto(hostapd monitor sock): %s",
-				   strerror(errno));
-		}
-	}
-}
-
 int zephyr_hostapd_ctrl_init(void *ctx)
 {
 	int ret;

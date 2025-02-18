@@ -372,12 +372,3 @@ wpa_supplicant_global_ctrl_iface_deinit(struct ctrl_iface_global_priv *priv)
 
 	os_free(priv);
 }
-
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
-void wpa_supplicant_msg_send(void *ctx, int level,
-			     enum wpa_msg_type type,
-			     const char *txt, size_t len)
-{
-	wpa_supplicant_ctrl_iface_msg_cb(ctx, level, type, txt, len);
-}
-#endif
