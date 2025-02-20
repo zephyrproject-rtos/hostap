@@ -16,37 +16,14 @@
 #include "ctrl_iface.h"
 #include "common/wpa_ctrl.h"
 
-#define MAX_CTRL_MSG_LEN 256
-/**
- * struct wpa_ctrl_mon - Data structure of control interface monitors
- *
- * This structure is used to store information about registered control
- * interface monitors into struct wpa_supplicant.
- */
-struct wpa_ctrl_mon {
-	struct wpa_ctrl_mon *next;
-	int sock;
-	int debug_level;
-	int errors;
-};
-
 struct ctrl_iface_priv {
 	struct wpa_supplicant *wpa_s;
-	/* 0 - wpa_cli, 1 - ctrl_iface */
+	/* wpa_cli command socket pair */
 	int sock_pair[2];
-	int mon_sock_pair[2];
-	struct wpa_ctrl_mon *ctrl_dst;
 };
 
 struct ctrl_iface_global_priv {
 	struct wpa_global *global;
-	/* 0 - wpa_cli, 1 - ctrl_iface */
+	/* wpa_cli command socket pair */
 	int sock_pair[2];
-	int mon_sock_pair[2];
-	struct wpa_ctrl_mon *ctrl_dst;
-};
-
-struct conn_msg {
-	int msg_len;
-	char msg[MAX_CTRL_MSG_LEN];
 };

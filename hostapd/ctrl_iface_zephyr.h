@@ -20,9 +20,4 @@
 
 #define MAX_CTRL_MSG_LEN 1024
 
-struct conn_msg {
-	int msg_len;
-	char msg[MAX_CTRL_MSG_LEN];
-};
-
 void hostapd_ctrl_iface_receive(int sock, void *eloop_ctx, void *sock_ctx);
