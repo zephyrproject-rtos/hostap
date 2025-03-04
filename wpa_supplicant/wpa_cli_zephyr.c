@@ -30,8 +30,6 @@
 #define DEFAULT_IFNAME "wlan0"
 #define MAX_ARGS 32
 
-struct wpa_ctrl *ctrl_conn;
-struct wpa_ctrl *mon_conn;
 struct wpa_ctrl *global_ctrl_conn;
 char *ifname_prefix = NULL;
 extern struct wpa_global *global;
@@ -47,7 +45,7 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 	size_t len;
 	int ret;
 
-	if (ctrl_conn == NULL && global_ctrl_conn == NULL) {
+	if (ctrl == NULL && global_ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Not connected to wpa_supplicant - command dropped.");
 		return -1;
 	}
@@ -94,30 +92,30 @@ static int wpa_ctrl_command_resp(struct wpa_ctrl *ctrl, const char *cmd, char *r
 	return _wpa_ctrl_command(ctrl, cmd, 0, resp);
 }
 
-int zephyr_wpa_cli_cmd_resp(const char *cmd, char *resp)
+int zephyr_wpa_cli_cmd_resp(struct wpa_ctrl *ctrl, const char *cmd, char *resp)
 {
-	return _wpa_ctrl_command(ctrl_conn, cmd, 1, resp);
+	return _wpa_ctrl_command(ctrl, cmd, 1, resp);
 }
 
 static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 {
 	int ret;
 
-	if (ctrl_conn == NULL)
+	if (wpa_s->ctrl_conn == NULL)
 		return;
 
-	ret = wpa_ctrl_detach(ctrl_conn);
+	ret = wpa_ctrl_detach(wpa_s->ctrl_conn);
 	if (ret < 0) {
 		wpa_printf(MSG_INFO, "Failed to detach from wpa_supplicant: %s",
 			strerror(errno));
 	}
-	wpa_ctrl_close(ctrl_conn);
-	ctrl_conn = NULL;
+	wpa_ctrl_close(wpa_s->ctrl_conn);
+	wpa_s->ctrl_conn = NULL;
 
 	eloop_unregister_read_sock(wpa_s->ctrl_iface->mon_sock_pair[0]);
 
-	wpa_ctrl_close(mon_conn);
-	mon_conn = NULL;
+	wpa_ctrl_close(wpa_s->mon_conn);
+	wpa_s->mon_conn = NULL;
 
 	close(wpa_s->ctrl_iface->mon_sock_pair[1]);
 	wpa_s->ctrl_iface->mon_sock_pair[1] = -1;
@@ -178,15 +176,15 @@ static void wpa_cli_mon_receive(int sock, void *eloop_ctx,
 {
 	struct wpa_supplicant *wpa_s = (struct wpa_supplicant *)eloop_ctx;
 
-	wpa_cli_recv_pending(mon_conn, wpa_s);
+	wpa_cli_recv_pending(wpa_s->mon_conn, wpa_s);
 }
 
 static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 {
 	int ret;
 
-	ctrl_conn = wpa_ctrl_open(wpa_s->ctrl_iface->sock_pair[0]);
-	if (ctrl_conn == NULL) {
+	wpa_s->ctrl_conn = wpa_ctrl_open(wpa_s->ctrl_iface->sock_pair[0]);
+	if (wpa_s->ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to open control connection to %d",
 			wpa_s->ctrl_iface->sock_pair[0]);
 		return -1;
@@ -198,9 +196,9 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 			    strerror(errno));
 		goto fail;
 	}
-	mon_conn = wpa_ctrl_open(wpa_s->ctrl_iface->mon_sock_pair[0]);
-	if (mon_conn) {
-		if (wpa_ctrl_attach(ctrl_conn) == 0) {
+	wpa_s->mon_conn = wpa_ctrl_open(wpa_s->ctrl_iface->mon_sock_pair[0]);
+	if (wpa_s->mon_conn) {
+		if (wpa_ctrl_attach(wpa_s->ctrl_conn) == 0) {
 			eloop_register_read_sock(wpa_s->ctrl_iface->mon_sock_pair[0],
 						wpa_cli_mon_receive, wpa_s, NULL);
 		}
@@ -208,7 +206,8 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 
 	return 0;
 fail:
-	wpa_ctrl_close(ctrl_conn);
+	wpa_ctrl_close(wpa_s->ctrl_conn);
+	wpa_s->ctrl_conn = NULL;
 	return -1;
 }
 
@@ -411,12 +410,12 @@ void zephyr_wpa_ctrl_deinit(void *wpa_s)
 	wpa_cli_close_connection((struct wpa_supplicant *)wpa_s);
 }
 
-int zephyr_wpa_ctrl_zephyr_cmd(int argc, const char *argv[])
+int zephyr_wpa_ctrl_zephyr_cmd(struct wpa_ctrl *ctrl, int argc, const char *argv[])
 {
-	return wpa_request(ctrl_conn, argc , (char **) argv);
+	return wpa_request(ctrl, argc , (char **) argv);
 }
 
-int zephyr_wpa_cli_cmd_v(const char *fmt, ...)
+int zephyr_wpa_cli_cmd_v(struct wpa_ctrl *ctrl, const char *fmt, ...)
 {
 	va_list cmd_args;
 	int argc;
@@ -433,15 +432,15 @@ int zephyr_wpa_cli_cmd_v(const char *fmt, ...)
 	for (int i = 0; i < argc; i++)
 		wpa_printf(MSG_DEBUG, "argv[%d]: %s", i, argv[i]);
 
-	return zephyr_wpa_ctrl_zephyr_cmd(argc, argv);
+	return zephyr_wpa_ctrl_zephyr_cmd(ctrl, argc, argv);
 }
 
-int z_wpa_ctrl_add_network(struct add_network_resp *resp)
+int z_wpa_ctrl_add_network(struct wpa_ctrl *ctrl, struct add_network_resp *resp)
 {
 	int ret;
 	char buf[MAX_RESPONSE_SIZE] = {0};
 
-	ret =  wpa_ctrl_command_resp(ctrl_conn, "ADD_NETWORK", buf);
+	ret =  wpa_ctrl_command_resp(ctrl, "ADD_NETWORK", buf);
 	if (ret) {
 		return ret;
 	}
@@ -456,12 +455,12 @@ int z_wpa_ctrl_add_network(struct add_network_resp *resp)
 	return 0;
 }
 
-int z_wpa_ctrl_signal_poll(struct signal_poll_resp *resp)
+int z_wpa_ctrl_signal_poll(struct wpa_ctrl *ctrl, struct signal_poll_resp *resp)
 {
 	int ret;
 	char buf[MAX_RESPONSE_SIZE] = {0};
 
-	ret = wpa_ctrl_command_resp(ctrl_conn, "SIGNAL_POLL", buf);
+	ret = wpa_ctrl_command_resp(ctrl, "SIGNAL_POLL", buf);
 	if (ret) {
 		return ret;
 	}
@@ -476,12 +475,12 @@ int z_wpa_ctrl_signal_poll(struct signal_poll_resp *resp)
 	return 0;
 }
 
-int z_wpa_ctrl_status(struct status_resp *resp)
+int z_wpa_ctrl_status(struct wpa_ctrl *ctrl, struct status_resp *resp)
 {
 	int ret;
 	char buf[MAX_RESPONSE_SIZE] = {0};
 
-	ret = wpa_ctrl_command_resp(ctrl_conn, "STATUS", buf);
+	ret = wpa_ctrl_command_resp(ctrl, "STATUS", buf);
 	if (ret) {
 		return ret;
 	}
