@@ -94,7 +94,7 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	// FIXME: sll_addr is not being filled as L2 header is not removed
 	hdr = (const struct ieee802_1x_hdr *) buf;
 
-	if (ll.sll_protocol != ETH_P_EAPOL) {
+	if (ntohs(ll.sll_protocol) != ETH_P_EAPOL) {
 		return;
 	}
 
