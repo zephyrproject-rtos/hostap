@@ -138,6 +138,10 @@
 #define CRYPTO_MBEDTLS_CRYPTO_PKCS7
 #endif /* crypto_pkcs7_*() */
 
+#if defined(CONFIG_DPP3) /* CONFIG_DPP3=y */
+#define CRYPTO_MBEDTLS_CRYPTO_HPKE
+#endif
+
 #if defined(EAP_SIM) || defined(EAP_SIM_DYNAMIC) || defined(EAP_SERVER_SIM) || defined(EAP_AKA) || \
     defined(EAP_AKA_DYNAMIC) || defined(EAP_SERVER_AKA) || defined(CONFIG_AP) || defined(HOSTAPD)
 /* CONFIG_EAP_SIM=y CONFIG_EAP_AKA=y CONFIG_AP=y HOSTAPD */
@@ -3228,5 +3232,38 @@ struct wpabuf *crypto_pkcs7_get_certificates(const struct wpabuf *pkcs7)
     return NULL;
 }
 #endif /* CRYPTO_MBEDTLS_CRYPTO_PKCS7 */
+
+#ifdef CRYPTO_MBEDTLS_CRYPTO_HPKE
+
+struct wpabuf *hpke_base_seal(enum hpke_kem_id kem_id,
+                              enum hpke_kdf_id kdf_id,
+                              enum hpke_aead_id aead_id,
+                              struct crypto_ec_key *peer_pub,
+                              const u8 *info,
+                              size_t info_len,
+                              const u8 *aad,
+                              size_t aad_len,
+                              const u8 *pt,
+                              size_t pt_len)
+{
+    /* not yet implemented */
+    return NULL;
+}
+
+struct wpabuf *hpke_base_open(enum hpke_kem_id kem_id,
+                              enum hpke_kdf_id kdf_id,
+                              enum hpke_aead_id aead_id,
+                              struct crypto_ec_key *own_priv,
+                              const u8 *info,
+                              size_t info_len,
+                              const u8 *aad,
+                              size_t aad_len,
+                              const u8 *enc_ct,
+                              size_t enc_ct_len)
+{
+    /* not yet implemented */
+    return NULL;
+}
+#endif
 
 #endif
