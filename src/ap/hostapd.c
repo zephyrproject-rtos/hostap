@@ -2697,9 +2697,11 @@ dfs_offload:
 		hostapd_neighbor_set_own_report(iface->bss[j]);
 
 #ifdef __ZEPHYR__
-	hostapd_send_wifi_mgmt_ap_status(iface,
-					 NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
-					 WIFI_STATUS_AP_SUCCESS);
+	if (IS_ENABLED(CONFIG_WIFI_NM_HOSTAPD_AP)) {
+		hostapd_send_wifi_mgmt_ap_status(iface,
+						NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+						WIFI_STATUS_AP_SUCCESS);
+	}
 #endif /* __ZEPHYR__ */
 	if (iface->interfaces && iface->interfaces->count > 1)
 		ieee802_11_set_beacons(iface);
