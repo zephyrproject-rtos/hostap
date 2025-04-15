@@ -2238,6 +2238,13 @@ struct wpabuf *tls_connection_handshake(void *tls_ctx,
                                             tls_mbedtls_ssl_ticket_parse, conn);
 #endif
 
+#ifdef MBEDTLS_X509_CRT_PARSE_C
+    /* This is insecure, but backwards as conf doesn't have hostname and
+     * for backwards compatible with MbedTLS version 3.6.3, disable
+     * hostname check. */
+    mbedtls_ssl_set_hostname(&conn->ssl, NULL);
+#endif
+
 #if MBEDTLS_VERSION_NUMBER >= 0x03020000 /* mbedtls 3.2.0 */
     int ret = mbedtls_ssl_handshake(&conn->ssl);
 #else
