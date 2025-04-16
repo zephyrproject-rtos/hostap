@@ -489,7 +489,7 @@ static int wpa_ctrl_command_sta(struct wpa_ctrl *ctrl, const char *cmd,
 	size_t len;
 	int ret;
 
-	if (ctrl_conn == NULL) {
+	if (ctrl == NULL) {
 		wpa_printf(MSG_INFO, "Not connected to hostapd - command dropped.\n");
 		return -1;
 	}
@@ -2122,7 +2122,7 @@ static int wpa_ctrl_command_p2p_peer(struct wpa_ctrl *ctrl, const char *cmd,
 	size_t len;
 	int ret;
 
-	if (ctrl_conn == NULL)
+	if (ctrl == NULL)
 		return -1;
 	len = sizeof(buf) - 1;
 	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len,
@@ -2817,7 +2817,7 @@ static int wpa_ctrl_command_bss(struct wpa_ctrl *ctrl, const char *cmd)
 	size_t len;
 	int ret, id = -1;
 
-	if (!ctrl_conn)
+	if (ctrl == NULL)
 		return -1;
 	len = sizeof(buf) - 1;
 	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len,
