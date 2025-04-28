@@ -41,10 +41,14 @@
 #include <zephyr/net/socket.h>
 #endif
 
-#if defined(CONFIG_CTRL_IFACE_UNIX) || defined(CONFIG_CTRL_IFACE_UDP) || defined(CONFIG_CTRL_IFACE_ZEPHYR)
+#if defined(CONFIG_CTRL_IFACE_UNIX) || defined(CONFIG_CTRL_IFACE_UDP)
 #define CTRL_IFACE_SOCKET
 #endif /* CONFIG_CTRL_IFACE_UNIX || CONFIG_CTRL_IFACE_UDP */
 
+#if defined(CONFIG_CTRL_IFACE_ZEPHYR)
+#include "ctrl_iface_zephyr.h"
+#define CTRL_IFACE_FIFO
+#endif /* CONFIG_CTRL_IFACE_ZEPHYR */
 
 /**
  * struct wpa_ctrl - Internal structure for control interface library
@@ -79,6 +83,9 @@ struct wpa_ctrl {
 #endif /* CONFIG_CTRL_IFACE_NAMED_PIPE */
 #ifdef CONFIG_CTRL_IFACE_ZEPHYR
 	int s;
+	int r; /* socket used to trigger reading */
+	struct k_fifo *fifo_read;
+	struct k_fifo *fifo_send;
 #endif /* CONFIG_CTRL_IFACE_ZEPHYR */
 };
 
@@ -597,13 +604,125 @@ retry_send:
 }
 #endif /* CTRL_IFACE_SOCKET */
 
+#ifdef CTRL_IFACE_FIFO
+int wpa_ctrl_request(struct wpa_ctrl *ctrl, const char *cmd, size_t cmd_len,
+		     char *reply, size_t *reply_len,
+		     void (*msg_cb)(char *msg, size_t len))
+{
+	struct timeval tv;
+	struct os_reltime started_at, ending_at;
+	int res, max_reply_len = *reply_len;
+	fd_set rfds;
+
+	errno = 0;
+	started_at.sec = 0;
+	started_at.usec = 0;
+retry_send:
+	if (send_data(ctrl->fifo_send, ctrl->s, cmd, cmd_len, 0) < 0) {
+		if (errno == EAGAIN || errno == EBUSY || errno == EWOULDBLOCK)
+		{
+			/*
+			 * Must be a non-blocking socket... Try for a bit
+			 * longer before giving up.
+			 */
+			if (started_at.sec == 0)
+				os_get_reltime(&started_at);
+			else {
+				struct os_reltime n;
+				os_get_reltime(&n);
+				/* Try for a few seconds. */
+				if (os_reltime_expired(&n, &started_at, 5))
+					goto send_err;
+			}
+			os_sleep(1, 0);
+			goto retry_send;
+		}
+	send_err:
+		return -1;
+	}
+
+	os_get_reltime(&ending_at);
+	ending_at.sec += CONFIG_WIFI_NM_WPA_CTRL_RESP_TIMEOUT_S;
+
+	for (;;) {
+		struct os_reltime diff;
+
+		os_get_reltime(&started_at);
+		if (os_reltime_before(&ending_at, &started_at))
+			return -2;
+		os_reltime_sub(&ending_at, &started_at, &diff);
+		tv.tv_sec = diff.sec;
+		tv.tv_usec = diff.usec;
+
+		FD_ZERO(&rfds);
+		FD_SET(ctrl->r, &rfds);
+		res = select(ctrl->r + 1, &rfds, NULL, NULL, &tv);
+		if (res < 0 && errno == EINTR)
+			continue;
+		if (res < 0)
+			return res;
+		if (FD_ISSET(ctrl->r, &rfds)) {
+			struct zephyr_msg *msg;
+			zvfs_eventfd_t value;
+
+			zvfs_eventfd_read(ctrl->r, &value);
+
+			msg = k_fifo_get(ctrl->fifo_read, K_NO_WAIT);
+			if (msg == NULL) {
+				wpa_printf(MSG_ERROR, "fifo(ctrl_iface): %s",
+					   "empty");
+				continue;
+			}
+
+			if (msg->data == NULL) {
+				wpa_printf(MSG_ERROR, "fifo(ctrl_iface): %s",
+					   "no data");
+				os_free(msg);
+				return -2;
+			}
+
+			res = MIN(msg->len, max_reply_len);
+			memcpy(reply, msg->data, res);
+
+			os_free(msg->data);
+			os_free(msg);
+
+			if ((res > 0 && reply[0] == '<') ||
+			    (res > 6 && strncmp(reply, "IFNAME=", 7) == 0)) {
+				/* This is an unsolicited message from
+				 * wpa_supplicant, not the reply to the
+				 * request. Use msg_cb to report this to the
+				 * caller. */
+				if (msg_cb) {
+					/* Make sure the message is nul
+					 * terminated. */
+					if ((size_t) res == *reply_len)
+						res = (*reply_len) - 1;
+					reply[res] = '\0';
+					msg_cb(reply, res);
+				}
+				continue;
+			}
+			*reply_len = res;
+			break;
+		} else {
+			return -2;
+		}
+	}
+	return 0;
+}
+#endif /* CTRL_IFACE_FIFO */
+
 #ifdef CONFIG_CTRL_IFACE_ZEPHYR
-struct wpa_ctrl * wpa_ctrl_open(const int sock)
+struct wpa_ctrl * wpa_ctrl_open(const int send_sock,
+				struct k_fifo *send_fifo,
+				int read_sock,
+				struct k_fifo *read_fifo)
 {
 	struct wpa_ctrl *ctrl;
 
-	if (sock < 0) {
-		wpa_printf(MSG_ERROR, "Invalid socket : %d\n", sock);
+	if (send_sock < 0 || read_sock < 0) {
+		wpa_printf(MSG_ERROR, "Invalid socket : %d / %d\n", send_sock, read_sock);
 		return NULL;
 	}
 
@@ -614,14 +733,16 @@ struct wpa_ctrl * wpa_ctrl_open(const int sock)
 	}
 
 	/* We use one of the socketpair opened in ctrl_iface_zephyr.c */
-	ctrl->s = sock;
+	ctrl->s = send_sock;
+	ctrl->r = read_sock;
+	ctrl->fifo_send = send_fifo;
+	ctrl->fifo_read = read_fifo;
 
 	return ctrl;
 }
 
 void wpa_ctrl_close(struct wpa_ctrl *ctrl)
 {
-	close(ctrl->s);
 	os_free(ctrl);
 }
 #endif
