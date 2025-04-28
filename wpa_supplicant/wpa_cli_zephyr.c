@@ -24,9 +24,9 @@
 #include "wpa_cli_zephyr.h"
 #include "ctrl_iface_zephyr.h"
 
-#define CMD_BUF_LEN  1024
-#define MAX_CMD_SIZE 512
-#define MAX_RESPONSE_SIZE 512
+#define CMD_BUF_LEN  512
+#define MAX_CMD_SIZE CMD_BUF_LEN
+#define MAX_RESPONSE_SIZE CMD_BUF_LEN
 #define DEFAULT_IFNAME "wlan0"
 #define MAX_ARGS 32
 
@@ -58,6 +58,7 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 	}
 
 	len = sizeof(buf) - 1;
+
 	ret = wpa_ctrl_request(ctrl, cmd, os_strlen(cmd), buf, &len, wpa_cli_msg_cb);
 	if (ret == -2) {
 		wpa_printf(MSG_ERROR, "'%s' command timed out.", cmd);
@@ -69,12 +70,12 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 
 	if (resp && len > 0) {
 		os_memcpy(resp, buf, len);
+
 		if (len > 1 && resp[len - 1] == '\n') {
 			/* Remove the LF */
 			resp[len - 1] = '\0';
-		} else {
-			resp[len] = '\0';
 		}
+
 		if (strncmp(resp, "FAIL", 4) == 0)
 			return -3;
 	}
@@ -116,7 +117,10 @@ static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 
 static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 {
-	ctrl_conn = wpa_ctrl_open(wpa_s->ctrl_iface->sock_pair[0]);
+	ctrl_conn = wpa_ctrl_open(wpa_s->ctrl_iface->sock_pair[1],
+				  &wpa_s->ctrl_iface->recv_fifo,
+				  wpa_s->ctrl_iface->sock_pair[0],
+				  &wpa_s->ctrl_iface->send_fifo);
 	if (ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to open control connection to %d",
 			wpa_s->ctrl_iface->sock_pair[0]);
@@ -129,7 +133,13 @@ static int wpa_cli_open_connection(struct wpa_supplicant *wpa_s)
 static int wpa_cli_open_global_ctrl(void)
 {
 	global_ctrl_conn = wpa_ctrl_open(zephyr_get_default_supplicant_context()->
-					 ctrl_iface->sock_pair[0]);
+					 ctrl_iface->sock_pair[1],
+					 &zephyr_get_default_supplicant_context()->
+					 ctrl_iface->fifo_recv,
+					 zephyr_get_default_supplicant_context()->
+					 ctrl_iface->sock_pair[0],
+					 &zephyr_get_default_supplicant_context()->
+					 ctrl_iface->fifo_send);
 	if (global_ctrl_conn == NULL) {
 		wpa_printf(MSG_ERROR, "Failed to open global control connection to "
 			   "%d - %s",

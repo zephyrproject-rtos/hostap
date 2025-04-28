@@ -522,7 +522,8 @@ enum wpa_vendor_elem_frame {
  * This function is used to open a control interface to wpa_supplicant/hostapd
  * using a connected socketpair.
  */
-struct wpa_ctrl * wpa_ctrl_open(const int sock);
+struct wpa_ctrl * wpa_ctrl_open(const int sock, struct k_fifo *fifo_send,
+				int read_sock, struct k_fifo *fifo_recv);
 #else
 /**
  * wpa_ctrl_open - Open a control interface to wpa_supplicant/hostapd
