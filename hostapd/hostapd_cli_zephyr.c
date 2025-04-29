@@ -262,16 +262,9 @@ static int hostapd_cli_open_connection(struct hostapd_data *hapd)
 
 static void hostapd_cli_close_connection(struct hostapd_data *hapd)
 {
-	int ret;
-
 	if (hapd_ctrl_conn == NULL)
 		return;
 
-	ret = wpa_ctrl_detach(hapd_ctrl_conn);
-	if (ret < 0) {
-		wpa_printf(MSG_INFO, "Failed to detach from wpa_supplicant: %s",
-			   strerror(errno));
-	}
 	wpa_ctrl_close(hapd_ctrl_conn);
 	hapd_ctrl_conn = NULL;
 }
