@@ -13,51 +13,63 @@ void hostapd_ctrl_iface_receive(int sock, void *eloop_ctx,
 					      void *sock_ctx)
 {
 	struct hostapd_data *hapd = eloop_ctx;
-	char buf[MAX_CTRL_MSG_LEN + 1];
-	char *pos;
-	int res;
+	const char *pos;
 	char *reply = NULL;
 	int reply_len = 0;
-	const int reply_size = MAX_CTRL_MSG_LEN;
+	const int reply_size = MAX_CTRL_MSG_LEN / 2;
+	zvfs_eventfd_t value;
+	struct zephyr_msg *msg;
 
-	res = recv(sock, buf, MAX_CTRL_MSG_LEN, 0);
-	if (res < 0) {
-		wpa_printf(MSG_ERROR, "recvfrom(ctrl_iface): %s",
-			   strerror(errno));
-		return;
-	}
+	do {
+		zvfs_eventfd_read(sock, &value);
 
-	if (!res) {
-		eloop_unregister_sock(sock, EVENT_TYPE_READ);
-		wpa_printf(MSG_DEBUG, "ctrl_iface: Peer unexpectedly shut down "
-			   "socket");
-		return;
-	}
+		msg = k_fifo_get(&hapd->recv_fifo, K_NO_WAIT);
+		if (msg == NULL) {
+			wpa_printf(MSG_ERROR, "fifo(ctrl_iface): %s",
+				   "empty");
+			return;
+		}
 
-	if ((size_t) res > MAX_CTRL_MSG_LEN) {
-		wpa_printf(MSG_ERROR, "recvform(ctrl_iface): input truncated");
-		return;
-	}
-	buf[res] = '\0';
+		if (msg->data == NULL) {
+			wpa_printf(MSG_ERROR, "fifo(global_ctrl_iface): %s",
+				   "no data");
+			goto out;
+		}
 
-	pos = buf;
-	while (*pos == ' ')
-		pos++;
+		if (msg->len > 1 && msg->data[msg->len - 1] == '\n') {
+			/* Remove the LF */
+			msg->data[msg->len - 1] = '\0';
+			msg->len--;
+		}
 
-	reply = os_malloc(reply_size);
-	if (reply == NULL) {
-		send(sock, "FAIL\n", 5, 0);
-		wpa_printf(MSG_ERROR, "hostapd cli malloc fail for reply buffer");
-		return;
-	}
+		pos = msg->data;
 
-	reply_len = hostapd_ctrl_iface_receive_process(hapd, pos, reply, reply_size, NULL, 0);
-	if (reply_len > 0) {
-		send(sock, reply, reply_len, 0);
-	} else if (reply_len == 0) {
-		send(sock, "OK\n", 3, 0);
-	} else if (reply_len < 0) {
-		send(sock, "FAIL\n", 5, 0);
-	}
-	os_free(reply);
+		while (*pos == ' ') {
+			pos++;
+		}
+
+		reply = os_malloc(reply_size);
+		if (reply == NULL) {
+			send_data(&hapd->send_fifo, hapd->send_sock, "FAIL\n", 5, 0);
+			wpa_printf(MSG_ERROR, "hostapd cli malloc fail for reply buffer");
+			goto out;
+		}
+
+		reply_len = hostapd_ctrl_iface_receive_process(hapd, (char *)pos, reply,
+							       reply_size, NULL, 0);
+		if (reply_len > 0) {
+			send_data(&hapd->send_fifo, hapd->send_sock, reply, reply_len, 0);
+		} else if (reply_len == 0) {
+			send_data(&hapd->send_fifo, hapd->send_sock, "OK\n", 3, 0);
+		} else if (reply_len < 0) {
+			send_data(&hapd->send_fifo, hapd->send_sock, "FAIL\n", 5, 0);
+		}
+
+		os_free(reply);
+
+	out:
+		os_free(msg->data);
+		os_free(msg);
+
+	} while (!k_fifo_is_empty(&hapd->recv_fifo));
 }

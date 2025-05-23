@@ -177,6 +177,12 @@ struct hostapd_data {
 	 * this should be the first parameter
 	 */
 	int is_hostapd;
+
+	struct k_fifo send_fifo;
+	struct k_fifo recv_fifo;
+
+	int send_sock;
+	int recv_sock;
 #endif
 	struct hostapd_iface *iface;
 	struct hostapd_config *iconf;
