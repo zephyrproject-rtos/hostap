@@ -22,12 +22,13 @@
 #include "ctrl_iface_zephyr.h"
 #include "hostapd_cli_zephyr.h"
 
+#include <zephyr/zvfs/eventfd.h>
+
 #define CMD_BUF_LEN  1024
 #define MAX_CMD_SIZE 512
 #define MAX_ARGS 32
 
-int hapd_sockpair[2];
-struct wpa_ctrl *hapd_ctrl_conn = NULL;
+static struct wpa_ctrl *hapd_ctrl_conn = NULL;
 
 static inline uint16_t supp_strlen(const char *str)
 {
@@ -247,10 +248,11 @@ int zephyr_hostapd_cli_cmd_v(const char *fmt, ...)
 static int hostapd_cli_open_connection(struct hostapd_data *hapd)
 {
 	if (!hapd_ctrl_conn) {
-		hapd_ctrl_conn = wpa_ctrl_open(hapd_sockpair[0]);
+		hapd_ctrl_conn = wpa_ctrl_open(hapd->recv_sock, &hapd->recv_fifo,
+					       hapd->send_sock, &hapd->send_fifo);
 		if (hapd_ctrl_conn == NULL) {
 			wpa_printf(MSG_ERROR, "Failed to open control connection to %d",
-				   hapd_sockpair[0]);
+				   hapd->send_sock);
 			return -1;
 		}
 	}
@@ -279,23 +281,52 @@ int zephyr_hostapd_ctrl_init(void *ctx)
 	int ret;
 	struct hostapd_data *hapd = ctx;
 
-	memset(hapd_sockpair, -1, sizeof(hapd_sockpair));
-	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, hapd_sockpair);
-	if (ret != 0) {
-		wpa_printf(MSG_ERROR, "socket(PF_INET): %s", strerror(errno));
+	hapd->send_sock = hapd->recv_sock = -1;
+
+	ret = zvfs_eventfd(0, ZVFS_EFD_NONBLOCK);
+	if (ret < 0) {
+		ret = errno;
+		wpa_printf(MSG_ERROR, "eventfd: %s (%d)", strerror(ret), ret);
 		goto fail;
 	}
 
-	eloop_register_read_sock(hapd_sockpair[1], hostapd_ctrl_iface_receive,
+	hapd->send_sock = ret;
+
+	ret = zvfs_eventfd(0, ZVFS_EFD_NONBLOCK);
+	if (ret < 0) {
+		ret = errno;
+		wpa_printf(MSG_ERROR, "eventfd: %s (%d)", strerror(ret), ret);
+		goto fail;
+	}
+
+	hapd->recv_sock = ret;
+
+	k_fifo_init(&hapd->send_fifo);
+	k_fifo_init(&hapd->recv_fifo);
+
+	wpa_printf(MSG_DEBUG, "hapd ctrl_iface: %d %d", hapd->send_sock,
+		   hapd->recv_sock);
+	wpa_printf(MSG_DEBUG, "hapd ctrl_iface: %p %p", &hapd->recv_fifo,
+		   &hapd->send_fifo);
+
+	eloop_register_read_sock(hapd->recv_sock, hostapd_ctrl_iface_receive,
 				 hapd, NULL);
 
 	ret = hostapd_cli_open_connection(hapd);
 	if (ret < 0) {
-		wpa_printf(MSG_INFO, "Failed to initialize control interface: %s: %d", hapd->conf->iface, ret);
-		return ret;
+		wpa_printf(MSG_INFO, "Failed to initialize control interface: %s: %d",
+			   hapd->conf->iface, ret);
+		goto fail;
 	}
 
+	return 0;
+
 fail:
+	if (hapd->send_sock >= 0)
+		close(hapd->send_sock);
+	if (hapd->recv_sock >= 0)
+		close(hapd->recv_sock);
+
 	return ret;
 }
 

@@ -17,6 +17,7 @@
 #include "hostapd.h"
 #include "ctrl_iface.h"
 #include "common/wpa_ctrl.h"
+#include "../wpa_supplicant/ctrl_iface_zephyr.h"
 
 #define MAX_CTRL_MSG_LEN 1024
 
