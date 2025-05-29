@@ -1927,6 +1927,8 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
         }
         else if (key[0] == 0x02 || key[0] == 0x03)
         {          /* (inc_y == 0) */
+            if(len == 0)
+                return NULL;
             --len; /*(repurpose len to prime_len)*/
 
             /* mbedtls_ecp_point_read_binary() does not currently support
