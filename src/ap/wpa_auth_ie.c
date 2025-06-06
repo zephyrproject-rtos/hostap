@@ -342,7 +342,7 @@ static u8 * rsne_write_data(u8 *buf, size_t len, u8 *pos, int group,
 
 
 	if (mfp != NO_MGMT_FRAME_PROTECTION &&
-	    group_mgmt_cipher != WPA_CIPHER_AES_128_CMAC) {
+	    group_mgmt_cipher != WPA_CIPHER_NONE) {
 		if (2 + 4 > buf + len - pos)
 			return NULL;
 		if (!pmkid) {
