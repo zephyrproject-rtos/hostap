@@ -36,6 +36,7 @@ struct wpa_sm;
 struct wpa_supplicant;
 struct ibss_rsn;
 struct scan_info;
+struct wpa_ctrl;
 struct wpa_bss;
 struct wpa_scan_results;
 struct hostapd_hw_modes;
@@ -700,6 +701,9 @@ struct wpa_supplicant {
 	unsigned char own_addr[ETH_ALEN];
 	unsigned char perm_addr[ETH_ALEN];
 	char ifname[100];
+	/* wpa_ctrl for each wpa_s */
+	struct wpa_ctrl *ctrl_conn;
+	struct wpa_ctrl *mon_conn;
 #ifdef CONFIG_MATCH_IFACE
 	int matched;
 #endif /* CONFIG_MATCH_IFACE */
