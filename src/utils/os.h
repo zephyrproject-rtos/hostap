@@ -381,7 +381,6 @@ int os_strcasecmp(const char *s1, const char *s2);
  */
 int os_strncasecmp(const char *s1, const char *s2, size_t n);
 
-#define CONFIG_BSS_MAX_IDLE_TIME CONFIG_WIFI_NM_WPA_SUPPLICANT_BSS_MAX_IDLE_TIME
 #endif
 
 
