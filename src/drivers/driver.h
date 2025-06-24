@@ -1355,12 +1355,6 @@ struct wpa_driver_associate_params {
 	enum sae_pwe sae_pwe;
 
 	/**
-	 * BSS Max Idle Period - Used to set the BSS Max Idle Period IE in
-	 * the Association Request frame.
-	 */
-	unsigned short bss_max_idle_period;
-
-	/**
 	 * disable_eht - Disable EHT for this connection
 	 */
 	int disable_eht;
