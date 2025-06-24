@@ -2670,7 +2670,6 @@ mscs_fail:
 	else
 		params.uapsd = -1;
 
-	params.bss_max_idle_period = CONFIG_BSS_MAX_IDLE_TIME;
 	if (wpa_s->valid_links) {
 		unsigned int i;
 
