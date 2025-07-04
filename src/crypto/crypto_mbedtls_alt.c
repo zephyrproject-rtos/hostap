@@ -1750,6 +1750,8 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 #include <mbedtls/ecp.h>
 #include <mbedtls/pk.h>
 
+mbedtls_ecp_keypair *mbedtls_pk_ec(const mbedtls_pk_context pk);
+
 static int crypto_mbedtls_keypair_gen(int group, mbedtls_pk_context *pk)
 {
     mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
@@ -1759,7 +1761,8 @@ static int crypto_mbedtls_keypair_gen(int group, mbedtls_pk_context *pk)
     if (pk_info == NULL)
         return -1;
     return mbedtls_pk_setup(pk, pk_info) ||
-                   mbedtls_ecp_gen_key(grp_id, mbedtls_pk_ec(*pk), hostap_rng_fn, hostap_rng_ctx()) ?
+                   mbedtls_ecp_gen_key(grp_id, (mbedtls_ecp_keypair *)mbedtls_pk_ec(*pk),
+				       hostap_rng_fn, hostap_rng_ctx()) ?
                -1 :
                0;
 }
@@ -1808,7 +1811,7 @@ struct crypto_ecdh *crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
     mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
     if (grp_id == MBEDTLS_ECP_DP_NONE)
         return NULL;
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)own_key);
+    mbedtls_ecp_keypair *ecp_kp = (mbedtls_ecp_keypair *)mbedtls_pk_ec(*(mbedtls_pk_context *)own_key);
     struct crypto_ecdh *ecdh    = os_malloc(sizeof(*ecdh));
     if (ecdh == NULL)
         return NULL;
@@ -1901,7 +1904,9 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
     if (len == 0) /*(invalid peer key)*/
         return NULL;
 
+#if defined (MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED) || defined (MBEDTLS_ECP_MONTGOMERY_ENABLED)
     mbedtls_ecp_group *grp = &ecdh->grp;
+#endif
 
 #if defined(MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED)
     if (mbedtls_ecp_get_type(grp) == MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS)
@@ -2629,7 +2634,7 @@ struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
     unsigned char *p = buf + sizeof(buf) - len;
 
 #ifdef MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
+    mbedtls_ecp_keypair *ecp_kp = (mbedtls_ecp_keypair *)mbedtls_pk_ec(*(mbedtls_pk_context *)key);
     if (ecp_kp == NULL)
         return NULL;
     mbedtls_ecp_group *grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
