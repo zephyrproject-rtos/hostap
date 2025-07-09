@@ -747,34 +747,6 @@ void wpa_ctrl_close(struct wpa_ctrl *ctrl)
 }
 #endif
 
-static int wpa_ctrl_attach_helper(struct wpa_ctrl *ctrl, int attach)
-{
-	char buf[10];
-	int ret;
-	size_t len = 10;
-
-	ret = wpa_ctrl_request(ctrl, attach ? "ATTACH" : "DETACH", 6,
-			       buf, &len, NULL);
-	if (ret < 0)
-		return ret;
-	if (len == 3 && os_memcmp(buf, "OK\n", 3) == 0)
-		return 0;
-	return -1;
-}
-
-
-int wpa_ctrl_attach(struct wpa_ctrl *ctrl)
-{
-	return wpa_ctrl_attach_helper(ctrl, 1);
-}
-
-
-int wpa_ctrl_detach(struct wpa_ctrl *ctrl)
-{
-	return wpa_ctrl_attach_helper(ctrl, 0);
-}
-
-
 #ifdef CTRL_IFACE_SOCKET
 
 int wpa_ctrl_recv(struct wpa_ctrl *ctrl, char *reply, size_t *reply_len)

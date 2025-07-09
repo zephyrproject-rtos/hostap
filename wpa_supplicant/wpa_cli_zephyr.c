@@ -101,16 +101,9 @@ int zephyr_wpa_cli_cmd_resp(const char *cmd, char *resp)
 
 static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 {
-	int ret;
-
 	if (ctrl_conn == NULL)
 		return;
 
-	ret = wpa_ctrl_detach(ctrl_conn);
-	if (ret < 0) {
-		wpa_printf(MSG_INFO, "Failed to detach from wpa_supplicant: %s",
-			strerror(errno));
-	}
 	wpa_ctrl_close(ctrl_conn);
 	ctrl_conn = NULL;
 }
