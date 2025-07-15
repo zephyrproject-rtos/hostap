@@ -9,7 +9,7 @@
 #include "utils/includes.h"
 
 #include "utils/common.h"
-#include "eloop.h"
+#include "utils/eloop.h"
 #include "config.h"
 #include "eapol_supp/eapol_supp_sm.h"
 #include "wpa_supplicant_i.h"
