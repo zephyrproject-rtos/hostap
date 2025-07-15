@@ -18,7 +18,7 @@
 LOG_MODULE_REGISTER(wpa_supp, CONFIG_WIFI_NM_WPA_SUPPLICANT_LOG_LEVEL);
 
 int wpa_debug_level = MSG_INFO;
-int wpa_debug_show_keys;
+int wpa_debug_show_keys = IS_ENABLED(CONFIG_WIFI_NM_WPA_SUPPLICANT_DEBUG_SHOW_KEYS);
 int wpa_debug_timestamp;
 
 #ifndef CONFIG_NO_STDOUT_DEBUG
