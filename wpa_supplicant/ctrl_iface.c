@@ -8403,9 +8403,9 @@ static int wpa_supplicant_signal_poll(struct wpa_supplicant *wpa_s, char *buf,
 	pos = buf;
 	end = buf + buflen;
 
-	ret = os_snprintf(pos, end - pos, "RSSI=%d\nLINKSPEED=%lu\n"
+	ret = os_snprintf(pos, end - pos, "RSSI=%d\nLINKSPEED=%.1f\n"
 			  "NOISE=%d\nFREQUENCY=%u\n",
-			  si.data.signal, si.data.current_tx_rate / 1000,
+			  si.data.signal, (double)si.data.current_tx_rate / 1000,
 			  si.current_noise, si.frequency);
 	if (os_snprintf_error(end - pos, ret))
 		return -1;
