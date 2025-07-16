@@ -11,12 +11,14 @@
 #include <zephyr/net/net_core.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/net_pkt.h>
+#include <zephyr/device.h>
 
 #include "includes.h"
 #include "common.h"
 #include "eloop.h"
 #include "l2_packet.h"
 #include "common/eapol_common.h"
+#include "drivers/driver_zephyr.h"
 
 struct l2_packet_data {
 	char ifname[17];
@@ -30,6 +32,7 @@ struct l2_packet_data {
 		     * buffers */
 	int fd;
 	unsigned short protocol;
+	void *dev_priv; /* Device private data for driver operations */
 };
 
 int l2_packet_get_own_addr(struct l2_packet_data *l2, u8 *addr)
@@ -41,35 +44,63 @@ int l2_packet_get_own_addr(struct l2_packet_data *l2, u8 *addr)
 int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		   const u8 *buf, size_t len)
 {
-	int ret;
+	int ret = -1;
+	const struct device *device = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
 
 	if (l2 == NULL) {
 		return -1;
 	}
 
+	/* Get the device from the interface */
+	device = net_if_get_device(l2->iface);
+	if (!device) {
+		wpa_printf(MSG_ERROR, "l2_packet_send: Failed to get device");
+		return -1;
+	}
+
+	/* Get driver operations */
+	dev_ops = get_dev_ops(device);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "l2_packet_send: Failed to get driver ops");
+		return -1;
+	}
+
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT
+	/* Try to use driver operation for high-priority transmission */
+	if (dev_ops && dev_ops->send_l2_packet) {
+		ret = dev_ops->send_l2_packet(l2->dev_priv, dst_addr, proto, buf, len);
+		if (ret >= 0) {
+			wpa_printf(MSG_DEBUG, "l2_packet_send: Used high-priority driver transmission");
+			return ret;
+		}
+		wpa_printf(MSG_DEBUG, "l2_packet_send: Driver L2 transmission failed, falling back to socket");
+	}
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT */
+
+	/* Fallback to socket-based transmission */
 	if (l2->l2_hdr) {
 		ret = send(l2->fd, buf, len, 0);
 		if (ret < 0) {
-			wpa_printf(MSG_ERROR, "l2_packet_send - send: %s",
-				   strerror(errno));
+			wpa_printf(MSG_ERROR, "l2_packet_send: send failed: %d", ret);
 		}
 	} else {
 		struct sockaddr_ll ll;
 
-		os_memset(&ll, 0, sizeof(ll));
+		memset(&ll, 0, sizeof(ll));
 		ll.sll_family = AF_PACKET;
-		ll.sll_ifindex = l2->ifindex;
 		ll.sll_protocol = htons(proto);
+		ll.sll_ifindex = l2->ifindex;
 		ll.sll_halen = ETH_ALEN;
-		os_memcpy(ll.sll_addr, dst_addr, ETH_ALEN);
-		// TODO: This takes up too much stack, call wifi driver TX directly?
+		memcpy(ll.sll_addr, dst_addr, ETH_ALEN);
+
 		ret = sendto(l2->fd, buf, len, 0, (struct sockaddr *) &ll,
 			     sizeof(ll));
 		if (ret < 0) {
-			wpa_printf(MSG_ERROR, "l2_packet_send - sendto: %s",
-				   strerror(errno));
+			wpa_printf(MSG_ERROR, "l2_packet_send: sendto failed: %d", ret);
 		}
 	}
+
 	return ret;
 }
 
@@ -114,6 +145,8 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	int ret = 0;
 	struct net_linkaddr *link_addr = NULL;
 	struct net_if *iface;
+	const struct device *device = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
 
 	iface = net_if_get_by_index(net_if_get_by_name(ifname));
 	if (!iface) {
@@ -142,6 +175,21 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 
 	link_addr = &iface->if_dev->link_addr;
 	os_memcpy(l2->own_addr, link_addr->addr, link_addr->len);
+
+	/* Get device and driver operations for high-priority transmission */
+	device = net_if_get_device(l2->iface);
+	if (device) {
+		dev_ops = get_dev_ops(device);
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT
+		if (dev_ops && dev_ops->send_l2_packet) {
+			/* Get device private data from the interface context */
+			struct nrf_wifi_vif_ctx_zep *vif_ctx_zep = device->data;
+			if (vif_ctx_zep) {
+				l2->dev_priv = vif_ctx_zep;
+			}
+		}
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT */
+	}
 
 	l2->fd = socket(AF_PACKET, l2_hdr ? SOCK_RAW : SOCK_DGRAM,
 			htons(protocol));
