@@ -2925,7 +2925,7 @@ static void wnm_bss_keep_alive(void *eloop_ctx, void *sock_ctx)
 		unsigned int msec;
 		msec = wpa_s->sme.bss_max_idle_period * 1024; /* times 1000 */
 		if (msec > 100)
-			msec -= 100;
+			msec -= CONFIG_KEEP_ALIVE_EARLY_MS;
 		eloop_register_timeout(msec / 1000, msec % 1000 * 1000,
 				       wnm_bss_keep_alive, wpa_s, NULL);
 	}
@@ -2960,7 +2960,7 @@ static void wnm_process_assoc_resp(struct wpa_supplicant *wpa_s,
 			 /* msec times 1000 */
 			msec = wpa_s->sme.bss_max_idle_period * 1024;
 			if (msec > 100)
-				msec -= 100;
+				msec -= CONFIG_KEEP_ALIVE_EARLY_MS;
 			eloop_register_timeout(msec / 1000, msec % 1000 * 1000,
 					       wnm_bss_keep_alive, wpa_s,
 					       NULL);

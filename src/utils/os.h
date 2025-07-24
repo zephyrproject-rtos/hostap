@@ -381,6 +381,7 @@ int os_strcasecmp(const char *s1, const char *s2);
  */
 int os_strncasecmp(const char *s1, const char *s2, size_t n);
 
+#define CONFIG_KEEP_ALIVE_EARLY_MS CONFIG_WIFI_NM_WPA_SUPPLICANT_KEEP_ALIVE_EARLY_MS
 #endif
 
 
