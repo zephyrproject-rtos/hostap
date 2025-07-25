@@ -2458,6 +2458,9 @@ struct wpa_driver_capa {
 	unsigned int mbssid_max_interfaces;
 	/* Maximum profile periodicity for enhanced MBSSID advertisement */
 	unsigned int ema_max_periodicity;
+
+	/* Driver TX processing delay in microseconds, used for TX delay compensation */
+	unsigned int driver_tx_processing_delay_ms;
 };
 
 
