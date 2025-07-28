@@ -2519,6 +2519,7 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	struct zep_drv_if_ctx *if_ctx = priv;
 	struct hostapd_data *hapd     = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
 	int ret                       = -1;
 
 	/* TODO: Unused for now, but might need for rekeying */
@@ -2532,6 +2533,19 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 
 	wpa_printf(MSG_DEBUG, "hostapd: Send EAPOL frame (encrypt=%d)", encrypt);
 
+	/* Try to use driver operation for high-priority transmission */
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT
+	if (dev_ops && dev_ops->send_l2_packet) {
+		ret = dev_ops->send_l2_packet(if_ctx->dev_priv, addr, ETH_P_EAPOL, data, data_len);
+		if (ret >= 0) {
+			return ret;
+		}
+		wpa_printf(MSG_DEBUG, "Driver L2 transmission failed, falling back to socket");
+	}
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT */
+
+	/* Fallback to socket-based transmission */
 	ret = l2_packet_send(hapd->l2, addr, ETH_P_EAPOL, data, data_len);
 	if (ret < 0) {
 		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
@@ -2539,7 +2553,7 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 	}
 #else
 	struct zep_drv_if_ctx *if_ctx = priv;
-	const struct zep_wpa_supp_dev_ops *dev_ops;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
 	int ret = -1;
 	struct wpa_supplicant *wpa_s = NULL;
 
@@ -2549,10 +2563,22 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 	(void)encrypt;
 
 	wpa_s = if_ctx->supp_if_ctx;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 
 	wpa_printf(MSG_DEBUG, "wpa_supp: Send EAPOL frame (encrypt=%d)", encrypt);
 
+	/* Try to use driver operation for high-priority transmission */
+	if (dev_ops && dev_ops->send_l2_packet) {
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT
+		ret = dev_ops->send_l2_packet(if_ctx->dev_priv, addr, ETH_P_EAPOL, data, data_len);
+		if (ret >= 0) {
+			return ret;
+		}
+		wpa_printf(MSG_DEBUG, "Driver L2 transmission failed, falling back to socket");
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_L2_PKT_DIRECT */
+	}
+
+	/* Fallback to socket-based transmission */
 	ret = l2_packet_send(wpa_s->l2, addr, ETH_P_EAPOL, data, data_len);
 	if (ret < 0) {
 		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
