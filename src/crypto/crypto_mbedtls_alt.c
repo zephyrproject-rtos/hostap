@@ -810,26 +810,10 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int ite
                            os_strlen(passphrase), ssid, ssid_len,
                            iterations, 32, buf) ? -1: 0;
 #else
-#if MBEDTLS_VERSION_NUMBER >= 0x03020200 /* mbedtls 3.2.2 */
     return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA1, (const u8 *)passphrase, os_strlen(passphrase), ssid, ssid_len,
                                          iterations, 32, buf) ?
                -1 :
                0;
-#else
-    const mbedtls_md_info_t *md_info;
-    md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
-    if (md_info == NULL)
-        return -1;
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    int ret = mbedtls_md_setup(&ctx, md_info, 1) ||
-                      mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const u8 *)passphrase, os_strlen(passphrase), ssid, ssid_len,
-                                                iterations, 32, buf) ?
-                  -1 :
-                  0;
-    mbedtls_md_free(&ctx);
-    return ret;
-#endif
 #endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 }
 #endif
@@ -1223,15 +1207,9 @@ int crypto_bignum_rand(struct crypto_bignum *r, const struct crypto_bignum *m)
         return -1;
 
         /*assert(r != m);*/              /* r must not be same as m for mbedtls_mpi_random()*/
-#if MBEDTLS_VERSION_NUMBER >= 0x021B0000 /* mbedtls 2.27.0 */
     return mbedtls_mpi_random((mbedtls_mpi *)r, 0, (mbedtls_mpi *)m, hostap_rng_fn, hostap_rng_ctx()) ?
                -1 :
                0;
-#else
-    /* (needed by EAP_PWD, SAE, DPP) */
-    wpa_printf(MSG_ERROR, "mbedtls 2.27.0 or later required for mbedtls_mpi_random()");
-    return -1;
-#endif
 }
 
 int crypto_bignum_add(const struct crypto_bignum *a, const struct crypto_bignum *b, struct crypto_bignum *c)
@@ -1824,7 +1802,6 @@ struct crypto_ecdh *crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
         /* copy grp and Q for later use
          * (retrieving this info later is more convoluted
          *  even if mbedtls_ecdh_make_public() is considered)*/
-#if MBEDTLS_VERSION_NUMBER >= 0x03020000 /* mbedtls 3.2.0 */
         mbedtls_mpi d;
         mbedtls_mpi_init(&d);
         if (mbedtls_ecp_export(ecp_kp, &ecdh->grp, &d, &ecdh->Q) == 0)
@@ -1833,11 +1810,6 @@ struct crypto_ecdh *crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
             return ecdh;
         }
         mbedtls_mpi_free(&d);
-#else
-        if (mbedtls_ecp_group_load(&ecdh->grp, grp_id) == 0 &&
-            mbedtls_ecp_copy(&ecdh->Q, &ecp_kp->MBEDTLS_PRIVATE(Q)) == 0)
-            return ecdh;
-#endif
     }
 
     mbedtls_ecp_point_free(&ecdh->Q);
@@ -2391,11 +2363,7 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
     if (ctx == NULL)
         return NULL;
     mbedtls_pk_init(ctx);
-#if MBEDTLS_VERSION_NUMBER < 0x03000000 /* mbedtls 3.0.0 */
-    if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0) == 0)
-#else
     if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0, hostap_rng_fn, hostap_rng_ctx()) == 0)
-#endif
         return (struct crypto_ec_key *)ctx;
 
     mbedtls_pk_free(ctx);
@@ -2848,9 +2816,7 @@ struct wpabuf *crypto_ec_key_sign(struct crypto_ec_key *key, const u8 *data, siz
     if (buf == NULL)
         return NULL;
     if (mbedtls_pk_sign((mbedtls_pk_context *)key, crypto_ec_key_sign_md(len), data, len, wpabuf_mhead_u8(buf),
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000 /* mbedtls 3.0.0 */
                         sig_len,
-#endif
                         &sig_len, hostap_rng_fn, hostap_rng_ctx()) == 0)
     {
         wpabuf_put(buf, sig_len);
@@ -2871,9 +2837,7 @@ struct wpabuf *crypto_ec_key_sign_r_s(struct crypto_ec_key *key, const u8 *data,
     size_t sig_len = MBEDTLS_ECDSA_MAX_LEN;
     u8 buf[MBEDTLS_ECDSA_MAX_LEN];
     if (mbedtls_ecdsa_write_signature(ecp_kp, crypto_ec_key_sign_md(len), data, len, buf,
-#if MBEDTLS_VERSION_NUMBER >= 0x03000000 /* mbedtls 3.0.0 */
                                       sig_len,
-#endif
                                       &sig_len, hostap_rng_fn, hostap_rng_ctx()))
     {
         return NULL;
