@@ -835,6 +835,7 @@ static int phy_info_band_cfg(struct phy_info_arg *phy_info,
 		os_memset(mode, 0, sizeof(*mode));
 
 		mode->mode = NUM_HOSTAPD_MODES;
+#ifndef CONFIG_WIFI_NM_WPA_SUPPLICANT_AP
 		mode->flags = HOSTAPD_MODE_FLAG_HT_INFO_KNOWN |
 			HOSTAPD_MODE_FLAG_VHT_INFO_KNOWN;
 
@@ -848,6 +849,10 @@ static int phy_info_band_cfg(struct phy_info_arg *phy_info,
 		mode->vht_mcs_set[1] = 0xff;
 		mode->vht_mcs_set[4] = 0xff;
 		mode->vht_mcs_set[5] = 0xff;
+#else
+		/* Disable VHT info for softAP mode - only HT info known */
+		mode->flags = HOSTAPD_MODE_FLAG_HT_INFO_KNOWN;
+#endif
 
 		*(phy_info->num_modes) += 1;
 
@@ -862,8 +867,13 @@ static int phy_info_band_cfg(struct phy_info_arg *phy_info,
 			band_info->ht_cap.wpa_supp_ampdu_density,
 			&band_info->ht_cap.mcs);
 
+#ifndef CONFIG_WIFI_NM_WPA_SUPPLICANT_AP
 	phy_info_vht_capa_cfg(mode, band_info->vht_cap.wpa_supp_cap,
 			&band_info->vht_cap.vht_mcs);
+#else
+	/* Disable VHT capabilities for softAP mode */
+	phy_info_vht_capa_cfg(mode, 0, NULL);
+#endif
 
 	phy_info_he_capa_cfg(mode, &band_info->he_cap);
 
