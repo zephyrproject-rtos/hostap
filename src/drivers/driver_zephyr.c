@@ -2703,6 +2703,35 @@ out:
 	return;
 }
 
+int wpa_drv_zep_signal_monitor(void *priv, int threshold, int hysteresis)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
+	int ret	= -1;
+
+	if (priv == NULL) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (dev_ops == NULL || dev_ops->signal_monitor == NULL) {
+		wpa_printf(MSG_DEBUG, "%s: signal_monitor op not supported", __func__);
+		goto out;
+	}
+
+	ret = dev_ops->signal_monitor(if_ctx->dev_priv, threshold, hysteresis);
+	if (ret != 0) {
+		wpa_printf(MSG_ERROR, "%s: signal_monitor op failed", __func__);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.name = "zephyr",
 	.desc = "Zephyr wpa_supplicant driver",
@@ -2728,6 +2757,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
+	.signal_monitor = wpa_drv_zep_signal_monitor,
 #ifdef CONFIG_AP
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	.hapd_init = wpa_drv_zep_hapd_init,
