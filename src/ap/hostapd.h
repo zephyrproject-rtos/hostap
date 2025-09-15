@@ -724,6 +724,9 @@ struct hostapd_iface {
 	bool is_no_ir;
 
 	bool is_ch_switch_dfs; /* Channel switch from ACS to DFS */
+#ifdef CONFIG_CTRL_IFACE_ZEPHYR
+	struct wpa_ctrl *ctrl_conn;
+#endif /* CONFIG_CTRL_IFACE_ZEPHYR */
 };
 
 /* hostapd.c */
