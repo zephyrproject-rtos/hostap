@@ -1368,7 +1368,7 @@ static void wpa_drv_zep_hapd_deinit(void *priv)
 
 	if_ctx = priv;
 
-	dev_ops = (struct zep_wpa_supp_dev_ops *)if_ctx->dev_ops;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops->hapd_deinit) {
 		wpa_printf(MSG_ERROR, "%s: No op registered for hapd deinit", __func__);
 		return;
