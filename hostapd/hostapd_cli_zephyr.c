@@ -28,8 +28,6 @@
 #define MAX_CMD_SIZE 512
 #define MAX_ARGS 32
 
-static struct wpa_ctrl *hapd_ctrl_conn = NULL;
-
 static inline uint16_t supp_strlen(const char *str)
 {
 	return str == NULL ? 0U : (uint16_t)strlen(str);
@@ -163,7 +161,7 @@ static int _wpa_ctrl_command(struct wpa_ctrl *ctrl, const char *cmd, int print, 
 	size_t len;
 	int ret;
 
-	if (hapd_ctrl_conn == NULL) {
+	if (ctrl == NULL) {
 		wpa_printf(MSG_ERROR, "Not connected to hostapd - command dropped.");
 		return -1;
 	}
@@ -215,17 +213,17 @@ int hostapd_ctrl_command_interactive(struct wpa_ctrl *ctrl, const char *cmd)
 	return _wpa_ctrl_command(ctrl, cmd, 1, NULL);
 }
 
-int zephyr_hostapd_cli_cmd_resp(const char *cmd, char *resp)
+int zephyr_hostapd_cli_cmd_resp(struct wpa_ctrl *ctrl, const char *cmd, char *resp)
 {
-	return _wpa_ctrl_command(hapd_ctrl_conn, cmd, 1, resp);
+	return _wpa_ctrl_command(ctrl, cmd, 1, resp);
 }
 
-int zephyr_hostapd_ctrl_zephyr_cmd(int argc, const char *argv[])
+int zephyr_hostapd_ctrl_zephyr_cmd(struct wpa_ctrl *ctrl, int argc, const char *argv[])
 {
-	return hostapd_request(hapd_ctrl_conn, argc , (char **) argv);
+	return hostapd_request(ctrl, argc , (char **) argv);
 }
 
-int zephyr_hostapd_cli_cmd_v(const char *fmt, ...)
+int zephyr_hostapd_cli_cmd_v(struct wpa_ctrl *ctrl, const char *fmt, ...)
 {
 	va_list cmd_args;
 	int argc;
@@ -242,15 +240,20 @@ int zephyr_hostapd_cli_cmd_v(const char *fmt, ...)
 	for (int i = 0; i < argc; i++)
 		wpa_printf(MSG_DEBUG, "argv[%d]: %s", i, argv[i]);
 
-	return zephyr_hostapd_ctrl_zephyr_cmd(argc, argv);
+	return zephyr_hostapd_ctrl_zephyr_cmd(ctrl, argc, argv);
 }
 
 static int hostapd_cli_open_connection(struct hostapd_data *hapd)
 {
-	if (!hapd_ctrl_conn) {
-		hapd_ctrl_conn = wpa_ctrl_open(hapd->recv_sock, &hapd->recv_fifo,
-					       hapd->send_sock, &hapd->send_fifo);
-		if (hapd_ctrl_conn == NULL) {
+	if (!hapd || !hapd->iface) {
+		wpa_printf(MSG_ERROR, "Invalid hapd or hapd->iface pointer");
+		return -1;
+	}
+
+	if (!hapd->iface->ctrl_conn) {
+		hapd->iface->ctrl_conn = wpa_ctrl_open(hapd->recv_sock, &hapd->recv_fifo,
+						       hapd->send_sock, &hapd->send_fifo);
+		if (hapd->iface->ctrl_conn == NULL) {
 			wpa_printf(MSG_ERROR, "Failed to open control connection to %d",
 				   hapd->send_sock);
 			return -1;
@@ -264,16 +267,16 @@ static void hostapd_cli_close_connection(struct hostapd_data *hapd)
 {
 	int ret;
 
-	if (hapd_ctrl_conn == NULL)
+	if (!hapd || !hapd->iface || hapd->iface->ctrl_conn == NULL)
 		return;
 
-	ret = wpa_ctrl_detach(hapd_ctrl_conn);
+	ret = wpa_ctrl_detach(hapd->iface->ctrl_conn);
 	if (ret < 0) {
 		wpa_printf(MSG_INFO, "Failed to detach from wpa_supplicant: %s",
 			   strerror(errno));
 	}
-	wpa_ctrl_close(hapd_ctrl_conn);
-	hapd_ctrl_conn = NULL;
+	wpa_ctrl_close(hapd->iface->ctrl_conn);
+	hapd->iface->ctrl_conn = NULL;
 }
 
 int zephyr_hostapd_ctrl_init(void *ctx)
@@ -334,4 +337,3 @@ void zephyr_hostapd_ctrl_deinit(void *hapd)
 {
 	hostapd_cli_close_connection((struct hostapd_data *)hapd);
 }
-
