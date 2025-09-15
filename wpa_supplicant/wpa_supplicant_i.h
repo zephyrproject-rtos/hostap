@@ -703,7 +703,6 @@ struct wpa_supplicant {
 	char ifname[100];
 	/* wpa_ctrl for each wpa_s */
 	struct wpa_ctrl *ctrl_conn;
-	struct wpa_ctrl *mon_conn;
 #ifdef CONFIG_MATCH_IFACE
 	int matched;
 #endif /* CONFIG_MATCH_IFACE */
