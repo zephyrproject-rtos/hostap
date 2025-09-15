@@ -701,8 +701,10 @@ struct wpa_supplicant {
 	unsigned char own_addr[ETH_ALEN];
 	unsigned char perm_addr[ETH_ALEN];
 	char ifname[100];
+#ifdef CONFIG_CTRL_IFACE_ZEPHYR
 	/* wpa_ctrl for each wpa_s */
 	struct wpa_ctrl *ctrl_conn;
+#endif /* CONFIG_CTRL_IFACE_ZEPHYR */
 #ifdef CONFIG_MATCH_IFACE
 	int matched;
 #endif /* CONFIG_MATCH_IFACE */
