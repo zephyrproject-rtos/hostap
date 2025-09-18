@@ -1899,6 +1899,30 @@ out:
 	return ret;
 }
 
+static int wpa_drv_zep_signal_monitor(void *priv, int threshold, int hysteresis)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->signal_monitor) {
+		wpa_printf(MSG_ERROR, "%s: signal_monitor op not supported", __func__);
+		goto out;
+	}
+
+	ret = dev_ops->signal_monitor(if_ctx->dev_priv, threshold, hysteresis);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: signal_monitor op failed: %d", __func__, ret);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 		unsigned int wait_time,
 		const u8 *dst, const u8 *src,
@@ -2722,6 +2746,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.deauthenticate = wpa_drv_zep_deauthenticate,
 	.set_key = wpa_drv_zep_set_key,
 	.signal_poll = wpa_drv_zep_signal_poll,
+	.signal_monitor = wpa_drv_zep_signal_monitor,
 	.send_action = wpa_drv_zep_send_action,
 	.get_hw_feature_data = wpa_drv_zep_get_hw_feature_data,
 	.get_ext_capab = wpa_drv_zep_get_ext_capab,
