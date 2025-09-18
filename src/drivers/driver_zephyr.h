@@ -351,6 +351,15 @@ struct zep_wpa_supp_dev_ops {
 	int (*cancel_remain_on_channel)(void *priv);
 	int (*get_inact_sec)(void *if_priv, const u8 *addr);
 	void (*send_action_cancel_wait)(void *priv);
+
+#ifdef CONFIG_NRF70_L2_PACKET
+	/* L2 packet transmission with high priority (VO) */
+	int (*send_l2_packet)(void *if_priv, const u8 *dst_addr, u16 proto,
+			      const u8 *data, size_t data_len);
+#endif
 };
+
+/* Function to get driver operations from device */
+const struct zep_wpa_supp_dev_ops *get_dev_ops(const struct device *dev);
 
 #endif /* DRIVER_ZEPHYR_H */
