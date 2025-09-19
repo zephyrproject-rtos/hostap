@@ -351,6 +351,7 @@ struct zep_wpa_supp_dev_ops {
 	int (*cancel_remain_on_channel)(void *priv);
 	int (*get_inact_sec)(void *if_priv, const u8 *addr);
 	void (*send_action_cancel_wait)(void *priv);
+	int (*signal_monitor)(void *if_priv, int threshold, int hysteresis);
 };
 
 #endif /* DRIVER_ZEPHYR_H */
