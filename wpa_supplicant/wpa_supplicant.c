@@ -883,7 +883,7 @@ void wpa_supplicant_reset_bgscan(struct wpa_supplicant *wpa_s)
 			struct wpa_scan_results *scan_res;
 			wpa_s->bgscan_ssid = wpa_s->current_ssid;
 			scan_res = wpa_supplicant_get_scan_results(wpa_s, NULL,
-								   0);
+								   0, NULL);
 			if (scan_res) {
 				bgscan_notify_scan(wpa_s, scan_res);
 				wpa_scan_results_free(scan_res);
@@ -2975,7 +2975,7 @@ void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 		struct wpa_scan_results *scan_res;
 
 		scan_res = wpa_supplicant_get_scan_results(wpa_s, NULL, 0,
-								NULL);
+							   NULL);
 		if (scan_res == NULL) {
 			/* Back to HT20 */
 			freq->sec_channel_offset = 0;
