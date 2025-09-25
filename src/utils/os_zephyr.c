@@ -5,7 +5,8 @@
  * See README for more details.
  */
 
-#include <zephyr/posix/time.h>
+#include <time.h>
+
 #include <zephyr/posix/sys/time.h>
 
 /* The clock_gettime() would be found in <zephyr/posix/time.h> but
