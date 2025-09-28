@@ -8,12 +8,6 @@
 #include <time.h>
 
 #include <zephyr/posix/sys/time.h>
-
-/* The clock_gettime() would be found in <zephyr/posix/time.h> but
- * that will cause conflict with picolib definition.
- */
-int clock_gettime(clockid_t clock_id, struct timespec *ts);
-
 #include <zephyr/random/random.h>
 
 #include "includes.h"
