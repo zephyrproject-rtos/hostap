@@ -101,6 +101,11 @@ int zephyr_wpa_cli_cmd_resp(struct wpa_ctrl *ctrl, const char *cmd, char *resp)
 	return _wpa_ctrl_command(ctrl, cmd, 1, resp);
 }
 
+int zephyr_wpa_cli_cmd_resp_noprint(struct wpa_ctrl *ctrl, const char *cmd, char *resp)
+{
+	return _wpa_ctrl_command(ctrl, cmd, 0, resp);
+}
+
 static void wpa_cli_close_connection(struct wpa_supplicant *wpa_s)
 {
 	if (wpa_s->ctrl_conn == NULL)
