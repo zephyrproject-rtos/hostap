@@ -6,8 +6,8 @@
  */
 
 #include <time.h>
+#include <sys/time.h>
 
-#include <zephyr/posix/sys/time.h>
 #include <zephyr/random/random.h>
 
 #include "includes.h"

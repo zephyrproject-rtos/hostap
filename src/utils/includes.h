@@ -47,16 +47,16 @@
 
 #if defined(__ZEPHYR__)
 #include <strings.h>
-#if defined(CONFIG_POSIX_API)
-#include <zephyr/posix/arpa/inet.h>
-#include <zephyr/posix/sys/select.h>
-#include <zephyr/posix/sys/socket.h>
-#include <zephyr/posix/unistd.h>
-#else /* defined(CONFIG_POSIX_API) */
+#if defined(CONFIG_POSIX_SYSTEM_INTERFACES)
+#include <arpa/inet.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#else /* defined(CONFIG_POSIX_SYSTEM_INTERFACES) */
 #include <zephyr/net/socket.h>
 #include <zephyr/net/socket_select.h>
 #include <zephyr/net/net_ip.h>
-#endif /* defined(CONFIG_POSIX_API) */
+#endif /* defined(CONFIG_POSIX_SYSTEM_INTERFACES) */
 #include <zephyr/shell/shell.h>
 
 #define signal(a, b) (void)(b)
