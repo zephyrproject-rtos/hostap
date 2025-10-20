@@ -1958,7 +1958,6 @@ int tls_connection_export_key(void *tls_ctx,
 #include <mbedtls/cipher.h>
 static size_t tls_mbedtls_ssl_keyblock_size(mbedtls_ssl_context *ssl)
 {
-#if !defined(MBEDTLS_USE_PSA_CRYPTO) /* XXX: (not extracted for PSA crypto) */
 #if defined(MBEDTLS_SSL_PROTO_TLS1_3)
     if (ssl->tls_version == MBEDTLS_SSL_VERSION_TLS1_3)
         return 0; /* (calculation not extracted) */
@@ -1992,7 +1991,6 @@ static size_t tls_mbedtls_ssl_keyblock_size(mbedtls_ssl_context *ssl)
         return keylen + mac_key_len + ivlen;
     }
 #endif                               /* MBEDTLS_SSL_SOME_SUITES_USE_MAC */
-#endif /* !MBEDTLS_USE_PSA_CRYPTO */ /* (not extracted for PSA crypto) */
     return 0;
 }
 
