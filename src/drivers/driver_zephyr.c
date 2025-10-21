@@ -420,10 +420,8 @@ static int wpa_drv_zep_abort_scan(void *priv,
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->scan_abort) {
-		wpa_printf(MSG_ERROR,
-			   "%s: No op registered for scan_abort",
-			   __func__);
+	if (!dev_ops || !dev_ops->scan_abort) {
+		wpa_printf(MSG_ERROR, "%s: scan_abort op not supported", __func__);
 		goto out;
 	}
 
@@ -896,12 +894,23 @@ static int wpa_drv_register_frame(struct zep_drv_if_ctx *if_ctx,
 		bool multicast)
 {
 	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = 0;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->register_frame)
-		return -1;
+	if (!dev_ops || !dev_ops->register_frame) {
+		wpa_printf(MSG_ERROR, "%s: register_frame op not supported", __func__);
+		goto out;
+	}
 
-	return dev_ops->register_frame(if_ctx->dev_priv, type, match, match_len, false);
+	ret = dev_ops->register_frame(if_ctx->dev_priv, type, match, match_len, false);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: register_frame op failed", __func__);
+		goto out;
+	}
+
+	ret = 0;
+out:
+	return ret;
 }
 
 static int wpa_drv_register_action_frame(struct zep_drv_if_ctx *if_ctx,
@@ -1107,13 +1116,8 @@ struct hostapd_hw_modes *wpa_drv_zep_get_hw_feature_data(void *priv,
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s:Failed to get dev_ops handle", __func__);
-		goto out;
-	}
-
-	if (!dev_ops->get_wiphy) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for get_wiphy", __func__);
+	if (!dev_ops || !dev_ops->get_wiphy) {
+		wpa_printf(MSG_ERROR, "%s: get_wiphy op not supported", __func__);
 		goto out;
 	}
 
@@ -1219,9 +1223,7 @@ static void *wpa_drv_zep_init(void *ctx,
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if ((!dev_ops) || (!dev_ops->init)) {
-		wpa_printf(MSG_ERROR,
-			   "%s: No op registered for init",
-			   __func__);
+		wpa_printf(MSG_ERROR, "%s: init op not supported", __func__);
 		os_free(if_ctx);
 		if_ctx = NULL;
 		goto out;
@@ -1275,8 +1277,8 @@ static void wpa_drv_zep_deinit(void *priv)
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->deinit) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for deinit", __func__);
+	if (!dev_ops || !dev_ops->deinit) {
+		wpa_printf(MSG_ERROR, "%s: deinit op not supported", __func__);
 		return;
 	}
 
@@ -1329,8 +1331,8 @@ static void *wpa_drv_zep_hapd_init(struct hostapd_data *hapd, struct wpa_init_pa
 	os_memcpy(params->own_addr, link_addr->addr, link_addr->len);
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->hapd_init) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for hapd init", __func__);
+	if (!dev_ops || !dev_ops->hapd_init) {
+		wpa_printf(MSG_ERROR, "%s: hapd_init op not supported", __func__);
 		os_free(if_ctx);
 		if_ctx = NULL;
 		goto out;
@@ -1393,8 +1395,8 @@ int wpa_drv_zep_do_acs(void *priv, struct drv_acs_params *params)
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->do_acs) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for do_acs", __func__);
+	if (!dev_ops || !dev_ops->do_acs) {
+		wpa_printf(MSG_ERROR, "%s: do_acs op not supported", __func__);
 		goto out;
 	}
 
@@ -1430,8 +1432,8 @@ static int wpa_drv_zep_scan2(void *priv, struct wpa_driver_scan_params *params)
 	}
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->scan2) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for scan2", __func__);
+	if (!dev_ops || !dev_ops->scan2) {
+		wpa_printf(MSG_ERROR, "%s: scan2 op not supported", __func__);
 		goto out;
 	}
 
@@ -1488,10 +1490,8 @@ struct wpa_scan_results *wpa_drv_zep_get_scan_results2(void *priv)
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->get_scan_results2) {
-		wpa_printf(MSG_ERROR,
-			   "%s: No op registered for scan2",
-			   __func__);
+	if (!dev_ops || !dev_ops->get_scan_results2) {
+		wpa_printf(MSG_ERROR, "%s: get_scan_results2 op not supported", __func__);
 		goto out;
 	}
 
@@ -1557,6 +1557,11 @@ static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 	}
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->deauthenticate) {
+		wpa_printf(MSG_ERROR, "%s: deauthenticate op not supported", __func__);
+		goto out;
+	}
+
 	ret = dev_ops->deauthenticate(if_ctx->dev_priv, addr, reason_code);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: deauthenticate op failed", __func__);
@@ -1597,6 +1602,10 @@ static int wpa_drv_zep_authenticate(void *priv,
 	}
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->authenticate) {
+		wpa_printf(MSG_ERROR, "%s: authenticate op not supported", __func__);
+		goto out;
+	}
 
 	os_memcpy(if_ctx->ssid, params->ssid, params->ssid_len);
 
@@ -1646,11 +1655,26 @@ static int wpa_drv_zep_associate(void *priv,
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
+
 
 	if (IS_ENABLED(CONFIG_AP) && params->mode == IEEE80211_MODE_AP) {
+		if (!dev_ops->init_ap) {
+			wpa_printf(MSG_ERROR, "%s: init_ap op not supported", __func__);
+			goto out;
+		}
+
 		ret = dev_ops->init_ap(if_ctx->dev_priv,
 				  params);
 	} else if (params->mode == IEEE80211_MODE_INFRA) {
+		if (!dev_ops->associate) {
+			wpa_printf(MSG_ERROR, "%s: associate op not supported", __func__);
+			goto out;
+		}
+
 		ret = dev_ops->associate(if_ctx->dev_priv,
 				   params);
 	} else {
@@ -1699,6 +1723,10 @@ static int _wpa_drv_zep_set_key(void *priv,
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->set_key) {
+		wpa_printf(MSG_ERROR, "%s: set_key op not supported", __func__);
+		goto out;
+	}
 
 	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
 	if (!iface) {
@@ -1773,8 +1801,7 @@ static int wpa_drv_zep_get_capa(void *priv, struct wpa_driver_capa *capa)
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-
-	if (!dev_ops->get_capa) {
+	if (!dev_ops || !dev_ops->get_capa) {
 		wpa_printf(MSG_ERROR, "%s: get_capa op not supported", __func__);
 		goto out;
 	}
@@ -1831,11 +1858,15 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	struct net_if *iface = NULL;
 
-	int ret;
+	int ret = -1;
 
 	if_ctx = priv;
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->set_supp_port) {
+		wpa_printf(MSG_ERROR, "%s: set_supp_port op not supported", __func__);
+		goto out;
+	}
 
 	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
 
@@ -1858,7 +1889,7 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 	}
 
 #endif
-
+out:
 	return ret;
 }
 
@@ -1881,17 +1912,14 @@ static int wpa_drv_zep_signal_poll(void *priv, struct wpa_signal_info *si)
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->signal_poll) {
+		wpa_printf(MSG_ERROR, "%s: signal_poll op not supported", __func__);
+		goto out;
+	}
 
-	os_memset(si, 0, sizeof(*si));
-
-	if (dev_ops && dev_ops->signal_poll) {
-		ret = dev_ops->signal_poll(if_ctx->dev_priv, si, if_ctx->bssid);
-		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: Signal polling failed: %d", __func__, ret);
-			goto out;
-		}
-	} else {
-		wpa_printf(MSG_ERROR, "%s: Signal polling not supported", __func__);
+	ret = dev_ops->signal_poll(if_ctx->dev_priv, si, if_ctx->bssid);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: Signal polling failed: %d", __func__, ret);
 		goto out;
 	}
 
@@ -1938,6 +1966,10 @@ static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->send_mlme) {
+		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported", __func__);
+		goto out;
+	}
 
 	wpa_printf(MSG_DEBUG, "wpa_supp: Send Action frame ("
 			"freq=%u MHz wait=%d ms no_cck=%d)",
@@ -1964,7 +1996,7 @@ static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 	}
 
 	os_free(buf);
-
+out:
 	return ret;
 }
 
@@ -2002,20 +2034,14 @@ static int wpa_drv_zep_get_conn_info(void *priv, struct wpa_conn_info *ci)
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-
-	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s:Failed to get dev_ops handle", __func__);
+	if (!dev_ops || !dev_ops->get_conn_info) {
+		wpa_printf(MSG_ERROR, "%s: get_conn_info op not supported", __func__);
 		goto out;
 	}
 
-	if (dev_ops->get_conn_info) {
-		ret = dev_ops->get_conn_info(if_ctx->dev_priv, ci);
-		if (ret) {
-			wpa_printf(MSG_ERROR, "%s: Failed to get connection info: %d", __func__, ret);
-			goto out;
-		}
-	} else {
-		wpa_printf(MSG_ERROR, "%s: Getting connection info is not supported", __func__);
+	ret = dev_ops->get_conn_info(if_ctx->dev_priv, ci);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: Failed to get connection info: %d", __func__, ret);
 		goto out;
 	}
 
@@ -2037,9 +2063,9 @@ static int wpa_drv_zep_set_country(void *priv, const char *alpha2_arg)
 	alpha2[2] = '\0';
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->set_country) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for set_country", __func__);
-		return ret;
+	if (!dev_ops || !dev_ops->set_country) {
+		wpa_printf(MSG_ERROR, "%s: set_country op not supported", __func__);
+		goto out;
 	}
 
 	ret = dev_ops->set_country(if_ctx->dev_priv, alpha2);
@@ -2048,6 +2074,7 @@ static int wpa_drv_zep_set_country(void *priv, const char *alpha2_arg)
 		return ret;
 	}
 
+out:
 	return ret;
 }
 
@@ -2062,9 +2089,9 @@ static int wpa_drv_zep_get_country(void *priv, char *alpha2)
 	alpha2[0] = '\0';
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->get_country) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for get_country", __func__);
-		return ret;
+	if (!dev_ops || !dev_ops->get_country) {
+		wpa_printf(MSG_ERROR, "%s: get_country op not supported", __func__);
+		goto out;
 	}
 
 	ret = dev_ops->get_country(if_ctx->dev_priv, alpha2);
@@ -2075,6 +2102,7 @@ static int wpa_drv_zep_get_country(void *priv, char *alpha2)
 
 	alpha2[2] = '\0';
 
+out:
 	return ret;
 }
 
@@ -2098,9 +2126,8 @@ static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
 		goto out;
 	}
 
-	dev_ops = if_ctx->dev_ctx->config;
-
-	if (!dev_ops->register_mgmt_frame) {
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->register_mgmt_frame) {
 		wpa_printf(MSG_ERROR, "%s: register_mgmt_frame op not supported", __func__);
 		goto out;
 	}
@@ -2195,8 +2222,8 @@ static int wpa_drv_zep_set_ap(void *priv,
 		wpa_printf(MSG_EXCESSIVE, "twt_responder=%d", params->twt_responder);
 
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops->set_ap) {
-		wpa_printf(MSG_ERROR, "%s: No op registered for set_ap", __func__);
+	if (!dev_ops || !dev_ops->set_ap) {
+		wpa_printf(MSG_ERROR, "%s: set_ap op not supported", __func__);
 		goto out;
 	}
 
@@ -2222,7 +2249,11 @@ static int wpa_drv_zep_set_ap(void *priv,
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
 
 	if (!if_ctx->beacon_set && !dev_ops->start_ap) {
 		wpa_printf(MSG_ERROR, "%s: start_ap op not supported", __func__);
@@ -2279,13 +2310,8 @@ int wpa_drv_zep_stop_ap(void *priv, int link_id)
 
 	if_ctx = priv;
 
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-#else
-	dev_ops = if_ctx->dev_ctx->config;
-#endif
-
-	if (!dev_ops->stop_ap) {
+	if (!dev_ops || !dev_ops->stop_ap) {
 		wpa_printf(MSG_ERROR, "%s: stop_ap op not supported", __func__);
 		goto out;
 	}
@@ -2318,9 +2344,9 @@ int wpa_drv_zep_deinit_ap(void *priv)
 
 	if_ctx = priv;
 
-	dev_ops = if_ctx->dev_ctx->config;
-
-	if (!dev_ops->deinit_ap) {
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->deinit_ap
+	) {
 		wpa_printf(MSG_ERROR, "%s: deinit_ap op not supported", __func__);
 		goto out;
 	}
@@ -2350,12 +2376,8 @@ int wpa_drv_zep_sta_add(void *priv, struct hostapd_sta_add_params *params)
 		goto out;
 	}
 
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-#else
-	dev_ops = if_ctx->dev_ctx->config;
-#endif
-	if (!dev_ops->sta_add) {
+	if (!dev_ops || !dev_ops->sta_add) {
 		wpa_printf(MSG_ERROR, "%s: sta_add op not supported", __func__);
 		goto out;
 	}
@@ -2382,8 +2404,8 @@ int wpa_drv_zep_sta_set_flags(void *priv, const u8 *addr, u32 total_flags,
 		goto out;
 	}
 
-	dev_ops = if_ctx->dev_ctx->config;
-	if (!dev_ops->sta_set_flags) {
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->sta_set_flags) {
 		wpa_printf(MSG_ERROR, "%s: sta_set_flags op not supported",
 			   __func__);
 		goto out;
@@ -2415,7 +2437,11 @@ int wpa_drv_zep_sta_deauth(void *priv, const u8 *own_addr, const u8 *addr, u16 r
 		goto out;
 	}
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
 
 	wpa_printf(MSG_DEBUG, "%s: addr %p reason_code %d",
 		   __func__, addr, reason_code);
@@ -2448,7 +2474,11 @@ int wpa_drv_zep_sta_disassoc(void *priv, const u8 *own_addr, const u8 *addr, u16
 		goto out;
 	}
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
 
 	wpa_printf(MSG_DEBUG, "%s: addr %p reason_code %d",
 		   __func__, addr, reason_code);
@@ -2480,14 +2510,9 @@ int wpa_drv_zep_sta_remove(void *priv, const u8 *addr)
 		goto out;
 	}
 
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-#else
-	dev_ops = if_ctx->dev_ctx->config;
-#endif
-	if (!dev_ops->sta_remove) {
-		wpa_printf(MSG_ERROR, "%s: sta_remove op not supported",
-			   __func__);
+	if (!dev_ops || !dev_ops->sta_remove) {
+		wpa_printf(MSG_ERROR, "%s: sta_remove op not supported", __func__);
 		goto out;
 	}
 
@@ -2512,11 +2537,12 @@ int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack
 	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
 	(void)link_id;
 
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-#else
-	dev_ops = if_ctx->dev_ctx->config;
-#endif
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
+
 	if (!dev_ops->send_mlme) {
 		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported",
 			   __func__);
@@ -2573,7 +2599,11 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 	(void)encrypt;
 
 	wpa_s = if_ctx->supp_if_ctx;
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
 
 	wpa_printf(MSG_DEBUG, "wpa_supp: Send EAPOL frame (encrypt=%d)", encrypt);
 
@@ -2596,7 +2626,12 @@ int wpa_drv_zep_get_inact_sec(void *priv, const u8 *addr)
 	const struct zep_wpa_supp_dev_ops *dev_ops;
 	int ret = -1;
 
-	dev_ops = if_ctx->dev_ctx->config;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
+
 	if (!dev_ops->get_inact_sec) {
 		wpa_printf(MSG_ERROR, "%s: get_inact_sec op not supported\n",
 			   __func__);
@@ -2627,7 +2662,6 @@ int wpa_drv_zep_dpp_listen(void *priv, bool enable)
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-
 	if (!dev_ops || !dev_ops->dpp_listen) {
 		wpa_printf(MSG_ERROR, "%s: dpp_listen op not supported", __func__);
 		goto out;
@@ -2658,7 +2692,6 @@ int wpa_drv_zep_remain_on_channel(void *priv, unsigned int freq,
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-
 	if (!dev_ops || !dev_ops->remain_on_channel) {
 		wpa_printf(MSG_ERROR, "%s: remain_on_channel op not supported", __func__);
 		goto out;
@@ -2687,7 +2720,6 @@ int wpa_drv_zep_cancel_remain_on_channel(void *priv)
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-
 	if (!dev_ops || !dev_ops->cancel_remain_on_channel) {
 		wpa_printf(MSG_ERROR, "%s: cancel_remain_on_channel op not supported", __func__);
 		goto out;
@@ -2715,7 +2747,6 @@ void wpa_drv_zep_send_action_cancel_wait(void *priv)
 
 	if_ctx = priv;
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-
 	if (!dev_ops || !dev_ops->send_action_cancel_wait) {
 		wpa_printf(MSG_DEBUG, "%s: send_action_cancel_wait op not supported", __func__);
 		goto out;
