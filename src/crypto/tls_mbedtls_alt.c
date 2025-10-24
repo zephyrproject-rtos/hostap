@@ -2119,16 +2119,25 @@ struct wpabuf *tls_connection_handshake(void *tls_ctx,
         mbedtls_ssl_conf_session_tickets_cb(&conn->tls_conf->conf, tls_mbedtls_ssl_ticket_write,
                                             tls_mbedtls_ssl_ticket_parse, conn);
 #endif
+    int ret = 0;
 
-#ifdef MBEDTLS_X509_CRT_PARSE_C
-    /* This is insecure, but backwards as conf doesn't have hostname and
-     * for backwards compatible with MbedTLS version 3.6.3, disable
-     * hostname check. */
-    mbedtls_ssl_set_hostname(&conn->ssl, NULL);
-#endif
+    if (conn->tls_conf->domain_match != NULL) {
+        ret = mbedtls_ssl_set_hostname(&conn->ssl, conn->tls_conf->domain_match);
+        if (ret != 0) {
+            wpa_printf(MSG_ERROR, "Failed to set hostname from domain match");
+            return NULL;
+        }
+    } else if (conn->tls_conf->suffix_match != NULL) {
+        ret = mbedtls_ssl_set_hostname(&conn->ssl, conn->tls_conf->suffix_match);
+        if (ret != 0) {
+            wpa_printf(MSG_ERROR, "Failed to set hostname from suffix match");
+            return NULL;
+        }
+    } else {
+        mbedtls_ssl_set_hostname(&conn->ssl, NULL);
+    }
 
 #if MBEDTLS_VERSION_NUMBER >= 0x03020000 /* mbedtls 3.2.0 */
-    int ret = 0;
     if (conn->ssl.MBEDTLS_PRIVATE(state) == MBEDTLS_SSL_HANDSHAKE_OVER &&
         conn->ssl.MBEDTLS_PRIVATE(tls_version) == MBEDTLS_SSL_VERSION_TLS1_3)
     {
