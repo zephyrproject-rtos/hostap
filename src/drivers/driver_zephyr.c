@@ -1014,6 +1014,25 @@ static void wpa_drv_zep_event_signal_change(struct zep_drv_if_ctx *if_ctx,
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_SIGNAL_CHANGE, event);
 }
 
+static void wpa_drv_zep_event_roc_complete(struct zep_drv_if_ctx *if_ctx,
+					    int freq, unsigned int duration)
+{
+	union wpa_event_data event;
+	os_memset(&event, 0, sizeof(event));
+	event.remain_on_channel.freq = freq;
+	event.remain_on_channel.duration = duration;
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_REMAIN_ON_CHANNEL, &event);
+}
+
+static void wpa_drv_zep_event_roc_cancel_complete(struct zep_drv_if_ctx *if_ctx,
+						   int freq)
+{
+	union wpa_event_data event;
+	os_memset(&event, 0, sizeof(event));
+	event.remain_on_channel.freq = freq;
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_CANCEL_REMAIN_ON_CHANNEL, &event);
+}
+
 static struct hostapd_hw_modes *
 wpa_driver_wpa_supp_postprocess_modes(struct hostapd_hw_modes *modes,
 		u16 *num_modes)
@@ -1247,6 +1266,8 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.mac_changed = wpa_drv_zep_event_mac_changed;
 	callbk_fns.ecsa_complete = wpa_drv_zep_event_ecsa_complete;
 	callbk_fns.signal_change = wpa_drv_zep_event_signal_change;
+	callbk_fns.roc_complete = wpa_drv_zep_event_roc_complete;
+	callbk_fns.roc_cancel_complete = wpa_drv_zep_event_roc_cancel_complete;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
