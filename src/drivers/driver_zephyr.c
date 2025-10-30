@@ -937,6 +937,15 @@ static int wpa_drv_mgmt_subscribe_non_ap(struct zep_drv_if_ctx *if_ctx)
 	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x05\x00", 2) < 0)
 		ret = -1;
 
+#ifdef CONFIG_P2P
+	/* P2P Public Action */
+	if (wpa_drv_register_action_frame(if_ctx, (u8 *) "\x04\x09\x50\x6f\x9a\x09", 6) < 0)
+		ret = -1;
+	/* P2P Action */
+	if (wpa_drv_register_action_frame(if_ctx, (u8 *) "\x7f\x50\x6f\x9a\x09", 5) < 0)
+		ret = -1;
+#endif /* CONFIG_P2P */
+
 	return ret;
 }
 
