@@ -213,6 +213,12 @@ struct zep_wpa_supp_dev_callbk_fns {
 
 	void (*signal_change)(struct zep_drv_if_ctx *if_ctx,
 			      union wpa_event_data *event);
+
+	void (*roc_complete)(struct zep_drv_if_ctx *if_ctx,
+			    int freq, unsigned int duration);
+
+	void (*roc_cancel_complete)(struct zep_drv_if_ctx *if_ctx,
+			     int freq);
 };
 
 struct zep_hostapd_dev_callbk_fns
