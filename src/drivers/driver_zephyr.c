@@ -2765,6 +2765,28 @@ out:
 	return ret;
 }
 
+int wpa_drv_zep_probe_req_report(void *priv, int report)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	int ret = -1;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	ret = wpa_drv_register_frame(priv, WLAN_FC_STYPE_PROBE_REQ << 4,
+							NULL, 0, 0);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: register probe req report failed", __func__);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 void wpa_drv_zep_send_action_cancel_wait(void *priv)
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
@@ -2837,5 +2859,6 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.dpp_listen = wpa_drv_zep_dpp_listen,
 	.remain_on_channel = wpa_drv_zep_remain_on_channel,
 	.cancel_remain_on_channel = wpa_drv_zep_cancel_remain_on_channel,
+	.probe_req_report = wpa_drv_zep_probe_req_report,
 	.send_action_cancel_wait = wpa_drv_zep_send_action_cancel_wait,
 };
