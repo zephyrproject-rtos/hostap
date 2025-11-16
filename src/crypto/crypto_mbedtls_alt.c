@@ -99,7 +99,7 @@
 #endif /* crypto_cipher_*() */
 
 #if defined(EAP_PWD) || defined(EAP_SERVER_PWD) /* CONFIG_EAP_PWD=y */ \
-    || defined(CONFIG_SAE)                      /* CONFIG_SAE=y */
+    || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)                      /* CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3=y */
 #define CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 #endif /* crypto_bignum_*() */
 
@@ -110,7 +110,7 @@
     || defined(EAP_IKEV2)         /* CONFIG_EAP_IKEV2y */  \
     || defined(EAP_IKEV2_DYNAMIC) /* CONFIG_EAP_IKEV2=y */ \
     || defined(EAP_SERVER_IKEV2)  /* CONFIG_EAP_IKEV2=y */ \
-    || defined(CONFIG_SAE)        /* CONFIG_SAE=y */       \
+    || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)        /* CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3=y */       \
     || defined(CONFIG_WPS)        /* CONFIG_WPS=y */
 #define CRYPTO_MBEDTLS_CRYPTO_DH
 #if defined(CONFIG_WPS_NFC)
@@ -125,7 +125,7 @@
 #define CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 
 #if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK) || defined(EAP_PWD) \
-    || defined(EAP_SERVER_PWD) || defined(CONFIG_SAE)
+    || defined(EAP_SERVER_PWD) || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)
 #define CRYPTO_MBEDTLS_CRYPTO_EC
 #endif
 
