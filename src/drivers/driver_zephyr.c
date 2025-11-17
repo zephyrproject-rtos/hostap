@@ -2810,6 +2810,35 @@ out:
 	return;
 }
 
+static int wpa_drv_zep_set_p2p_powersave(void *priv, int legacy_ps, int opp_ps,
+				     int ctwindow)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
+	int ret	= -1;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->set_p2p_powersave) {
+		wpa_printf(MSG_ERROR, "%s: set_p2p_powersave op not supported", __func__);
+		goto out;
+	}
+
+	ret = dev_ops->set_p2p_powersave(if_ctx->dev_priv, legacy_ps, opp_ps, ctwindow);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: set_p2p_powersave op failed", __func__);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.name = "zephyr",
 	.desc = "Zephyr wpa_supplicant driver",
@@ -2861,4 +2890,5 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.cancel_remain_on_channel = wpa_drv_zep_cancel_remain_on_channel,
 	.probe_req_report = wpa_drv_zep_probe_req_report,
 	.send_action_cancel_wait = wpa_drv_zep_send_action_cancel_wait,
+	.set_p2p_powersave = wpa_drv_zep_set_p2p_powersave,
 };
