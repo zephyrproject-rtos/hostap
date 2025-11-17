@@ -215,10 +215,12 @@ struct zep_wpa_supp_dev_callbk_fns {
 			      union wpa_event_data *event);
 
 	void (*roc_complete)(struct zep_drv_if_ctx *if_ctx,
-			    int freq, unsigned int duration);
+			    int freq, unsigned int duration, u64 cookie);
 
 	void (*roc_cancel_complete)(struct zep_drv_if_ctx *if_ctx,
-			     int freq);
+			     int freq, u64 cookie);
+
+	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 cookie);
 };
 
 struct zep_hostapd_dev_callbk_fns
@@ -355,6 +357,7 @@ struct zep_wpa_supp_dev_ops {
 	int (*dpp_listen)(void *priv, bool enable);
 	int (*remain_on_channel)(void *priv, unsigned int freq, unsigned int duration);
 	int (*cancel_remain_on_channel)(void *priv);
+	int (*set_p2p_powersave)(void *if_priv, int legacy_ps, int opp_ps, int ctwindow);
 	int (*get_inact_sec)(void *if_priv, const u8 *addr);
 	void (*send_action_cancel_wait)(void *priv);
 	int (*signal_monitor)(void *if_priv, int threshold, int hysteresis);
