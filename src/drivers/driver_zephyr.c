@@ -22,6 +22,10 @@
 /* TODO: The timeout should be retrieved from the driver to keep it generic */
 #define SCAN_TIMEOUT 35
 #define GET_WIPHY_TIMEOUT 10
+#define COOKIE_RESP_EVENT_TIMEOUT 5000
+
+u64 remain_on_chan_cookie = 0;
+bool waiting_for_remain_on_channel_cookie = false;
 
 int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
 	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
@@ -1024,22 +1028,40 @@ static void wpa_drv_zep_event_signal_change(struct zep_drv_if_ctx *if_ctx,
 }
 
 static void wpa_drv_zep_event_roc_complete(struct zep_drv_if_ctx *if_ctx,
-					    int freq, unsigned int duration)
+					    int freq, unsigned int duration, u64 cookie)
 {
 	union wpa_event_data event;
-	os_memset(&event, 0, sizeof(event));
-	event.remain_on_channel.freq = freq;
-	event.remain_on_channel.duration = duration;
-	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_REMAIN_ON_CHANNEL, &event);
+
+	if (remain_on_chan_cookie == cookie) {
+		os_memset(&event, 0, sizeof(event));
+		event.remain_on_channel.freq = freq;
+		event.remain_on_channel.duration = duration;
+		wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_REMAIN_ON_CHANNEL, &event);
+	}
 }
 
 static void wpa_drv_zep_event_roc_cancel_complete(struct zep_drv_if_ctx *if_ctx,
-						   int freq)
+						   int freq, u64 cookie)
 {
 	union wpa_event_data event;
-	os_memset(&event, 0, sizeof(event));
-	event.remain_on_channel.freq = freq;
-	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_CANCEL_REMAIN_ON_CHANNEL, &event);
+	if (remain_on_chan_cookie == cookie) {
+		os_memset(&event, 0, sizeof(event));
+		event.remain_on_channel.freq = freq;
+		wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_CANCEL_REMAIN_ON_CHANNEL, &event);
+	}
+}
+
+static void wpa_drv_zep_event_cookie_event(struct zep_drv_if_ctx *if_ctx,
+					  u64 cookie)
+{
+	if (waiting_for_remain_on_channel_cookie) {
+		remain_on_chan_cookie = cookie;
+		waiting_for_remain_on_channel_cookie = false;
+		k_sem_give(&if_ctx->drv_resp_sem);
+	}
+	else {
+		wpa_printf(MSG_DEBUG, "wpa_supp: Unexpected cookie event received");
+	}
 }
 
 static struct hostapd_hw_modes *
@@ -1277,6 +1299,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.signal_change = wpa_drv_zep_event_signal_change;
 	callbk_fns.roc_complete = wpa_drv_zep_event_roc_complete;
 	callbk_fns.roc_cancel_complete = wpa_drv_zep_event_roc_cancel_complete;
+	callbk_fns.cookie_event = wpa_drv_zep_event_cookie_event;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
@@ -2730,6 +2753,13 @@ int wpa_drv_zep_remain_on_channel(void *priv, unsigned int freq,
 	ret = dev_ops->remain_on_channel(if_ctx->dev_priv, freq, duration);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: dpp_listen op failed", __func__);
+		goto out;
+	}
+
+	waiting_for_remain_on_channel_cookie = true;
+	ret = k_sem_take(&if_ctx->drv_resp_sem, K_MSEC(COOKIE_RESP_EVENT_TIMEOUT));
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: remain_on_channel wait failed", __func__);
 		goto out;
 	}
 

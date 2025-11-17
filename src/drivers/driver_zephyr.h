@@ -215,10 +215,12 @@ struct zep_wpa_supp_dev_callbk_fns {
 			      union wpa_event_data *event);
 
 	void (*roc_complete)(struct zep_drv_if_ctx *if_ctx,
-			    int freq, unsigned int duration);
+			    int freq, unsigned int duration, u64 cookie);
 
 	void (*roc_cancel_complete)(struct zep_drv_if_ctx *if_ctx,
-			     int freq);
+			     int freq, u64 cookie);
+
+	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 cookie);
 };
 
 struct zep_hostapd_dev_callbk_fns
