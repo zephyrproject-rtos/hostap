@@ -118,6 +118,11 @@ struct zep_wpa_supp_mbox_msg_data {
 	void *data;
 };
 
+struct cookie_info {
+        struct dl_list list;
+        unsigned long long host_cookie;
+        unsigned long long rpu_cookie;
+};
 
 struct zep_drv_ctx {
 	void *supp_ctx;
@@ -152,6 +157,8 @@ struct zep_drv_if_ctx {
 	unsigned char auth_bssid[6];
 	unsigned char auth_attempt_bssid[6];
 	bool beacon_set;
+	u64 remain_on_channel_cookie;
+	bool pending_remain_on_channel;
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	struct zep_wpa_supp_dev_ops *dev_ops;
 	struct hostapd_data *hapd;
@@ -215,10 +222,12 @@ struct zep_wpa_supp_dev_callbk_fns {
 			      union wpa_event_data *event);
 
 	void (*roc_complete)(struct zep_drv_if_ctx *if_ctx,
-			    int freq, unsigned int duration);
+			    int freq, unsigned int duration, u64 cookie);
 
 	void (*roc_cancel_complete)(struct zep_drv_if_ctx *if_ctx,
-			     int freq);
+			     int freq, u64 cookie);
+
+	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 host_cookie, u64 cookie);
 };
 
 struct zep_hostapd_dev_callbk_fns
@@ -353,8 +362,8 @@ struct zep_wpa_supp_dev_ops {
 			size_t match_len, const u8 *match);
 
 	int (*dpp_listen)(void *priv, bool enable);
-	int (*remain_on_channel)(void *priv, unsigned int freq, unsigned int duration);
-	int (*cancel_remain_on_channel)(void *priv);
+	int (*remain_on_channel)(void *priv, unsigned int freq, unsigned int duration, u64 host_cookie);
+	int (*cancel_remain_on_channel)(void *priv, u64 rpu_cookie);
 	int (*set_p2p_powersave)(void *if_priv, int legacy_ps, int opp_ps, int ctwindow);
 	int (*get_inact_sec)(void *if_priv, const u8 *addr);
 	void (*send_action_cancel_wait)(void *priv);
