@@ -971,6 +971,10 @@ static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 	fc = le_to_host16(mgmt->frame_control);
 	stype = WLAN_FC_GET_STYPE(fc);
 
+	if (stype == WLAN_FC_STYPE_PROBE_REQ && !if_ctx->probe_req_listen) {
+		wpa_printf(MSG_MSGDUMP, "wpa_supp: Device not in probe req listen mode - ignore frame");
+		return;
+	}
 	os_memset(&event, 0, sizeof(event));
 
 	if (frequency) {
@@ -2792,7 +2796,7 @@ int wpa_drv_zep_cancel_remain_on_channel(void *priv)
 		goto out;
 	}
 
-	ret = dev_ops->cancel_remain_on_channel(if_ctx->dev_priv, remain_on_chan_cookie);
+	ret = dev_ops->cancel_remain_on_channel(if_ctx->dev_priv, if_ctx->remain_on_channel_cookie);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: cancel_roc op failed", __func__);
 		goto out;
@@ -2813,6 +2817,19 @@ int wpa_drv_zep_probe_req_report(void *priv, int report)
 	}
 
 	if_ctx = priv;
+
+	if (!report) {
+		wpa_printf(MSG_DEBUG, "%s: Unregister probe request report", __func__);
+		if_ctx->probe_req_listen = false;
+		return 0;
+	}
+
+	if_ctx->probe_req_listen = true;
+	if(if_ctx->probe_req_set) {
+		wpa_printf(MSG_DEBUG, "%s: Probe request already registered", __func__);
+		return 0;
+	}
+
 	ret = wpa_drv_register_frame(priv, WLAN_FC_STYPE_PROBE_REQ << 4,
 							NULL, 0, 0);
 	if (ret) {
@@ -2820,6 +2837,7 @@ int wpa_drv_zep_probe_req_report(void *priv, int report)
 		goto out;
 	}
 
+	if_ctx->probe_req_set = true;
 out:
 	return ret;
 }

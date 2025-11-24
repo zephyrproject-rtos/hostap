@@ -157,6 +157,8 @@ struct zep_drv_if_ctx {
 	unsigned char auth_bssid[6];
 	unsigned char auth_attempt_bssid[6];
 	bool beacon_set;
+	bool probe_req_set;
+	bool probe_req_listen;
 	u64 remain_on_channel_cookie;
 	bool pending_remain_on_channel;
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
