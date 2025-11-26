@@ -2147,7 +2147,6 @@ struct wpabuf *tls_connection_handshake(void *tls_ctx,
         if (res < 0)
         {
             wpa_printf(MSG_DEBUG, "%s failed: 0x%x", __func__, res);
-            wpabuf_free(*appl_data);
             ret = -1;
         }
         else
