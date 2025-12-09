@@ -448,9 +448,7 @@ void tls_connection_deinit(void *tls_ctx, struct tls_connection *conn)
     if (conn == NULL)
         return;
 
-#if !defined(MBEDTLS_SSL_PROTO_TLS1_3)
     if (conn->tls_prf_type)
-#endif
         tls_connection_deinit_expkey(conn);
 
 #ifdef TLS_MBEDTLS_SESSION_TICKETS
@@ -554,9 +552,7 @@ int tls_connection_shutdown(void *tls_ctx, struct tls_connection *conn)
     conn->push_buf    = NULL;
     conn->established = 0;
     conn->resumed     = 0;
-#if !defined(MBEDTLS_SSL_PROTO_TLS1_3)
     if (conn->tls_prf_type)
-#endif
         tls_connection_deinit_expkey(conn);
 
     /* RFE: prepare for session resumption? (see doc in crypto/tls.h) */
@@ -1879,16 +1875,19 @@ static void tls_connection_export_keys_cb(void *p_expkey,
 {
     struct tls_connection *conn = p_expkey;
     conn->tls_prf_type          = tls_prf_type;
-#if !defined(MBEDTLS_SSL_PROTO_TLS1_3)
+
+    /* For TLS 1.3, client_random and server_random are not used in key derivation.
+     * Key export relies on HKDF and exporter_master_secret instead of PRF inputs. */
     if (!tls_prf_type)
         return;
-#endif
+
     if (secret_len > sizeof(conn->expkey_secret))
     {
         emsg(MSG_ERROR, "tls_connection_export_keys_cb secret too long");
         conn->tls_prf_type = MBEDTLS_SSL_TLS_PRF_NONE; /* 0 */
         return;
     }
+
     conn->expkey_secret_len = secret_len;
     os_memcpy(conn->expkey_secret, secret, secret_len);
     os_memcpy(conn->expkey_randbytes, client_random, MBEDTLS_EXPKEY_RAND_LEN);
@@ -1898,12 +1897,9 @@ static void tls_connection_export_keys_cb(void *p_expkey,
 
 int tls_connection_get_random(void *tls_ctx, struct tls_connection *conn, struct tls_random *data)
 {
-    if (!conn
-#if !defined(MBEDTLS_SSL_PROTO_TLS1_3)
-        || !conn->tls_prf_type
-#endif
-       )
+    if (!conn || !conn->tls_prf_type)
         return -1;
+
     data->client_random     = conn->expkey_randbytes;
     data->client_random_len = MBEDTLS_EXPKEY_RAND_LEN;
     data->server_random     = conn->expkey_randbytes + MBEDTLS_EXPKEY_RAND_LEN;
@@ -1979,12 +1975,9 @@ int tls_connection_get_eap_fast_key(void *tls_ctx, struct tls_connection *conn, 
 {
     int ret;
 
-    /* XXX: has export keys callback been run? */
-    if (!conn
-#if !defined(MBEDTLS_SSL_PROTO_TLS1_3)
-        || !conn->tls_prf_type
-#endif
-        )
+    /* EAP-FAST relies on TLS 1.0/1.2 key block derivation (PRF-based).
+     * TLS 1.3 removed PRF and key block concept, so EAP-FAST cannot operate over TLS 1.3. */
+    if (!conn || !conn->tls_prf_type)
         return -1;
 
     conn->expkey_keyblock_size = tls_mbedtls_ssl_keyblock_size(&conn->ssl);
@@ -2000,30 +1993,11 @@ int tls_connection_get_eap_fast_key(void *tls_ctx, struct tls_connection *conn, 
     os_memcpy(seed, conn->expkey_randbytes + MBEDTLS_EXPKEY_RAND_LEN, MBEDTLS_EXPKEY_RAND_LEN);
     os_memcpy(seed + MBEDTLS_EXPKEY_RAND_LEN, conn->expkey_randbytes, MBEDTLS_EXPKEY_RAND_LEN);
 
-#if MBEDTLS_VERSION_NUMBER >= 0x02120000 /* mbedtls 2.18.0 */
-    #if (MBEDTLS_VERSION_NUMBER >= 0x03040000)
-    if (conn->ssl.tls_version == MBEDTLS_SSL_VERSION_TLS1_3)
-    {
-        psa_algorithm_t hash_alg = mbedtls_md_psa_alg_from_type(
-                        (mbedtls_md_type_t)conn->ssl.handshake->ciphersuite_info->mac);
-        ret = mbedtls_ssl_tls13_hkdf_expand_label(hash_alg, conn->expkey_secret,
-                                                  conn->expkey_secret_len,
-                                                  (const unsigned char *)"key expansion",
-                                                  os_strlen("key expansion"), seed,
-                                                  sizeof(seed), tmp_out, skip + out_len);
-    }
-    else
-#endif
-    {
-        ret = mbedtls_ssl_tls_prf(conn->tls_prf_type, conn->expkey_secret,
-                                  conn->expkey_secret_len, "key expansion",
-                                  seed, sizeof(seed), tmp_out, skip + out_len);
-    }
+    ret = mbedtls_ssl_tls_prf(conn->tls_prf_type, conn->expkey_secret,
+                              conn->expkey_secret_len, "key expansion",
+                              seed, sizeof(seed), tmp_out, skip + out_len);
     if (ret == 0)
         os_memcpy(out, tmp_out + skip, out_len);
-#else
-    ret = -1;         /*(not reached if not impl; return -1 at top of func)*/
-#endif
 
     bin_clear_free(tmp_out, skip + out_len);
     forced_memzero(seed, sizeof(seed));
