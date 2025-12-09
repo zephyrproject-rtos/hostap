@@ -1919,35 +1919,15 @@ int tls_connection_export_key(void *tls_ctx,
                               u8 *out,
                               size_t out_len)
 {
-    /* (EAP-PEAP EAP-TLS EAP-TTLS) */
-#if MBEDTLS_VERSION_NUMBER >= 0x02120000 /* mbedtls 2.18.0 */
     if (!conn || !conn->established)
         return -1;
 
-#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
-#if (MBEDTLS_VERSION_NUMBER >= 0x03040000)
-    if (conn->ssl.tls_version == MBEDTLS_SSL_VERSION_TLS1_3)
-    {
-        psa_algorithm_t hash_alg = mbedtls_md_psa_alg_from_type(
-                    (mbedtls_md_type_t)conn->ssl.handshake->ciphersuite_info->mac);
-        return mbedtls_ssl_tls13_hkdf_expand_label(hash_alg, conn->expkey_secret,
-                                                   conn->expkey_secret_len, (const unsigned char *)label,
-                                                   os_strlen(label), context,
-                                                   context_len, out, out_len);
-    }
-    else
-#endif
-#endif
-    {
-        return (conn->tls_prf_type) ?
-                   mbedtls_ssl_tls_prf(conn->tls_prf_type, conn->expkey_secret, conn->expkey_secret_len, label,
-                                       conn->expkey_randbytes, sizeof(conn->expkey_randbytes), out, out_len) :
-                   -1;
-    }
-#else
-    /* not implemented here for mbedtls < 2.18.0 */
-    return -1;
-#endif
+    /* Export keying material using MbedTLS API (supports TLS 1.2 and TLS 1.3) */
+    return mbedtls_ssl_export_keying_material(&conn->ssl,
+                                    out, out_len,
+                                    label, os_strlen(label),
+                                    context, context_len,
+                                    context_len);
 }
 
 #ifdef TLS_MBEDTLS_EAP_FAST
