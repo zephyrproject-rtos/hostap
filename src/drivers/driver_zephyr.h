@@ -159,6 +159,7 @@ struct zep_drv_if_ctx {
 	bool beacon_set;
 	bool probe_req_set;
 	bool probe_req_listen;
+	bool ap_probe_req_listen;
 	u64 remain_on_channel_cookie;
 	bool pending_remain_on_channel;
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
