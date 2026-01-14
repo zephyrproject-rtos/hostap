@@ -2776,13 +2776,13 @@ int wpa_drv_zep_remain_on_channel(void *priv, unsigned int freq,
 	}
 
 	host_cookie = if_ctx->remain_on_channel_cookie++;
+	if_ctx->pending_remain_on_channel = true;
 	ret = dev_ops->remain_on_channel(if_ctx->dev_priv, freq, duration, host_cookie);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: dpp_listen op failed", __func__);
 		goto out;
 	}
 
-	if_ctx->pending_remain_on_channel = true;
 	ret = k_sem_take(&if_ctx->drv_resp_sem, K_MSEC(COOKIE_RESP_EVENT_TIMEOUT));
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: remain_on_channel wait failed", __func__);
