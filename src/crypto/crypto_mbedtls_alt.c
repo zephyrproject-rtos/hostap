@@ -15,6 +15,7 @@
 #include <mbedtls/asn1write.h>
 #include <mbedtls/aes.h>
 #include <mbedtls/md.h>
+#include <mbedtls/md5.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
@@ -70,6 +71,7 @@
 #include "crypto.h"
 #include "aes_wrap.h"
 #include "aes.h"
+#include "md5.h"
 #include "sha1.h"
 #include "sha256.h"
 #include "sha384.h"
@@ -287,6 +289,13 @@ int sha1_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 }
 #endif
 
+#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
+int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
+{
+    return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_MD5);
+}
+#endif
+
 #ifdef MBEDTLS_MD4_C
 #include <mbedtls/md4.h>
 int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -309,6 +318,9 @@ struct crypto_hash *crypto_hash_init(enum crypto_hash_alg alg, const u8 *key, si
 
     switch (alg)
     {
+        case CRYPTO_HASH_ALG_HMAC_MD5:
+            md_type = MBEDTLS_MD_MD5;
+            break;
         case CRYPTO_HASH_ALG_HMAC_SHA1:
             md_type = MBEDTLS_MD_SHA1;
             break;
@@ -447,6 +459,18 @@ int hmac_sha1_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *a
 int hmac_sha1(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8 *mac)
 {
     return hmac_vector(key, key_len, 1, &data, &data_len, mac, MBEDTLS_MD_SHA1);
+}
+#endif
+
+#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
+int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
+{
+    return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_MD5);
+}
+
+int hmac_md5(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8 *mac)
+{
+    return hmac_vector(key, key_len, 1, &data, &data_len, mac, MBEDTLS_MD_MD5);
 }
 #endif
 
@@ -2771,6 +2795,8 @@ static mbedtls_md_type_t crypto_ec_key_sign_md(size_t len)
             return MBEDTLS_MD_SHA256;
         case 20:
             return MBEDTLS_MD_SHA1;
+        case 16:
+            return MBEDTLS_MD_MD5;
         default:
             return MBEDTLS_MD_NONE;
     }
