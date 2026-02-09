@@ -519,6 +519,18 @@ err:
 	}
 }
 
+/**
+ * wpa_drv_zep_event_proc_sched_scan_stopped - Process scheduled scan stopped event
+ * @if_ctx: Interface context
+ *
+ * This function handles the scheduled scan stopped notification from the driver.
+ */
+void wpa_drv_zep_event_proc_sched_scan_stopped(struct zep_drv_if_ctx *if_ctx)
+{
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
+			EVENT_SCHED_SCAN_STOPPED,
+			NULL);
+}
 
 void wpa_drv_zep_event_proc_auth_resp(struct zep_drv_if_ctx *if_ctx,
 				      union wpa_event_data *event)
@@ -1290,6 +1302,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.scan_start = wpa_drv_zep_event_proc_scan_start;
 	callbk_fns.scan_done = wpa_drv_zep_event_proc_scan_done;
 	callbk_fns.scan_res = wpa_drv_zep_event_proc_scan_res;
+	callbk_fns.sched_scan_stopped = wpa_drv_zep_event_proc_sched_scan_stopped;
 	callbk_fns.auth_resp = wpa_drv_zep_event_proc_auth_resp;
 	callbk_fns.assoc_resp = wpa_drv_zep_event_proc_assoc_resp;
 	callbk_fns.deauth = wpa_drv_zep_event_proc_deauth;
@@ -1596,6 +1609,130 @@ out:
 	return if_ctx->scan_res2;
 }
 
+/**
+ * wpa_drv_zep_sched_scan - Start scheduled scan
+ * @priv: Pointer to private driver data
+ * @params: Scan parameters
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function initiates a scheduled scan. The driver will periodically
+ * perform scans according to the scan plans specified in params.
+ */
+static int wpa_drv_zep_sched_scan(void *priv,
+				  struct wpa_driver_scan_params *params)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: dev_ops is NULL", __func__);
+		goto out;
+	}
+
+	/* Check if scheduled scan is supported */
+	if (!dev_ops->sched_scan) {
+		wpa_printf(MSG_INFO, "%s: Scheduled scan not supported by driver",
+			   __func__);
+		ret = -1;
+		goto out;
+	}
+
+	/* Validate scan plans */
+	if (!params->sched_scan_plans || params->sched_scan_plans_num == 0) {
+		wpa_printf(MSG_ERROR,
+			   "%s: Invalid sched_scan_plans configuration",
+			   __func__);
+		ret = -1;
+		goto out;
+	}
+
+	wpa_printf(MSG_DEBUG, "%s: Starting scheduled scan with %u plan(s)",
+		   __func__, params->sched_scan_plans_num);
+
+	/* Log scan plan details for debugging */
+	for (unsigned int i = 0; i < params->sched_scan_plans_num; i++) {
+		wpa_printf(MSG_DEBUG,
+			   "sched_scan plan[%u]: interval=%u iterations=%u",
+			   i,
+			   params->sched_scan_plans[i].interval,
+			   params->sched_scan_plans[i].iterations);
+	}
+
+	/* Call the driver's scheduled scan implementation */
+	ret = dev_ops->sched_scan(if_ctx->dev_priv, params);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: Driver sched_scan failed: %d",
+			   __func__, ret);
+		goto out;
+	}
+
+	wpa_printf(MSG_DEBUG, "%s: Scheduled scan started successfully", __func__);
+
+	ret = 0;
+out:
+	return ret;
+}
+
+/**
+ * wpa_drv_zep_stop_sched_scan - Stop scheduled scan
+ * @priv: Pointer to private driver data
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function stops an ongoing scheduled scan.
+ */
+static int wpa_drv_zep_stop_sched_scan(void *priv)
+{
+	struct zep_drv_if_ctx *if_ctx = NULL;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
+		goto out;
+	}
+
+	if_ctx = priv;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: dev_ops is NULL", __func__);
+		goto out;
+	}
+
+	/* Check if stop scheduled scan is supported */
+	if (!dev_ops->stop_sched_scan) {
+		wpa_printf(MSG_ERROR,
+			   "%s: Stop scheduled scan not supported by driver",
+			   __func__);
+		ret = -1;
+		goto out;
+	}
+
+	wpa_printf(MSG_DEBUG, "%s: Stopping scheduled scan", __func__);
+
+	/* Call the driver's stop scheduled scan implementation */
+	ret = dev_ops->stop_sched_scan(if_ctx->dev_priv);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: Driver stop_sched_scan failed: %d",
+			   __func__, ret);
+		goto out;
+	}
+
+	wpa_printf(MSG_DEBUG, "%s: Scheduled scan stopped successfully", __func__);
+
+	ret = 0;
+out:
+	return ret;
+}
 
 static int wpa_drv_zep_deauthenticate(void *priv, const u8 *addr,
 				      u16 reason_code)
@@ -2919,6 +3056,8 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.scan2 = wpa_drv_zep_scan2,
 	.abort_scan = wpa_drv_zep_abort_scan,
 	.get_scan_results2 = wpa_drv_zep_get_scan_results2,
+	.sched_scan = wpa_drv_zep_sched_scan,
+	.stop_sched_scan = wpa_drv_zep_stop_sched_scan,
 	.authenticate = wpa_drv_zep_authenticate,
 	.associate = wpa_drv_zep_associate,
 	.get_capa = wpa_drv_zep_get_capa,
