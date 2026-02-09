@@ -10,7 +10,9 @@
 
 #include "common.h"
 #include "crypto/crypto.h"
+#ifndef CONFIG_FIPS
 #include "crypto/md5.h"
+#endif /* CONFIG_FIPS */
 #include "crypto/sha1.h"
 #include "crypto/random.h"
 #include "ikev2_common.h"
@@ -18,7 +20,9 @@
 
 static const struct ikev2_integ_alg ikev2_integ_algs[] = {
 	{ AUTH_HMAC_SHA1_96, 20, 12 },
+#ifndef CONFIG_FIPS
 	{ AUTH_HMAC_MD5_96, 16, 12 }
+#endif /* CONFIG_FIPS */
 };
 
 #define NUM_INTEG_ALGS ARRAY_SIZE(ikev2_integ_algs)
@@ -26,7 +30,9 @@ static const struct ikev2_integ_alg ikev2_integ_algs[] = {
 
 static const struct ikev2_prf_alg ikev2_prf_algs[] = {
 	{ PRF_HMAC_SHA1, 20, 20 },
+#ifndef CONFIG_FIPS
 	{ PRF_HMAC_MD5, 16, 16 }
+#endif /* CONFIG_FIPS */
 };
 
 #define NUM_PRF_ALGS ARRAY_SIZE(ikev2_prf_algs)
@@ -66,6 +72,7 @@ int ikev2_integ_hash(int alg, const u8 *key, size_t key_len, const u8 *data,
 			return -1;
 		os_memcpy(hash, tmphash, 12);
 		break;
+#ifndef CONFIG_FIPS
 	case AUTH_HMAC_MD5_96:
 		if (key_len != 16)
 			return -1;
@@ -73,6 +80,7 @@ int ikev2_integ_hash(int alg, const u8 *key, size_t key_len, const u8 *data,
 			return -1;
 		os_memcpy(hash, tmphash, 12);
 		break;
+#endif /* CONFIG_FIPS */
 	default:
 		return -1;
 	}
@@ -102,8 +110,10 @@ int ikev2_prf_hash(int alg, const u8 *key, size_t key_len,
 	case PRF_HMAC_SHA1:
 		return hmac_sha1_vector(key, key_len, num_elem, addr, len,
 					hash);
+#ifndef CONFIG_FIPS
 	case PRF_HMAC_MD5:
 		return hmac_md5_vector(key, key_len, num_elem, addr, len, hash);
+#endif /* CONFIG_FIPS */
 	default:
 		return -1;
 	}
