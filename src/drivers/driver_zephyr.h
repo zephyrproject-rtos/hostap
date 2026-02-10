@@ -181,6 +181,8 @@ struct zep_wpa_supp_dev_callbk_fns {
 	void (*scan_res)(struct zep_drv_if_ctx *if_ctx, struct wpa_scan_res *r,
 			 bool more_res);
 
+	void (*sched_scan_stopped)(struct zep_drv_if_ctx *if_ctx);
+
 	void (*auth_resp)(struct zep_drv_if_ctx *if_ctx,
 			  union wpa_event_data *event);
 
@@ -280,6 +282,9 @@ struct zep_wpa_supp_dev_ops {
 		     struct wpa_driver_scan_params *params);
 	int (*scan_abort)(void *if_priv);
 	int (*get_scan_results2)(void *if_priv);
+	int (*sched_scan)(void *if_priv,
+			  struct wpa_driver_scan_params *params);
+	int (*stop_sched_scan)(void *if_priv);
 	int (*deauthenticate)(void *if_priv,
 			      const char *addr,
 			      unsigned short reason_code);
