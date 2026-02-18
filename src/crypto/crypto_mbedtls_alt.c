@@ -13,12 +13,7 @@
 #include <mbedtls/platform_util.h> /* mbedtls_platform_zeroize() */
 #include <mbedtls/asn1.h>
 #include <mbedtls/asn1write.h>
-#include <mbedtls/aes.h>
-#include <mbedtls/md.h>
-#include <mbedtls/md5.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/sha512.h>
+#include <mbedtls/bignum.h>
 
 #ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
 #include "supp_psa_api.h"
