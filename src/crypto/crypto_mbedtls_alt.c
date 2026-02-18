@@ -474,9 +474,22 @@ int hmac_md5(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8 
 }
 #endif
 
-#ifdef MBEDTLS_HKDF_C
-#include <mbedtls/hkdf.h>
+#if defined(PSA_WANT_ALG_HKDF)
+#include <psa/crypto.h>
 
+/* Perform "_op_" PSA API call and check if it succeeded. If not return
+ * "_ret_fail_".
+ * Note that operations using "psa_status" can be specified as second argument
+ * like "do_something(psa_status)".
+*/
+#define PSA_CHECK(_op_, _ret_fail_) \
+    do { \
+        psa_status_t psa_status; \
+        psa_status = _op_; \
+        if (psa_status != PSA_SUCCESS) { \
+            return _ret_fail_; \
+        } \
+    } while(0)
 /* sha256-kdf.c sha384-kdf.c sha512-kdf.c */
 
 /* HMAC-SHA256 KDF (RFC 5295) and HKDF-Expand(SHA256) (RFC 5869) */
@@ -495,8 +508,19 @@ __attribute_noinline__ static int hmac_kdf_expand(const u8 *prk,
         return -1;
 
     const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(md_type);
-    if (label == NULL) /* RFC 5869 HKDF-Expand when (label == NULL) */
-        return mbedtls_hkdf_expand(md_info, prk, prk_len, info, info_len, okm, okm_len) ? -1 : 0;
+    /* RFC 5869 HKDF-Expand when (label == NULL) */
+    if (label == NULL) {
+        psa_key_derivation_operation_t psa_op = PSA_KEY_DERIVATION_OPERATION_INIT;
+        psa_algorithm_t psa_hash_alg = mbedtls_md_psa_alg_from_type(md_type);
+
+        PSA_CHECK(psa_key_derivation_setup(&psa_op, PSA_ALG_HKDF_EXPAND(psa_hash_alg)), -1);
+        PSA_CHECK(psa_key_derivation_input_bytes(&psa_op, PSA_KEY_DERIVATION_INPUT_SECRET,
+                                                 prk, prk_len), -1);
+        PSA_CHECK(psa_key_derivation_input_bytes(&psa_op, PSA_KEY_DERIVATION_INPUT_INFO,
+                                                 info, info_len), -1);
+        PSA_CHECK(psa_key_derivation_output_bytes(&psa_op, okm, okm_len), -1);
+        PSA_CHECK(psa_key_derivation_abort(&psa_op), -1);
+    }
 
     const size_t mac_len = mbedtls_md_get_size(md_info);
     /* okm_len must not exceed 255 times hash len (RFC 5869 Section 2.3) */
@@ -505,12 +529,17 @@ __attribute_noinline__ static int hmac_kdf_expand(const u8 *prk,
 
     mbedtls_md_context_t ctx;
     mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, md_info, 1) != 0)
-    {
+    if (mbedtls_md_setup(&ctx, md_info, 0) != 0) {
+        return -1;
+    }
+    if (mbedtls_md_hmac_setup(&ctx, md_info) != 0) {
         mbedtls_md_free(&ctx);
         return -1;
     }
-    mbedtls_md_hmac_starts(&ctx, prk, prk_len);
+    if (mbedtls_md_hmac_starts(&ctx, prk, prk_len) != 0) {
+        mbedtls_md_free(&ctx);
+        return -1;
+    }
 
     u8 iter           = 1;
     const u8 *addr[4] = {okm, (const u8 *)label, info, &iter};
@@ -558,7 +587,7 @@ int hmac_sha256_kdf(
 {
     return hmac_kdf_expand(secret, secret_len, label, seed, seed_len, out, outlen, MBEDTLS_MD_SHA256);
 }
-#endif /* MBEDTLS_HKDF_C */
+#endif /* PSA_WANT_ALG_HKDF */
 
 /* sha256-prf.c sha384-prf.c sha512-prf.c */
 
