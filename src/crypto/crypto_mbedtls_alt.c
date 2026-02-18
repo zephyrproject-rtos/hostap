@@ -2386,7 +2386,7 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
     if (ctx == NULL)
         return NULL;
     mbedtls_pk_init(ctx);
-    if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0, hostap_rng_fn, hostap_rng_ctx()) == 0)
+    if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0) == 0)
         return (struct crypto_ec_key *)ctx;
 
     mbedtls_pk_free(ctx);
@@ -2839,8 +2839,7 @@ struct wpabuf *crypto_ec_key_sign(struct crypto_ec_key *key, const u8 *data, siz
     if (buf == NULL)
         return NULL;
     if (mbedtls_pk_sign((mbedtls_pk_context *)key, crypto_ec_key_sign_md(len), data, len, wpabuf_mhead_u8(buf),
-                        sig_len,
-                        &sig_len, hostap_rng_fn, hostap_rng_ctx()) == 0)
+                        sig_len, &sig_len) == 0)
     {
         wpabuf_put(buf, sig_len);
         return buf;
@@ -3227,7 +3226,7 @@ struct wpabuf *crypto_csr_sign(struct crypto_csr *csr, struct crypto_ec_key *key
     mbedtls_x509write_csr_set_md_alg((mbedtls_x509write_csr *)csr, sig_md);
 
     unsigned char buf[4096]; /* XXX: large enough?  too large? */
-    int len = mbedtls_x509write_csr_der((mbedtls_x509write_csr *)csr, buf, sizeof(buf), hostap_rng_fn, hostap_rng_ctx());
+    int len = mbedtls_x509write_csr_der((mbedtls_x509write_csr *)csr, buf, sizeof(buf));
     if (len < 0)
         return NULL;
     /*  Note: data is written at the end of the buffer! Use the

@@ -327,7 +327,6 @@ struct tls_conf *tls_conf_init(void *tls_ctx)
     tls_conf->refcnt = 1;
 
     mbedtls_ssl_config_init(&tls_conf->conf);
-    mbedtls_ssl_conf_rng(&tls_conf->conf, hostap_rng_fn, hostap_rng_ctx());
     mbedtls_x509_crt_init(&tls_conf->ca_cert);
     mbedtls_x509_crt_init(&tls_conf->client_cert);
     mbedtls_pk_init(&tls_conf->private_key);
@@ -1483,7 +1482,7 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf, const struct tls_con
         }
         const char *pwd = params->private_key_passwd;
         ret = mbedtls_pk_parse_key(&tls_conf->private_key, data, len, (const unsigned char *)pwd,
-                                   pwd ? os_strlen(pwd) : 0, hostap_rng_fn, hostap_rng_ctx());
+                                   pwd ? os_strlen(pwd) : 0);
         if (params->private_key)
         {
             forced_memzero(data, len);
