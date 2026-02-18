@@ -823,6 +823,7 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int ite
 #ifdef MBEDTLS_NIST_KW_C
 
 #include <mbedtls/nist_kw.h>
+#include <psa/crypto.h>
 
 /* aes-wrap.c */
 int aes_wrap(const u8 *kek, size_t kek_len, int n, const u8 *plain, u8 *cipher)
@@ -830,15 +831,26 @@ int aes_wrap(const u8 *kek, size_t kek_len, int n, const u8 *plain, u8 *cipher)
     if (TEST_FAIL())
         return -1;
 
-    mbedtls_nist_kw_context ctx;
-    mbedtls_nist_kw_init(&ctx);
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
     size_t olen;
-    int ret = mbedtls_nist_kw_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, kek, kek_len * 8, 1) ||
-                      mbedtls_nist_kw_wrap(&ctx, MBEDTLS_KW_MODE_KW, plain, n * 8, cipher, &olen, (n + 1) * 8) ?
-                  -1 :
-                  0;
-    mbedtls_nist_kw_free(&ctx);
-    return ret;
+    psa_status_t status;
+    int ret;
+
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_AES);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECB_NO_PADDING);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
+    status = psa_import_key(&key_attr, kek, kek_len, &key_id);
+    if (status != PSA_SUCCESS) {
+        return -1;
+    }
+
+    ret = mbedtls_nist_kw_wrap(key_id, MBEDTLS_KW_MODE_KW, plain, n * 8, cipher, (n + 1) * 8, &olen);
+
+    psa_reset_key_attributes(&key_attr);
+    psa_destroy_key(key_id);
+
+    return (ret != 0) ? -1 : 0;
 }
 
 /* aes-unwrap.c */
@@ -847,15 +859,26 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
     if (TEST_FAIL())
         return -1;
 
-    mbedtls_nist_kw_context ctx;
-    mbedtls_nist_kw_init(&ctx);
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
     size_t olen;
-    int ret = mbedtls_nist_kw_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, kek, kek_len * 8, 0) ||
-                      mbedtls_nist_kw_unwrap(&ctx, MBEDTLS_KW_MODE_KW, cipher, (n + 1) * 8, plain, &olen, n * 8) ?
-                  -1 :
-                  0;
-    mbedtls_nist_kw_free(&ctx);
-    return ret;
+    psa_status_t status;
+    int ret;
+
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_AES);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECB_NO_PADDING);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
+    status = psa_import_key(&key_attr, kek, kek_len, &key_id);
+    if (status != PSA_SUCCESS) {
+        return -1;
+    }
+
+    ret = mbedtls_nist_kw_unwrap(key_id, MBEDTLS_KW_MODE_KW, cipher, (n + 1) * 8, plain, n * 8, &olen);
+
+    psa_reset_key_attributes(&key_attr);
+    psa_destroy_key(key_id);
+
+    return (ret != 0) ? -1 : 0;
 }
 #endif /* MBEDTLS_NIST_KW_C */
 
