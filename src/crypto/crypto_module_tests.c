@@ -19,6 +19,7 @@
 #include "crypto/sha256.h"
 #include "crypto/sha384.h"
 
+#define CONFIG_FIPS
 
 static int test_siv(void)
 {
