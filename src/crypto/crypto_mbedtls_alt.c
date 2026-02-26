@@ -146,92 +146,27 @@
 
 #endif /* crypto_rsa_*() */
 
-
-
-#if defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-#include <mbedtls/psa_util.h>
-/* Setting ctr_drbg_init_state to 1 to allow unload_crypto to run */
-static int ctr_drbg_init_state = 1;
-int (*hostap_rng_fn)(void*, unsigned char*, size_t) = mbedtls_psa_get_random;
-#else
-#include <mbedtls/entropy.h>
-#include <mbedtls/ctr_drbg.h>
-static int ctr_drbg_init_state;
-static mbedtls_ctr_drbg_context ctr_drbg;
-static mbedtls_entropy_context entropy;
-int(*hostap_rng_fn)(void*, unsigned char*, size_t) = mbedtls_ctr_drbg_random;
-#endif
-
 #ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 #include <mbedtls/bignum.h>
 static mbedtls_mpi mpi_sw_A;
 #endif
 
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-static int wm_wrap_entropy_poll(void *data, unsigned char *output, size_t len, size_t *olen)
+__attribute_cold__ void crypto_unload(void)
 {
-    ((void)data);
-    os_get_random(output, len);
-    *olen = len;
+    /* Nothing to do */
+}
+
+int hostap_rng_fn(void* ctx, unsigned char* buf, size_t buf_size)
+{
+    if (psa_generate_random(buf, buf_size) != PSA_SUCCESS) {
+        return -1;
+    }
     return 0;
 }
 
-__attribute_cold__ __attribute_noinline__ static mbedtls_ctr_drbg_context *ctr_drbg_init(void)
-{
-    const unsigned char *custom_name = (const unsigned char *)"WPA_SUPPLICANT/HOSTAPD";
-    size_t custom_name_len           = os_strlen((const char *)custom_name);
-
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_entropy_init(&entropy);
-
-    mbedtls_entropy_add_source(&entropy, wm_wrap_entropy_poll, NULL, ENTROPY_MIN_PLATFORM,
-                               MBEDTLS_ENTROPY_SOURCE_STRONG);
-
-    if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, custom_name, custom_name_len))
-    {
-        wpa_printf(MSG_ERROR, "Init of random number generator failed");
-        /* XXX: abort? */
-    }
-    else
-        ctr_drbg_init_state = 1;
-
-    return &ctr_drbg;
-}
-#endif
-
-__attribute_cold__ void crypto_unload(void)
-{
-    if (ctr_drbg_init_state)
-    {
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-        mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
-#endif
-#ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
-        mbedtls_mpi_free(&mpi_sw_A);
-#endif
-        ctr_drbg_init_state = 0;
-    }
-}
-
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-/* init ctr_drbg on first use
- * crypto_global_init() and crypto_global_deinit() are not available here
- * (available only when CONFIG_TLS=internal, which is not CONFIG_TLS=mbedtls) */
-mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void); /*(not in header)*/
-inline mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void)
-{
-    return ctr_drbg_init_state ? &ctr_drbg : ctr_drbg_init();
-}
-#endif
-
 void *hostap_rng_ctx(void)
 {
-#if defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-    return MBEDTLS_PSA_RANDOM_STATE;
-#else
-    return (mbedtls_ctr_drbg_context *) crypto_mbedtls_ctr_drbg();
-#endif /* MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG */
+    return NULL;
 }
 
 /* tradeoff: slightly smaller code size here at cost of slight increase
