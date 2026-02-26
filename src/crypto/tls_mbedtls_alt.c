@@ -47,6 +47,7 @@
 
 #ifndef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_NONE
 
+#include <psa/crypto.h>
 #include <mbedtls/version.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/error.h>
@@ -58,6 +59,7 @@
 #include <mbedtls/ssl_ticket.h>
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crt.h>
+#include <mbedtls/pk.h>
 #if defined(MBEDTLS_SSL_PROTO_TLS1_3)
 #include <../library/ssl_misc.h>
 #include <../library/ssl_tls13_keys.h>
@@ -1449,7 +1451,7 @@ static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb128 = {
     /* Only SHA-256 and 384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA256) | MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA384),
     /* Only ECDSA */
-    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECDSA) | MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECKEY),
+    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA),
 #if defined(MBEDTLS_ECP_C)
     /* Only NIST P-256 and P-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP256R1) | MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP384R1),
@@ -1466,7 +1468,7 @@ static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb192 = {
     /* Only SHA-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA384),
     /* Only ECDSA */
-    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECDSA) | MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECKEY),
+    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA),
 #if defined(MBEDTLS_ECP_C)
     /* Only NIST P-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP384R1),
@@ -2952,8 +2954,8 @@ static int tls_mbedtls_verify_cb(void *arg, mbedtls_x509_crt *crt, int depth, ui
         if (tls_conf->flags & TLS_CONN_SUITEB)
         {
             /* check RSA modulus size (public key bitlen) */
-            const mbedtls_pk_type_t pk_alg = mbedtls_pk_get_type(&crt->pk);
-            if ((pk_alg == MBEDTLS_PK_RSA || pk_alg == MBEDTLS_PK_RSASSA_PSS)
+            const psa_key_type_t key_type = mbedtls_pk_get_key_type(&crt->pk);
+            if (PSA_KEY_TYPE_IS_RSA(key_type)
 #ifdef CONFIG_SUITEB192
                 && mbedtls_pk_get_bitlen(&crt->pk) < 3072
 #else
