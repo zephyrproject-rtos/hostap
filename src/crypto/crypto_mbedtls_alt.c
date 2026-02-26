@@ -15,9 +15,9 @@
 #include <mbedtls/asn1write.h>
 #include <mbedtls/bignum.h>
 
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
+#include <psa/crypto.h>
+#include <mbedtls/psa_util.h>
 #include "supp_psa_api.h"
-#endif
 
 #ifndef MBEDTLS_PRIVATE
 #define MBEDTLS_PRIVATE(x) x
@@ -113,7 +113,7 @@
 #endif /* dh5_init_fixed() */
 #endif /* crypto_dh_*() */
 
-#if defined(MBEDTLS_ECDH_C) || defined(CONFIG_PSA_WANT_ALG_ECDH)
+#if defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_ECDH
 #endif /* crypto_ecdh_*() */
 
@@ -169,32 +169,10 @@ void *hostap_rng_ctx(void)
     return NULL;
 }
 
-/* tradeoff: slightly smaller code size here at cost of slight increase
- * in instructions and function calls at runtime versus the expanded
- * per-message-digest code that follows in #else (~0.5 kib .text larger) */
 __attribute_noinline__ static int md_vector(
     size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac, mbedtls_md_type_t md_type)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return md_vector_psa(num_elem, addr, len, mac, md_type);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 0) != 0)
-    {
-        mbedtls_md_free(&ctx);
-        return -1;
-    }
-    mbedtls_md_starts(&ctx);
-    for (size_t i = 0; i < num_elem; ++i)
-        mbedtls_md_update(&ctx, addr[i], len[i]);
-    mbedtls_md_finish(&ctx, mac);
-    mbedtls_md_free(&ctx);
-    return 0;
-#endif
 }
 
 int sha512_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -212,14 +190,14 @@ int sha256_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA256);
 }
 
-#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
+#if defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int sha1_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
 }
 #endif
 
-#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
+#if defined(CONFIG_PSA_WANT_ALG_MD5)
 int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -328,26 +306,7 @@ __attribute_noinline__ static int hmac_vector(const u8 *key,
                                               u8 *mac,
                                               mbedtls_md_type_t md_type)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return hmac_vector_psa(key, key_len, num_elem, addr, len, mac, md_type);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1) != 0)
-    {
-        mbedtls_md_free(&ctx);
-        return -1;
-    }
-    mbedtls_md_hmac_starts(&ctx, key, key_len);
-    for (size_t i = 0; i < num_elem; ++i)
-        mbedtls_md_hmac_update(&ctx, addr[i], len[i]);
-    mbedtls_md_hmac_finish(&ctx, mac);
-    mbedtls_md_free(&ctx);
-    return 0;
-#endif
 }
 
 int hmac_sha512_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -380,7 +339,7 @@ int hmac_sha256(const u8 *key, size_t key_len, const u8 *data, size_t data_len, 
     return hmac_vector(key, key_len, 1, &data, &data_len, mac, MBEDTLS_MD_SHA256);
 }
 
-#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
+#if defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int hmac_sha1_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
@@ -392,7 +351,7 @@ int hmac_sha1(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8
 }
 #endif
 
-#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
+#if defined(CONFIG_PSA_WANT_ALG_MD5)
 int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -598,7 +557,6 @@ int sha384_prf(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA384);
 }
 
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
 /**
  * Based on Supplicant internal implementaion of SHA-256. This API
  * uses PSA APIs instead of Supplicant internal implementation or
@@ -641,16 +599,11 @@ static int hmac_prf256(const u8 *key,
 
     return 0;
 }
-#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 
 int sha256_prf(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return hmac_prf256(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
-#else
-    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
-#endif
 }
 
 int sha256_prf_bits(
@@ -659,7 +612,7 @@ int sha256_prf_bits(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, MBEDTLS_MD_SHA256);
 }
 
-#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
+#if defined(CONFIG_PSA_WANT_ALG_SHA_1)
 
 /* sha1-prf.c */
 
@@ -732,7 +685,7 @@ int sha1_t_prf(
 }
 
 #endif /* CRYPTO_MBEDTLS_SHA1_T_PRF */
-#endif /* MBEDTLS_SHA1_C || CONFIG_PSA_WANT_ALG_SHA_1 */
+#endif /* CONFIG_PSA_WANT_ALG_SHA_1 */
 
 #ifdef MBEDTLS_DES_C
 #include <mbedtls/des.h>
@@ -764,16 +717,9 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 #include <mbedtls/pkcs5.h>
 int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int iterations, u8 *buf, size_t buflen)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return pbkdf2_sha1_psa(MBEDTLS_MD_SHA1, (const u8 *)passphrase,
                            os_strlen(passphrase), ssid, ssid_len,
                            iterations, 32, buf) ? -1: 0;
-#else
-    return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA1, (const u8 *)passphrase, os_strlen(passphrase), ssid, ssid_len,
-                                         iterations, 32, buf) ?
-               -1 :
-               0;
-#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 }
 #endif
 
@@ -841,7 +787,7 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
 }
 #endif /* MBEDTLS_NIST_KW_C */
 
-#if defined(MBEDTLS_CMAC_C) || defined(CONFIG_PSA_WANT_ALG_CMAC)
+#if defined(CONFIG_PSA_WANT_ALG_CMAC)
 
 /* aes-omac1.c */
 
@@ -849,46 +795,7 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
 
 int omac1_aes_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return omac1_aes_vector_psa(key, key_len, num_elem, addr, len, mac);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_cipher_type_t cipher_type;
-    switch (key_len)
-    {
-        case 16:
-            cipher_type = MBEDTLS_CIPHER_AES_128_ECB;
-            break;
-        case 24:
-            cipher_type = MBEDTLS_CIPHER_AES_192_ECB;
-            break;
-        case 32:
-            cipher_type = MBEDTLS_CIPHER_AES_256_ECB;
-            break;
-        default:
-            return -1;
-    }
-    const mbedtls_cipher_info_t *cipher_info;
-    cipher_info = mbedtls_cipher_info_from_type(cipher_type);
-    if (cipher_info == NULL)
-        return -1;
-
-    mbedtls_cipher_context_t ctx;
-    mbedtls_cipher_init(&ctx);
-    int ret = -1;
-    if (mbedtls_cipher_setup(&ctx, cipher_info) == 0 && mbedtls_cipher_cmac_starts(&ctx, key, key_len * 8) == 0)
-    {
-        ret = 0;
-        for (size_t i = 0; i < num_elem && ret == 0; ++i)
-            ret = mbedtls_cipher_cmac_update(&ctx, addr[i], len[i]);
-    }
-    if (ret == 0)
-        ret = mbedtls_cipher_cmac_finish(&ctx, mac);
-    mbedtls_cipher_free(&ctx);
-    return ret ? -1 : 0;
-#endif
 }
 
 int omac1_aes_128_vector(const u8 *key, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -914,9 +821,9 @@ int omac1_aes_256(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 #define MBEDTLS_AES_BLOCK_SIZE 16
 #endif
 
-#endif /* MBEDTLS_CMAC_C */
+#endif /* CONFIG_PSA_WANT_ALG_CMAC */
 
-#if defined(MBEDTLS_AES_C) || defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
+#if defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
 
 /* These interfaces can be inefficient when used in loops, as the overhead of
  * initialization each call is large for each block input (e.g. 16 bytes) */
@@ -924,45 +831,13 @@ int omac1_aes_256(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 /* aes-encblock.c */
 int aes_128_encrypt_block(const u8 *key, const u8 *in, u8 *out)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return aes_128_encrypt_block_psa(key, in, out);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_aes_context aes;
-    mbedtls_aes_init(&aes);
-    int ret =
-        mbedtls_aes_setkey_enc(&aes, key, 128) || mbedtls_aes_crypt_ecb(&aes, MBEDTLS_AES_ENCRYPT, in, out) ? -1 : 0;
-    mbedtls_aes_free(&aes);
-    return ret;
-#endif
 }
 
 /* aes-ctr.c */
 int aes_ctr_encrypt(const u8 *key, size_t key_len, const u8 *nonce, u8 *data, size_t data_len)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return aes_ctr_encrypt_psa(key, key_len, nonce, data, data_len);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    unsigned char counter[MBEDTLS_AES_BLOCK_SIZE];
-    unsigned char stream_block[MBEDTLS_AES_BLOCK_SIZE];
-    os_memcpy(counter, nonce, MBEDTLS_AES_BLOCK_SIZE); /*(must be writable)*/
-
-    mbedtls_aes_context ctx;
-    mbedtls_aes_init(&ctx);
-    size_t nc_off = 0;
-    int ret       = mbedtls_aes_setkey_enc(&ctx, key, key_len * 8) ||
-                      mbedtls_aes_crypt_ctr(&ctx, data_len, &nc_off, counter, stream_block, data, data) ?
-                  -1 :
-                  0;
-    forced_memzero(stream_block, sizeof(stream_block));
-    mbedtls_aes_free(&ctx);
-    return ret;
-#endif
 }
 
 int aes_128_ctr_encrypt(const u8 *key, const u8 *nonce, u8 *data, size_t data_len)
@@ -970,26 +845,16 @@ int aes_128_ctr_encrypt(const u8 *key, const u8 *nonce, u8 *data, size_t data_le
     return aes_ctr_encrypt(key, 16, nonce, data, data_len);
 }
 
+#define HOSTAP_AES_ENCRYPT     0
+#define HOSTAP_AES_DECRYPT     1
+
 /* aes-cbc.c */
 static int aes_128_cbc_oper(const u8 *key, const u8 *iv, u8 *data, size_t data_len, int mode)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
-    if (mode == MBEDTLS_AES_ENCRYPT)
+    if (mode == HOSTAP_AES_ENCRYPT)
         return aes_128_cbc_encrypt_psa(key, iv, data, data_len);
     else
         return aes_128_cbc_decrypt_psa(key, iv, data, data_len);
-#else
-    unsigned char ivec[MBEDTLS_AES_BLOCK_SIZE];
-    os_memcpy(ivec, iv, MBEDTLS_AES_BLOCK_SIZE); /*(must be writable)*/
-
-    mbedtls_aes_context ctx;
-    mbedtls_aes_init(&ctx);
-    int ret = (mode == MBEDTLS_AES_ENCRYPT ? mbedtls_aes_setkey_enc(&ctx, key, 128) :
-                                             mbedtls_aes_setkey_dec(&ctx, key, 128)) ||
-              mbedtls_aes_crypt_cbc(&ctx, mode, data_len, ivec, data, data);
-    mbedtls_aes_free(&ctx);
-    return ret ? -1 : 0;
-#endif
 }
 
 int aes_128_cbc_encrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
@@ -997,7 +862,7 @@ int aes_128_cbc_encrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
     if (TEST_FAIL())
         return -1;
 
-    return aes_128_cbc_oper(key, iv, data, data_len, MBEDTLS_AES_ENCRYPT);
+    return aes_128_cbc_oper(key, iv, data, data_len, HOSTAP_AES_ENCRYPT);
 }
 
 int aes_128_cbc_decrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
@@ -1005,9 +870,9 @@ int aes_128_cbc_decrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
     if (TEST_FAIL())
         return -1;
 
-    return aes_128_cbc_oper(key, iv, data, data_len, MBEDTLS_AES_DECRYPT);
+    return aes_128_cbc_oper(key, iv, data, data_len, HOSTAP_AES_DECRYPT);
 }
-#endif
+#endif /* CONFIG_PSA_WANT_KEY_TYPE_AES */
 
 /*
  * Much of the following is documented in crypto.h as for CONFIG_TLS=internal
@@ -1037,7 +902,7 @@ struct crypto_cipher *crypto_cipher_init(enum crypto_cipher_alg alg, const u8 *i
     size_t iv_len;
     switch (alg)
     {
-#ifdef MBEDTLS_AES_C
+#ifdef PSA_WANT_KEY_TYPE_AES
         case CRYPTO_CIPHER_ALG_AES:
             if (key_len == 16)
                 cipher_type = MBEDTLS_CIPHER_AES_128_CTR;
