@@ -49,7 +49,6 @@
 
 #include <psa/crypto.h>
 #include <mbedtls/version.h>
-#include <mbedtls/ctr_drbg.h>
 #include <mbedtls/error.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pem.h>
@@ -165,7 +164,6 @@ struct tls_global
 {
     struct tls_conf *tls_conf;
     char *ocsp_stapling_response;
-    mbedtls_ctr_drbg_context *ctr_drbg; /*(see crypto_mbedtls.c)*/
 #ifdef MBEDTLS_SSL_SESSION_TICKETS
     mbedtls_ssl_ticket_context ticket_ctx;
 #endif
