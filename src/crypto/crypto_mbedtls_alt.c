@@ -913,12 +913,6 @@ struct crypto_cipher *crypto_cipher_init(enum crypto_cipher_alg alg, const u8 *i
             iv_len = 16;
             break;
 #endif
-#ifdef MBEDTLS_DES_C
-        case CRYPTO_CIPHER_ALG_3DES:
-            cipher_type = MBEDTLS_CIPHER_DES_EDE3_CBC;
-            iv_len      = 8;
-            break;
-#endif
         default:
             return NULL;
     }
