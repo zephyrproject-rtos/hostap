@@ -67,6 +67,7 @@
 #include "wpas_kay.h"
 #include "mesh.h"
 #include "dpp_supplicant.h"
+#include "nan_usd.h"
 #ifdef CONFIG_MESH
 #include "ap/ap_config.h"
 #include "ap/hostapd.h"
@@ -7292,6 +7293,11 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 	if (wpas_dpp_init(wpa_s) < 0)
 		return -1;
 #endif /* CONFIG_DPP */
+
+#ifdef CONFIG_NAN_USD
+	if (wpas_nan_usd_init(wpa_s) < 0)
+		return -1;
+#endif /* CONFIG_NAN_USD */
 
 	if (wpa_supplicant_init_eapol(wpa_s) < 0)
 		return -1;
