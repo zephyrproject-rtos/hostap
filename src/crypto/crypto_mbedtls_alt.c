@@ -687,7 +687,6 @@ int sha1_t_prf(
 #endif /* CRYPTO_MBEDTLS_SHA1_T_PRF */
 #endif /* CONFIG_PSA_WANT_ALG_SHA_1 */
 
-#ifdef MBEDTLS_DES_C
 #include <mbedtls/des.h>
 int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 {
@@ -710,7 +709,6 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
     mbedtls_des_free(&des);
     return ret;
 }
-#endif
 
 #ifdef CRYPTO_MBEDTLS_PBKDF2_SHA1
 /* sha1-pbkdf2.c */
