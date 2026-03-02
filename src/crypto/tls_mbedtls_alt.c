@@ -47,8 +47,8 @@
 
 #ifndef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_NONE
 
+#include <psa/crypto.h>
 #include <mbedtls/version.h>
-#include <mbedtls/ctr_drbg.h>
 #include <mbedtls/error.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pem.h>
@@ -58,6 +58,7 @@
 #include <mbedtls/ssl_ticket.h>
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crt.h>
+#include <mbedtls/pk.h>
 #if defined(MBEDTLS_SSL_PROTO_TLS1_3)
 #include <../library/ssl_misc.h>
 #include <../library/ssl_tls13_keys.h>
@@ -163,7 +164,6 @@ struct tls_global
 {
     struct tls_conf *tls_conf;
     char *ocsp_stapling_response;
-    mbedtls_ctr_drbg_context *ctr_drbg; /*(see crypto_mbedtls.c)*/
 #ifdef MBEDTLS_SSL_SESSION_TICKETS
     mbedtls_ssl_ticket_context ticket_ctx;
 #endif
@@ -327,7 +327,6 @@ struct tls_conf *tls_conf_init(void *tls_ctx)
     tls_conf->refcnt = 1;
 
     mbedtls_ssl_config_init(&tls_conf->conf);
-    mbedtls_ssl_conf_rng(&tls_conf->conf, hostap_rng_fn, hostap_rng_ctx());
     mbedtls_x509_crt_init(&tls_conf->ca_cert);
     mbedtls_x509_crt_init(&tls_conf->client_cert);
     mbedtls_pk_init(&tls_conf->private_key);
@@ -846,129 +845,62 @@ static const int suite_AES_256_ephemeral[] = {
     /* All AES-256 ephemeral suites */
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CCM,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA256,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CCM_8};
+};
 
 /* data copied from lighttpd src/mod_mbedtls.c (BSD-3-Clause) */
 static const int suite_AES_128_ephemeral[] = {
     /* All AES-128 ephemeral suites */
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CCM,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CCM_8};
+};
 
 /* data copied from lighttpd src/mod_mbedtls.c (BSD-3-Clause) */
 /* HIGH cipher list (mapped from openssl list to mbedtls) */
 static const int suite_HIGH[] = {MBEDTLS_TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CCM,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA256,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CCM_8,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_CAMELLIA_256_CBC_SHA384,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_CAMELLIA_256_CBC_SHA384,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_ARIA_256_GCM_SHA384,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_ARIA_256_GCM_SHA384,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_ARIA_256_GCM_SHA384,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CCM,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CCM_8,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_CAMELLIA_128_CBC_SHA256,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_CAMELLIA_128_CBC_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_ECDSA_WITH_ARIA_128_GCM_SHA256,
                                  MBEDTLS_TLS_ECDHE_RSA_WITH_ARIA_128_GCM_SHA256,
-                                 MBEDTLS_TLS_DHE_RSA_WITH_ARIA_128_GCM_SHA256,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_256_GCM_SHA384,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_256_CCM,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_AES_256_CBC_SHA384,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_256_CBC_SHA384,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_AES_256_CBC_SHA,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_256_CBC_SHA,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_CAMELLIA_256_CBC_SHA384,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_CAMELLIA_256_CBC_SHA384,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_256_CCM_8,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_ARIA_256_GCM_SHA384,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_128_GCM_SHA256,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_128_CCM,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_128_CBC_SHA256,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_128_CBC_SHA,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_CAMELLIA_128_CBC_SHA256,
                                  MBEDTLS_TLS_ECDHE_PSK_WITH_CAMELLIA_128_CBC_SHA256,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_AES_128_CCM_8,
-                                 MBEDTLS_TLS_DHE_PSK_WITH_ARIA_128_GCM_SHA256,
-                                 MBEDTLS_TLS_RSA_WITH_AES_256_GCM_SHA384,
-                                 MBEDTLS_TLS_RSA_WITH_AES_256_CCM,
-                                 MBEDTLS_TLS_RSA_WITH_AES_256_CBC_SHA256,
-                                 MBEDTLS_TLS_RSA_WITH_AES_256_CBC_SHA,
-                                 MBEDTLS_TLS_RSA_WITH_AES_256_CCM_8,
-                                 MBEDTLS_TLS_RSA_WITH_CAMELLIA_256_CBC_SHA256,
-                                 MBEDTLS_TLS_RSA_WITH_CAMELLIA_256_CBC_SHA,
-                                 MBEDTLS_TLS_RSA_WITH_ARIA_256_GCM_SHA384,
-                                 MBEDTLS_TLS_RSA_WITH_AES_128_GCM_SHA256,
-                                 MBEDTLS_TLS_RSA_WITH_AES_128_CCM,
-                                 MBEDTLS_TLS_RSA_WITH_AES_128_CBC_SHA256,
-                                 MBEDTLS_TLS_RSA_WITH_AES_128_CBC_SHA,
-                                 MBEDTLS_TLS_RSA_WITH_AES_128_CCM_8,
-                                 MBEDTLS_TLS_RSA_WITH_CAMELLIA_128_CBC_SHA256,
-                                 MBEDTLS_TLS_RSA_WITH_CAMELLIA_128_CBC_SHA,
-                                 MBEDTLS_TLS_RSA_WITH_ARIA_128_GCM_SHA256,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_AES_256_GCM_SHA384,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_AES_256_CBC_SHA384,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_AES_256_CBC_SHA,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_CAMELLIA_256_CBC_SHA384,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_ARIA_256_GCM_SHA384,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_AES_128_GCM_SHA256,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_AES_128_CBC_SHA256,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_AES_128_CBC_SHA,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_CAMELLIA_128_CBC_SHA256,
-                                 MBEDTLS_TLS_RSA_PSK_WITH_ARIA_128_GCM_SHA256,
                                  MBEDTLS_TLS_PSK_WITH_CHACHA20_POLY1305_SHA256,
                                  MBEDTLS_TLS_PSK_WITH_AES_256_GCM_SHA384,
                                  MBEDTLS_TLS_PSK_WITH_AES_256_CCM,
@@ -1483,7 +1415,7 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf, const struct tls_con
         }
         const char *pwd = params->private_key_passwd;
         ret = mbedtls_pk_parse_key(&tls_conf->private_key, data, len, (const unsigned char *)pwd,
-                                   pwd ? os_strlen(pwd) : 0, hostap_rng_fn, hostap_rng_ctx());
+                                   pwd ? os_strlen(pwd) : 0);
         if (params->private_key)
         {
             forced_memzero(data, len);
@@ -1517,7 +1449,7 @@ static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb128 = {
     /* Only SHA-256 and 384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA256) | MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA384),
     /* Only ECDSA */
-    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECDSA) | MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECKEY),
+    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA),
 #if defined(MBEDTLS_ECP_C)
     /* Only NIST P-256 and P-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP256R1) | MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP384R1),
@@ -1534,7 +1466,7 @@ static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb192 = {
     /* Only SHA-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA384),
     /* Only ECDSA */
-    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECDSA) | MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_ECKEY),
+    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA),
 #if defined(MBEDTLS_ECP_C)
     /* Only NIST P-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP384R1),
@@ -3020,8 +2952,8 @@ static int tls_mbedtls_verify_cb(void *arg, mbedtls_x509_crt *crt, int depth, ui
         if (tls_conf->flags & TLS_CONN_SUITEB)
         {
             /* check RSA modulus size (public key bitlen) */
-            const mbedtls_pk_type_t pk_alg = mbedtls_pk_get_type(&crt->pk);
-            if ((pk_alg == MBEDTLS_PK_RSA || pk_alg == MBEDTLS_PK_RSASSA_PSS)
+            const psa_key_type_t key_type = mbedtls_pk_get_key_type(&crt->pk);
+            if (PSA_KEY_TYPE_IS_RSA(key_type)
 #ifdef CONFIG_SUITEB192
                 && mbedtls_pk_get_bitlen(&crt->pk) < 3072
 #else

@@ -13,16 +13,11 @@
 #include <mbedtls/platform_util.h> /* mbedtls_platform_zeroize() */
 #include <mbedtls/asn1.h>
 #include <mbedtls/asn1write.h>
-#include <mbedtls/aes.h>
-#include <mbedtls/md.h>
-#include <mbedtls/md5.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/sha512.h>
+#include <mbedtls/bignum.h>
 
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
+#include <psa/crypto.h>
+#include <mbedtls/psa_util.h>
 #include "supp_psa_api.h"
-#endif
 
 #ifndef MBEDTLS_PRIVATE
 #define MBEDTLS_PRIVATE(x) x
@@ -118,7 +113,7 @@
 #endif /* dh5_init_fixed() */
 #endif /* crypto_dh_*() */
 
-#if defined(MBEDTLS_ECDH_C) || defined(CONFIG_PSA_WANT_ALG_ECDH)
+#if defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_ECDH
 #endif /* crypto_ecdh_*() */
 
@@ -151,120 +146,33 @@
 
 #endif /* crypto_rsa_*() */
 
-
-
-#if defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-#include <mbedtls/psa_util.h>
-/* Setting ctr_drbg_init_state to 1 to allow unload_crypto to run */
-static int ctr_drbg_init_state = 1;
-int (*hostap_rng_fn)(void*, unsigned char*, size_t) = mbedtls_psa_get_random;
-#else
-#include <mbedtls/entropy.h>
-#include <mbedtls/ctr_drbg.h>
-static int ctr_drbg_init_state;
-static mbedtls_ctr_drbg_context ctr_drbg;
-static mbedtls_entropy_context entropy;
-int(*hostap_rng_fn)(void*, unsigned char*, size_t) = mbedtls_ctr_drbg_random;
-#endif
-
 #ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 #include <mbedtls/bignum.h>
 static mbedtls_mpi mpi_sw_A;
 #endif
 
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-static int wm_wrap_entropy_poll(void *data, unsigned char *output, size_t len, size_t *olen)
-{
-    ((void)data);
-    os_get_random(output, len);
-    *olen = len;
-    return 0;
-}
-
-__attribute_cold__ __attribute_noinline__ static mbedtls_ctr_drbg_context *ctr_drbg_init(void)
-{
-    const unsigned char *custom_name = (const unsigned char *)"WPA_SUPPLICANT/HOSTAPD";
-    size_t custom_name_len           = os_strlen((const char *)custom_name);
-
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_entropy_init(&entropy);
-
-    mbedtls_entropy_add_source(&entropy, wm_wrap_entropy_poll, NULL, ENTROPY_MIN_PLATFORM,
-                               MBEDTLS_ENTROPY_SOURCE_STRONG);
-
-    if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, custom_name, custom_name_len))
-    {
-        wpa_printf(MSG_ERROR, "Init of random number generator failed");
-        /* XXX: abort? */
-    }
-    else
-        ctr_drbg_init_state = 1;
-
-    return &ctr_drbg;
-}
-#endif
-
 __attribute_cold__ void crypto_unload(void)
 {
-    if (ctr_drbg_init_state)
-    {
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-        mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
-#endif
-#ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
-        mbedtls_mpi_free(&mpi_sw_A);
-#endif
-        ctr_drbg_init_state = 0;
-    }
+    /* Nothing to do */
 }
 
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-/* init ctr_drbg on first use
- * crypto_global_init() and crypto_global_deinit() are not available here
- * (available only when CONFIG_TLS=internal, which is not CONFIG_TLS=mbedtls) */
-mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void); /*(not in header)*/
-inline mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void)
+int hostap_rng_fn(void* ctx, unsigned char* buf, size_t buf_size)
 {
-    return ctr_drbg_init_state ? &ctr_drbg : ctr_drbg_init();
+    if (psa_generate_random(buf, buf_size) != PSA_SUCCESS) {
+        return -1;
+    }
+    return 0;
 }
-#endif
 
 void *hostap_rng_ctx(void)
 {
-#if defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-    return MBEDTLS_PSA_RANDOM_STATE;
-#else
-    return (mbedtls_ctr_drbg_context *) crypto_mbedtls_ctr_drbg();
-#endif /* MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG */
+    return NULL;
 }
 
-/* tradeoff: slightly smaller code size here at cost of slight increase
- * in instructions and function calls at runtime versus the expanded
- * per-message-digest code that follows in #else (~0.5 kib .text larger) */
 __attribute_noinline__ static int md_vector(
     size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac, mbedtls_md_type_t md_type)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return md_vector_psa(num_elem, addr, len, mac, md_type);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 0) != 0)
-    {
-        mbedtls_md_free(&ctx);
-        return -1;
-    }
-    mbedtls_md_starts(&ctx);
-    for (size_t i = 0; i < num_elem; ++i)
-        mbedtls_md_update(&ctx, addr[i], len[i]);
-    mbedtls_md_finish(&ctx, mac);
-    mbedtls_md_free(&ctx);
-    return 0;
-#endif
 }
 
 int sha512_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -282,14 +190,14 @@ int sha256_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA256);
 }
 
-#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
+#if defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int sha1_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
 }
 #endif
 
-#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
+#if defined(CONFIG_PSA_WANT_ALG_MD5)
 int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return md_vector(num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -398,26 +306,7 @@ __attribute_noinline__ static int hmac_vector(const u8 *key,
                                               u8 *mac,
                                               mbedtls_md_type_t md_type)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return hmac_vector_psa(key, key_len, num_elem, addr, len, mac, md_type);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1) != 0)
-    {
-        mbedtls_md_free(&ctx);
-        return -1;
-    }
-    mbedtls_md_hmac_starts(&ctx, key, key_len);
-    for (size_t i = 0; i < num_elem; ++i)
-        mbedtls_md_hmac_update(&ctx, addr[i], len[i]);
-    mbedtls_md_hmac_finish(&ctx, mac);
-    mbedtls_md_free(&ctx);
-    return 0;
-#endif
 }
 
 int hmac_sha512_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -450,7 +339,7 @@ int hmac_sha256(const u8 *key, size_t key_len, const u8 *data, size_t data_len, 
     return hmac_vector(key, key_len, 1, &data, &data_len, mac, MBEDTLS_MD_SHA256);
 }
 
-#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
+#if defined(CONFIG_PSA_WANT_ALG_SHA_1)
 int hmac_sha1_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_SHA1);
@@ -462,7 +351,7 @@ int hmac_sha1(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8
 }
 #endif
 
-#if defined(MBEDTLS_MD5_C) || defined(CONFIG_PSA_WANT_ALG_MD5)
+#if defined(CONFIG_PSA_WANT_ALG_MD5)
 int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     return hmac_vector(key, key_len, num_elem, addr, len, mac, MBEDTLS_MD_MD5);
@@ -474,9 +363,22 @@ int hmac_md5(const u8 *key, size_t key_len, const u8 *data, size_t data_len, u8 
 }
 #endif
 
-#ifdef MBEDTLS_HKDF_C
-#include <mbedtls/hkdf.h>
+#if defined(PSA_WANT_ALG_HKDF)
+#include <psa/crypto.h>
 
+/* Perform "_op_" PSA API call and check if it succeeded. If not return
+ * "_ret_fail_".
+ * Note that operations using "psa_status" can be specified as second argument
+ * like "do_something(psa_status)".
+*/
+#define PSA_CHECK(_op_, _ret_fail_) \
+    do { \
+        psa_status_t psa_status; \
+        psa_status = _op_; \
+        if (psa_status != PSA_SUCCESS) { \
+            return _ret_fail_; \
+        } \
+    } while(0)
 /* sha256-kdf.c sha384-kdf.c sha512-kdf.c */
 
 /* HMAC-SHA256 KDF (RFC 5295) and HKDF-Expand(SHA256) (RFC 5869) */
@@ -495,8 +397,19 @@ __attribute_noinline__ static int hmac_kdf_expand(const u8 *prk,
         return -1;
 
     const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(md_type);
-    if (label == NULL) /* RFC 5869 HKDF-Expand when (label == NULL) */
-        return mbedtls_hkdf_expand(md_info, prk, prk_len, info, info_len, okm, okm_len) ? -1 : 0;
+    /* RFC 5869 HKDF-Expand when (label == NULL) */
+    if (label == NULL) {
+        psa_key_derivation_operation_t psa_op = PSA_KEY_DERIVATION_OPERATION_INIT;
+        psa_algorithm_t psa_hash_alg = mbedtls_md_psa_alg_from_type(md_type);
+
+        PSA_CHECK(psa_key_derivation_setup(&psa_op, PSA_ALG_HKDF_EXPAND(psa_hash_alg)), -1);
+        PSA_CHECK(psa_key_derivation_input_bytes(&psa_op, PSA_KEY_DERIVATION_INPUT_SECRET,
+                                                 prk, prk_len), -1);
+        PSA_CHECK(psa_key_derivation_input_bytes(&psa_op, PSA_KEY_DERIVATION_INPUT_INFO,
+                                                 info, info_len), -1);
+        PSA_CHECK(psa_key_derivation_output_bytes(&psa_op, okm, okm_len), -1);
+        PSA_CHECK(psa_key_derivation_abort(&psa_op), -1);
+    }
 
     const size_t mac_len = mbedtls_md_get_size(md_info);
     /* okm_len must not exceed 255 times hash len (RFC 5869 Section 2.3) */
@@ -505,12 +418,17 @@ __attribute_noinline__ static int hmac_kdf_expand(const u8 *prk,
 
     mbedtls_md_context_t ctx;
     mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, md_info, 1) != 0)
-    {
+    if (mbedtls_md_setup(&ctx, md_info, 0) != 0) {
+        return -1;
+    }
+    if (mbedtls_md_hmac_setup(&ctx, md_info) != 0) {
         mbedtls_md_free(&ctx);
         return -1;
     }
-    mbedtls_md_hmac_starts(&ctx, prk, prk_len);
+    if (mbedtls_md_hmac_starts(&ctx, prk, prk_len) != 0) {
+        mbedtls_md_free(&ctx);
+        return -1;
+    }
 
     u8 iter           = 1;
     const u8 *addr[4] = {okm, (const u8 *)label, info, &iter};
@@ -558,7 +476,7 @@ int hmac_sha256_kdf(
 {
     return hmac_kdf_expand(secret, secret_len, label, seed, seed_len, out, outlen, MBEDTLS_MD_SHA256);
 }
-#endif /* MBEDTLS_HKDF_C */
+#endif /* PSA_WANT_ALG_HKDF */
 
 /* sha256-prf.c sha384-prf.c sha512-prf.c */
 
@@ -639,7 +557,6 @@ int sha384_prf(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA384);
 }
 
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
 /**
  * Based on Supplicant internal implementaion of SHA-256. This API
  * uses PSA APIs instead of Supplicant internal implementation or
@@ -682,16 +599,11 @@ static int hmac_prf256(const u8 *key,
 
     return 0;
 }
-#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 
 int sha256_prf(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return hmac_prf256(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
-#else
-    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA256);
-#endif
 }
 
 int sha256_prf_bits(
@@ -700,7 +612,7 @@ int sha256_prf_bits(
     return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, MBEDTLS_MD_SHA256);
 }
 
-#if defined(MBEDTLS_SHA1_C) || defined(CONFIG_PSA_WANT_ALG_SHA_1)
+#if defined(CONFIG_PSA_WANT_ALG_SHA_1)
 
 /* sha1-prf.c */
 
@@ -773,9 +685,8 @@ int sha1_t_prf(
 }
 
 #endif /* CRYPTO_MBEDTLS_SHA1_T_PRF */
-#endif /* MBEDTLS_SHA1_C || CONFIG_PSA_WANT_ALG_SHA_1 */
+#endif /* CONFIG_PSA_WANT_ALG_SHA_1 */
 
-#ifdef MBEDTLS_DES_C
 #include <mbedtls/des.h>
 int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 {
@@ -798,23 +709,15 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
     mbedtls_des_free(&des);
     return ret;
 }
-#endif
 
 #ifdef CRYPTO_MBEDTLS_PBKDF2_SHA1
 /* sha1-pbkdf2.c */
 #include <mbedtls/pkcs5.h>
 int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int iterations, u8 *buf, size_t buflen)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return pbkdf2_sha1_psa(MBEDTLS_MD_SHA1, (const u8 *)passphrase,
                            os_strlen(passphrase), ssid, ssid_len,
                            iterations, 32, buf) ? -1: 0;
-#else
-    return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA1, (const u8 *)passphrase, os_strlen(passphrase), ssid, ssid_len,
-                                         iterations, 32, buf) ?
-               -1 :
-               0;
-#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA */
 }
 #endif
 
@@ -823,6 +726,7 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int ite
 #ifdef MBEDTLS_NIST_KW_C
 
 #include <mbedtls/nist_kw.h>
+#include <psa/crypto.h>
 
 /* aes-wrap.c */
 int aes_wrap(const u8 *kek, size_t kek_len, int n, const u8 *plain, u8 *cipher)
@@ -830,15 +734,26 @@ int aes_wrap(const u8 *kek, size_t kek_len, int n, const u8 *plain, u8 *cipher)
     if (TEST_FAIL())
         return -1;
 
-    mbedtls_nist_kw_context ctx;
-    mbedtls_nist_kw_init(&ctx);
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
     size_t olen;
-    int ret = mbedtls_nist_kw_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, kek, kek_len * 8, 1) ||
-                      mbedtls_nist_kw_wrap(&ctx, MBEDTLS_KW_MODE_KW, plain, n * 8, cipher, &olen, (n + 1) * 8) ?
-                  -1 :
-                  0;
-    mbedtls_nist_kw_free(&ctx);
-    return ret;
+    psa_status_t status;
+    int ret;
+
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_AES);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECB_NO_PADDING);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
+    status = psa_import_key(&key_attr, kek, kek_len, &key_id);
+    if (status != PSA_SUCCESS) {
+        return -1;
+    }
+
+    ret = mbedtls_nist_kw_wrap(key_id, MBEDTLS_KW_MODE_KW, plain, n * 8, cipher, (n + 1) * 8, &olen);
+
+    psa_reset_key_attributes(&key_attr);
+    psa_destroy_key(key_id);
+
+    return (ret != 0) ? -1 : 0;
 }
 
 /* aes-unwrap.c */
@@ -847,19 +762,30 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
     if (TEST_FAIL())
         return -1;
 
-    mbedtls_nist_kw_context ctx;
-    mbedtls_nist_kw_init(&ctx);
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
     size_t olen;
-    int ret = mbedtls_nist_kw_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, kek, kek_len * 8, 0) ||
-                      mbedtls_nist_kw_unwrap(&ctx, MBEDTLS_KW_MODE_KW, cipher, (n + 1) * 8, plain, &olen, n * 8) ?
-                  -1 :
-                  0;
-    mbedtls_nist_kw_free(&ctx);
-    return ret;
+    psa_status_t status;
+    int ret;
+
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_AES);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECB_NO_PADDING);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
+    status = psa_import_key(&key_attr, kek, kek_len, &key_id);
+    if (status != PSA_SUCCESS) {
+        return -1;
+    }
+
+    ret = mbedtls_nist_kw_unwrap(key_id, MBEDTLS_KW_MODE_KW, cipher, (n + 1) * 8, plain, n * 8, &olen);
+
+    psa_reset_key_attributes(&key_attr);
+    psa_destroy_key(key_id);
+
+    return (ret != 0) ? -1 : 0;
 }
 #endif /* MBEDTLS_NIST_KW_C */
 
-#if defined(MBEDTLS_CMAC_C) || defined(CONFIG_PSA_WANT_ALG_CMAC)
+#if defined(CONFIG_PSA_WANT_ALG_CMAC)
 
 /* aes-omac1.c */
 
@@ -867,46 +793,7 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
 
 int omac1_aes_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return omac1_aes_vector_psa(key, key_len, num_elem, addr, len, mac);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_cipher_type_t cipher_type;
-    switch (key_len)
-    {
-        case 16:
-            cipher_type = MBEDTLS_CIPHER_AES_128_ECB;
-            break;
-        case 24:
-            cipher_type = MBEDTLS_CIPHER_AES_192_ECB;
-            break;
-        case 32:
-            cipher_type = MBEDTLS_CIPHER_AES_256_ECB;
-            break;
-        default:
-            return -1;
-    }
-    const mbedtls_cipher_info_t *cipher_info;
-    cipher_info = mbedtls_cipher_info_from_type(cipher_type);
-    if (cipher_info == NULL)
-        return -1;
-
-    mbedtls_cipher_context_t ctx;
-    mbedtls_cipher_init(&ctx);
-    int ret = -1;
-    if (mbedtls_cipher_setup(&ctx, cipher_info) == 0 && mbedtls_cipher_cmac_starts(&ctx, key, key_len * 8) == 0)
-    {
-        ret = 0;
-        for (size_t i = 0; i < num_elem && ret == 0; ++i)
-            ret = mbedtls_cipher_cmac_update(&ctx, addr[i], len[i]);
-    }
-    if (ret == 0)
-        ret = mbedtls_cipher_cmac_finish(&ctx, mac);
-    mbedtls_cipher_free(&ctx);
-    return ret ? -1 : 0;
-#endif
 }
 
 int omac1_aes_128_vector(const u8 *key, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -932,9 +819,9 @@ int omac1_aes_256(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 #define MBEDTLS_AES_BLOCK_SIZE 16
 #endif
 
-#endif /* MBEDTLS_CMAC_C */
+#endif /* CONFIG_PSA_WANT_ALG_CMAC */
 
-#if defined(MBEDTLS_AES_C) || defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
+#if defined(CONFIG_PSA_WANT_KEY_TYPE_AES)
 
 /* These interfaces can be inefficient when used in loops, as the overhead of
  * initialization each call is large for each block input (e.g. 16 bytes) */
@@ -942,45 +829,13 @@ int omac1_aes_256(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 /* aes-encblock.c */
 int aes_128_encrypt_block(const u8 *key, const u8 *in, u8 *out)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return aes_128_encrypt_block_psa(key, in, out);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    mbedtls_aes_context aes;
-    mbedtls_aes_init(&aes);
-    int ret =
-        mbedtls_aes_setkey_enc(&aes, key, 128) || mbedtls_aes_crypt_ecb(&aes, MBEDTLS_AES_ENCRYPT, in, out) ? -1 : 0;
-    mbedtls_aes_free(&aes);
-    return ret;
-#endif
 }
 
 /* aes-ctr.c */
 int aes_ctr_encrypt(const u8 *key, size_t key_len, const u8 *nonce, u8 *data, size_t data_len)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
     return aes_ctr_encrypt_psa(key, key_len, nonce, data, data_len);
-#else
-    if (TEST_FAIL())
-        return -1;
-
-    unsigned char counter[MBEDTLS_AES_BLOCK_SIZE];
-    unsigned char stream_block[MBEDTLS_AES_BLOCK_SIZE];
-    os_memcpy(counter, nonce, MBEDTLS_AES_BLOCK_SIZE); /*(must be writable)*/
-
-    mbedtls_aes_context ctx;
-    mbedtls_aes_init(&ctx);
-    size_t nc_off = 0;
-    int ret       = mbedtls_aes_setkey_enc(&ctx, key, key_len * 8) ||
-                      mbedtls_aes_crypt_ctr(&ctx, data_len, &nc_off, counter, stream_block, data, data) ?
-                  -1 :
-                  0;
-    forced_memzero(stream_block, sizeof(stream_block));
-    mbedtls_aes_free(&ctx);
-    return ret;
-#endif
 }
 
 int aes_128_ctr_encrypt(const u8 *key, const u8 *nonce, u8 *data, size_t data_len)
@@ -988,26 +843,16 @@ int aes_128_ctr_encrypt(const u8 *key, const u8 *nonce, u8 *data, size_t data_le
     return aes_ctr_encrypt(key, 16, nonce, data, data_len);
 }
 
+#define HOSTAP_AES_ENCRYPT     0
+#define HOSTAP_AES_DECRYPT     1
+
 /* aes-cbc.c */
 static int aes_128_cbc_oper(const u8 *key, const u8 *iv, u8 *data, size_t data_len, int mode)
 {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
-    if (mode == MBEDTLS_AES_ENCRYPT)
+    if (mode == HOSTAP_AES_ENCRYPT)
         return aes_128_cbc_encrypt_psa(key, iv, data, data_len);
     else
         return aes_128_cbc_decrypt_psa(key, iv, data, data_len);
-#else
-    unsigned char ivec[MBEDTLS_AES_BLOCK_SIZE];
-    os_memcpy(ivec, iv, MBEDTLS_AES_BLOCK_SIZE); /*(must be writable)*/
-
-    mbedtls_aes_context ctx;
-    mbedtls_aes_init(&ctx);
-    int ret = (mode == MBEDTLS_AES_ENCRYPT ? mbedtls_aes_setkey_enc(&ctx, key, 128) :
-                                             mbedtls_aes_setkey_dec(&ctx, key, 128)) ||
-              mbedtls_aes_crypt_cbc(&ctx, mode, data_len, ivec, data, data);
-    mbedtls_aes_free(&ctx);
-    return ret ? -1 : 0;
-#endif
 }
 
 int aes_128_cbc_encrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
@@ -1015,7 +860,7 @@ int aes_128_cbc_encrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
     if (TEST_FAIL())
         return -1;
 
-    return aes_128_cbc_oper(key, iv, data, data_len, MBEDTLS_AES_ENCRYPT);
+    return aes_128_cbc_oper(key, iv, data, data_len, HOSTAP_AES_ENCRYPT);
 }
 
 int aes_128_cbc_decrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
@@ -1023,9 +868,9 @@ int aes_128_cbc_decrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
     if (TEST_FAIL())
         return -1;
 
-    return aes_128_cbc_oper(key, iv, data, data_len, MBEDTLS_AES_DECRYPT);
+    return aes_128_cbc_oper(key, iv, data, data_len, HOSTAP_AES_DECRYPT);
 }
-#endif
+#endif /* CONFIG_PSA_WANT_KEY_TYPE_AES */
 
 /*
  * Much of the following is documented in crypto.h as for CONFIG_TLS=internal
@@ -1055,7 +900,7 @@ struct crypto_cipher *crypto_cipher_init(enum crypto_cipher_alg alg, const u8 *i
     size_t iv_len;
     switch (alg)
     {
-#ifdef MBEDTLS_AES_C
+#ifdef PSA_WANT_KEY_TYPE_AES
         case CRYPTO_CIPHER_ALG_AES:
             if (key_len == 16)
                 cipher_type = MBEDTLS_CIPHER_AES_128_CTR;
@@ -1064,12 +909,6 @@ struct crypto_cipher *crypto_cipher_init(enum crypto_cipher_alg alg, const u8 *i
             if (key_len == 32)
                 cipher_type = MBEDTLS_CIPHER_AES_256_CTR;
             iv_len = 16;
-            break;
-#endif
-#ifdef MBEDTLS_DES_C
-        case CRYPTO_CIPHER_ALG_3DES:
-            cipher_type = MBEDTLS_CIPHER_DES_EDE3_CBC;
-            iv_len      = 8;
             break;
 #endif
         default:
@@ -1728,247 +1567,147 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 #include <mbedtls/ecp.h>
 #include <mbedtls/pk.h>
 
-mbedtls_ecp_keypair *mbedtls_pk_ec(const mbedtls_pk_context pk);
+/* tf-psa-crypto internal functions */
+psa_ecc_family_t mbedtls_ecc_group_to_psa(mbedtls_ecp_group_id grpid, size_t *bits);
+mbedtls_ecp_group_id mbedtls_ecc_group_from_psa(psa_ecc_family_t family, size_t bits);
 
-static int crypto_mbedtls_keypair_gen(int group, mbedtls_pk_context *pk)
+static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id)
 {
     mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
-    if (grp_id == MBEDTLS_ECP_DP_NONE)
+    psa_ecc_family_t ec_family;
+    psa_key_bits_t key_bits;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
+
+    *key_id = PSA_KEY_ID_NULL;
+
+    ec_family = mbedtls_ecc_group_to_psa(grp_id, (size_t *) &key_bits);
+    if (ec_family == 0) {
         return -1;
-    const mbedtls_pk_info_t *pk_info = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
-    if (pk_info == NULL)
+    }
+
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(ec_family));
+    psa_set_key_bits(&key_attr, key_bits);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE |
+                            PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_VERIFY_HASH);
+    if (psa_generate_key(&key_attr, key_id) != PSA_SUCCESS) {
         return -1;
-    return mbedtls_pk_setup(pk, pk_info) ||
-                   mbedtls_ecp_gen_key(grp_id, (mbedtls_ecp_keypair *)mbedtls_pk_ec(*pk),
-				       hostap_rng_fn, hostap_rng_ctx()) ?
-               -1 :
-               0;
+    }
+
+    return 0;
 }
 
 #endif
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_ECDH
 
-#include <mbedtls/ecdh.h>
 #include <mbedtls/ecdsa.h>
 #include <mbedtls/ecp.h>
 #include <mbedtls/pk.h>
 
-/* wrap mbedtls_ecdh_context for more future-proof direct access to components
- * (mbedtls_ecdh_context internal implementation may change between releases)
- *
- * If mbedtls_pk_context -- specifically underlying mbedtls_ecp_keypair --
- * lifetime were guaranteed to be longer than that of mbedtls_ecdh_context,
- * then mbedtls_pk_context or mbedtls_ecp_keypair could be stored in crypto_ecdh
- * (or crypto_ec_key could be stored in crypto_ecdh, and crypto_ec_key could
- *  wrap mbedtls_ecp_keypair and components, to avoid MBEDTLS_PRIVATE access) */
-struct crypto_ecdh
-{
-    mbedtls_ecdh_context ctx;
-    mbedtls_ecp_group grp;
-    mbedtls_ecp_point Q;
+struct crypto_ecdh {
+    mbedtls_pk_context our_key;
+    uint8_t peer_key[PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)];
+    uint8_t shared_secret[PSA_BITS_TO_BYTES(PSA_VENDOR_ECC_MAX_CURVE_BITS)];
 };
 
-struct crypto_ec
-{
+/*
+ * Following map is being used:
+ *      struct crypto_ec_key --> mbedtls_pk_context
+ */
+
+struct crypto_ec {
     mbedtls_ecp_group group;
 };
 
 struct crypto_ecdh *crypto_ecdh_init(int group)
 {
-    mbedtls_pk_context pk;
-    mbedtls_pk_init(&pk);
-    struct crypto_ecdh *ecdh =
-        crypto_mbedtls_keypair_gen(group, &pk) == 0 ? crypto_ecdh_init2(group, (struct crypto_ec_key *)&pk) : NULL;
-    mbedtls_pk_free(&pk);
+    struct crypto_ecdh *ecdh = NULL;
+    psa_key_id_t key_id;
+    int ret;
+
+    if (crypto_mbedtls_keypair_gen(group, &key_id) != 0) {
+        return NULL;
+    }
+
+    ecdh = os_calloc(sizeof(struct crypto_ecdh), 1);
+    if (ecdh == NULL) {
+        psa_destroy_key(key_id);
+        return NULL;
+    }
+
+    mbedtls_pk_init(&ecdh->our_key);
+    ret = mbedtls_pk_copy_from_psa(key_id, &ecdh->our_key);
+    psa_destroy_key(key_id);
+    if (ret != 0) {
+        mbedtls_pk_free(&ecdh->our_key);
+        os_free(ecdh);
+        return NULL;
+    }
+
     return ecdh;
 }
 
 struct crypto_ecdh *crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
 {
-    mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
-    if (grp_id == MBEDTLS_ECP_DP_NONE)
+    struct crypto_ecdh *ecdh = NULL;
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) own_key;
+
+    ecdh = os_calloc(sizeof(struct crypto_ecdh), 1);
+    if (ecdh == NULL) {
         return NULL;
-    mbedtls_ecp_keypair *ecp_kp = (mbedtls_ecp_keypair *)mbedtls_pk_ec(*(mbedtls_pk_context *)own_key);
-    struct crypto_ecdh *ecdh    = os_malloc(sizeof(*ecdh));
-    if (ecdh == NULL)
-        return NULL;
-    mbedtls_ecdh_init(&ecdh->ctx);
-    mbedtls_ecp_group_init(&ecdh->grp);
-    mbedtls_ecp_point_init(&ecdh->Q);
-    if (mbedtls_ecdh_setup(&ecdh->ctx, grp_id) == 0 &&
-        mbedtls_ecdh_get_params(&ecdh->ctx, ecp_kp, MBEDTLS_ECDH_OURS) == 0)
-    {
-        /* copy grp and Q for later use
-         * (retrieving this info later is more convoluted
-         *  even if mbedtls_ecdh_make_public() is considered)*/
-        mbedtls_mpi d;
-        mbedtls_mpi_init(&d);
-        if (mbedtls_ecp_export(ecp_kp, &ecdh->grp, &d, &ecdh->Q) == 0)
-        {
-            mbedtls_mpi_free(&d);
-            return ecdh;
-        }
-        mbedtls_mpi_free(&d);
     }
 
-    mbedtls_ecp_point_free(&ecdh->Q);
-    mbedtls_ecp_group_free(&ecdh->grp);
-    mbedtls_ecdh_free(&ecdh->ctx);
-    os_free(ecdh);
-    return NULL;
+    memcpy(&ecdh->our_key, pk, sizeof(mbedtls_pk_context));
+
+    return ecdh;
 }
 
 struct wpabuf *crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 {
-    mbedtls_ecp_group *grp = &ecdh->grp;
-    size_t len             = CRYPTO_EC_plen(grp);
-#ifdef MBEDTLS_ECP_MONTGOMERY_ENABLED
-    /* len */
-#endif
-#ifdef MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED
-    if (mbedtls_ecp_get_type(grp) == MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS)
-        len = inc_y ? len * 2 + 1 : len + 1;
-#endif
-    struct wpabuf *buf = wpabuf_alloc(len);
-    if (buf == NULL)
+    struct wpabuf *buf = wpabuf_alloc(PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS));
+    if (buf == NULL) {
         return NULL;
-    inc_y = inc_y ? MBEDTLS_ECP_PF_UNCOMPRESSED : MBEDTLS_ECP_PF_COMPRESSED;
-    if (mbedtls_ecp_point_write_binary(grp, &ecdh->Q, inc_y, &len, wpabuf_mhead_u8(buf), len) == 0)
-    {
-        wpabuf_put(buf, len);
-        return buf;
     }
 
-    wpabuf_free(buf);
-    return NULL;
+    if (mbedtls_pk_write_pubkey_der(&ecdh->our_key, wpabuf_mhead(buf), wpabuf_len(buf)) < 0) {
+        wpabuf_free(buf);
+        return NULL;
+    }
+
+    return buf;
 }
-
-#if defined(MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED)
-static int crypto_mbedtls_short_weierstrass_derive_y(mbedtls_ecp_group *grp, mbedtls_mpi *bn, int parity_bit)
-{
-    /* y^2 = x^3 + ax + b
-     * sqrt(w) = w^((p+1)/4) mod p   (for prime p where p = 3 mod 4) */
-    mbedtls_mpi *cy2 =
-        (mbedtls_mpi *)crypto_ec_point_compute_y_sqr((struct crypto_ec *)grp, (const struct crypto_bignum *)bn); /*x*/
-    if (cy2 == NULL)
-        return -1;
-
-    /*mbedtls_mpi_free(bn);*/
-    /*(reuse bn to store result (y))*/
-
-    mbedtls_mpi exp;
-    mbedtls_mpi_init(&exp);
-    int ret = mbedtls_mpi_get_bit(&grp->P, 0) != 1    /*(p = 3 mod 4)*/
-              || mbedtls_mpi_get_bit(&grp->P, 1) != 1 /*(p = 3 mod 4)*/
-              || mbedtls_mpi_add_int(&exp, &grp->P, 1) || mbedtls_mpi_shift_r(&exp, 2) ||
-              mbedtls_mpi_exp_mod(bn, cy2, &exp, &grp->P, NULL) ||
-              (mbedtls_mpi_get_bit(bn, 0) != parity_bit && mbedtls_mpi_sub_mpi(bn, &grp->P, bn));
-    mbedtls_mpi_free(&exp);
-    mbedtls_mpi_free(cy2);
-    os_free(cy2);
-    return ret;
-}
-#endif
 
 struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, const u8 *key, size_t len)
 {
-    if (len == 0) /*(invalid peer key)*/
+    struct wpabuf *buf;
+    size_t olen;
+
+    buf = wpabuf_alloc(sizeof(&ecdh->shared_secret));
+    if (buf == NULL) {
         return NULL;
-
-#if defined (MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED) || defined (MBEDTLS_ECP_MONTGOMERY_ENABLED)
-    mbedtls_ecp_group *grp = &ecdh->grp;
-#endif
-
-#if defined(MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED)
-    if (mbedtls_ecp_get_type(grp) == MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS)
-    {
-        /* add header for mbedtls_ecdh_read_public() */
-        u8 buf[256];
-        if (sizeof(buf) - 1 < len)
-            return NULL;
-        buf[0] = (u8)(len);
-        os_memcpy(buf + 1, key, len);
-
-        if (inc_y)
-        {
-            if (!(len & 1))
-            { /*(dpp code/tests does not include tag?!?)*/
-                if (sizeof(buf) - 2 < len)
-                    return NULL;
-                buf[0] = (u8)(1 + len);
-                buf[1] = 0x04;
-                os_memcpy(buf + 2, key, len);
-            }
-            len >>= 1; /*(repurpose len to prime_len)*/
-        }
-        else if (key[0] == 0x02 || key[0] == 0x03)
-        {          /* (inc_y == 0) */
-            if(len == 0)
-                return NULL;
-            --len; /*(repurpose len to prime_len)*/
-
-            /* mbedtls_ecp_point_read_binary() does not currently support
-             * MBEDTLS_ECP_PF_COMPRESSED format (buf[1] = 0x02 or 0x03)
-             * (returns MBEDTLS_ERR_ECP_FEATURE_UNAVAILABLE) */
-
-            /* derive y, amend buf[] with y for UNCOMPRESSED format */
-            if (sizeof(buf) - 2 < len * 2 || len == 0)
-                return NULL;
-            buf[0] = (u8)(1 + len * 2);
-            buf[1] = 0x04;
-            mbedtls_mpi bn;
-            mbedtls_mpi_init(&bn);
-            int ret = mbedtls_mpi_read_binary(&bn, key + 1, len) ||
-                      crypto_mbedtls_short_weierstrass_derive_y(grp, &bn, key[0] & 1) ||
-                      mbedtls_mpi_write_binary(&bn, buf + 2 + len, len);
-            mbedtls_mpi_free(&bn);
-            if (ret != 0)
-                return NULL;
-        }
-
-        if (key[0] == 0) /*(repurpose len to prime_len)*/
-            len = CRYPTO_EC_plen(grp);
-
-        if (mbedtls_ecdh_read_public(&ecdh->ctx, buf, buf[0] + 1))
-            return NULL;
     }
-#endif
-#if defined(MBEDTLS_ECP_MONTGOMERY_ENABLED)
-    if (mbedtls_ecp_get_type(grp) == MBEDTLS_ECP_TYPE_MONTGOMERY)
-    {
-        if (mbedtls_ecdh_read_public(&ecdh->ctx, key, len))
-            return NULL;
-    }
-#endif
 
-    struct wpabuf *buf = wpabuf_alloc(len);
-    if (buf == NULL)
+    if (psa_raw_key_agreement(PSA_ALG_ECDH, ecdh->our_key.MBEDTLS_PRIVATE(priv_id),
+                              key, len,
+                              wpabuf_mhead(buf), wpabuf_len(buf), &olen) != 0) {
+        wpabuf_free(buf);
         return NULL;
-
-    if (mbedtls_ecdh_calc_secret(&ecdh->ctx, &len, wpabuf_mhead(buf), len, hostap_rng_fn, hostap_rng_ctx()) == 0)
-    {
-        wpabuf_put(buf, len);
-        return buf;
     }
 
-    wpabuf_clear_free(buf);
-    return NULL;
+    return buf;
 }
 
 void crypto_ecdh_deinit(struct crypto_ecdh *ecdh)
 {
     if (ecdh == NULL)
         return;
-    mbedtls_ecp_point_free(&ecdh->Q);
-    mbedtls_ecp_group_free(&ecdh->grp);
-    mbedtls_ecdh_free(&ecdh->ctx);
+    mbedtls_pk_free(&ecdh->our_key);
     os_free(ecdh);
 }
 
 size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
 {
-    return CRYPTO_EC_plen(&ecdh->grp);
+    return mbedtls_pk_get_bitlen(&ecdh->our_key);
 }
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_ECDH */
@@ -2357,427 +2096,332 @@ void crypto_ec_point_debug_print(const struct crypto_ec *e, const struct crypto_
 }
 #endif
 
+#include <psa/crypto.h>
+#include <mbedtls/oid.h>
+
 struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
 {
-    mbedtls_pk_context *ctx = os_malloc(sizeof(*ctx));
-    if (ctx == NULL)
-        return NULL;
-    mbedtls_pk_init(ctx);
-    if (mbedtls_pk_parse_key(ctx, der, der_len, NULL, 0, hostap_rng_fn, hostap_rng_ctx()) == 0)
-        return (struct crypto_ec_key *)ctx;
+    mbedtls_pk_context *pk;
 
-    mbedtls_pk_free(ctx);
-    os_free(ctx);
-    return NULL;
+    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    if (pk == NULL)
+        return NULL;
+
+    mbedtls_pk_init(pk);
+    if (mbedtls_pk_parse_key(pk, der, der_len, NULL, 0) != 0) {
+        mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
+    }
+
+    return (struct crypto_ec_key *) pk;
 }
 
-#include <mbedtls/error.h>
-#include <mbedtls/oid.h>
-static int crypto_mbedtls_pk_parse_subpubkey_compressed(mbedtls_pk_context *ctx, const u8 *der, size_t der_len)
+struct crypto_ec_key * crypto_ec_key_set_priv(int group, const u8 *raw, size_t raw_len)
 {
-    /* The following is modified from:
-     *   mbedtls/library/pkparse.c:mbedtls_pk_parse_subpubkey()
-     *   mbedtls/library/pkparse.c:pk_get_pk_alg()
-     *   mbedtls/library/pkparse.c:pk_use_ecparams()
-     */
-    mbedtls_pk_type_t pk_alg = MBEDTLS_PK_NONE;
-    const mbedtls_pk_info_t *pk_info;
+    mbedtls_pk_context *pk;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_ecc_family_t ec_family;
+    psa_key_bits_t key_bits;
+    mbedtls_ecp_group_id ecp_group_id;
     int ret;
-    size_t len;
-    const unsigned char *end = der + der_len;
-    unsigned char *p;
-    *(const unsigned char **)&p = der;
 
-    if ((ret = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) != 0)
-    {
-        return (MBEDTLS_ERROR_ADD(MBEDTLS_ERR_PK_KEY_INVALID_FORMAT, ret));
+    ecp_group_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
+    ec_family = mbedtls_ecc_group_to_psa(ecp_group_id, (size_t *) &key_bits);
+    if (ec_family == 0) {
+        return NULL;
     }
 
-    end = p + len;
-
-    /*
-    if( ( ret = pk_get_pk_alg( &p, end, &pk_alg, &alg_params ) ) != 0 )
-        return( ret );
-    */
-    mbedtls_asn1_buf alg_oid, params;
-    memset(&params, 0, sizeof(mbedtls_asn1_buf));
-    if ((ret = mbedtls_asn1_get_alg(&p, end, &alg_oid, &params)) != 0)
-        return (MBEDTLS_ERROR_ADD(MBEDTLS_ERR_PK_INVALID_ALG, ret));
-    if (mbedtls_oid_get_pk_alg(&alg_oid, &pk_alg) != 0)
-        return (MBEDTLS_ERR_PK_UNKNOWN_PK_ALG);
-
-    if ((ret = mbedtls_asn1_get_bitstring_null(&p, end, &len)) != 0)
-        return (MBEDTLS_ERROR_ADD(MBEDTLS_ERR_PK_INVALID_PUBKEY, ret));
-
-    if (p + len != end)
-        return (MBEDTLS_ERROR_ADD(MBEDTLS_ERR_PK_INVALID_PUBKEY, MBEDTLS_ERR_ASN1_LENGTH_MISMATCH));
-
-    if ((pk_info = mbedtls_pk_info_from_type(pk_alg)) == NULL)
-        return (MBEDTLS_ERR_PK_UNKNOWN_PK_ALG);
-
-    if ((ret = mbedtls_pk_setup(ctx, pk_info)) != 0)
-        return (ret);
-
-    /* assume mbedtls_pk_parse_subpubkey(&der, der+der_len, ctx)
-     * has already run with ctx initialized up to pk_get_ecpubkey(),
-     * and pk_get_ecpubkey() has returned MBEDTLS_ERR_ECP_FEATURE_UNAVAILABLE
-     *
-     * mbedtls mbedtls_ecp_point_read_binary()
-     * does not handle point in COMPRESSED format
-     *
-     * (validate assumption that algorithm is EC) */
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*ctx);
-    if (ecp_kp == NULL)
-        return (MBEDTLS_ERR_ECP_FEATURE_UNAVAILABLE);
-    mbedtls_ecp_group *ecp_kp_grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
-    mbedtls_ecp_point *ecp_kp_Q   = &ecp_kp->MBEDTLS_PRIVATE(Q);
-    mbedtls_ecp_group_id grp_id;
-
-    /* mbedtls/library/pkparse.c:pk_use_ecparams() */
-
-    if (params.tag == MBEDTLS_ASN1_OID)
-    {
-        if (mbedtls_oid_get_ec_grp(&params, &grp_id) != 0)
-            return (MBEDTLS_ERR_PK_UNKNOWN_NAMED_CURVE);
-    }
-    else
-    {
-        return (MBEDTLS_ERR_PK_KEY_INVALID_FORMAT);
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(ec_family));
+    psa_set_key_bits(&key_attr, key_bits);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECDH);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE);
+    if (psa_import_key(&key_attr, raw, raw_len, &key_id) != PSA_SUCCESS) {
+        return NULL;
     }
 
-    /*
-     * grp may already be initialized; if so, make sure IDs match
-     */
-    if (ecp_kp_grp->id != MBEDTLS_ECP_DP_NONE && ecp_kp_grp->id != grp_id)
-        return (MBEDTLS_ERR_PK_KEY_INVALID_FORMAT);
+    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    if (pk == NULL) {
+        psa_destroy_key(key_id);
+        return NULL;
+    }
 
-    if ((ret = mbedtls_ecp_group_load(ecp_kp_grp, grp_id)) != 0)
-        return (ret);
+    mbedtls_pk_init(pk);
+    ret = mbedtls_pk_copy_from_psa(key_id, pk);
+    psa_destroy_key(key_id);
+    if (ret != 0) {
+        mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
+    }
 
-    /* (validate assumption that EC point is in COMPRESSED format) */
-    len = CRYPTO_EC_plen(ecp_kp_grp);
-    if (mbedtls_ecp_get_type(ecp_kp_grp) != MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS || (end - p) != 1 + len ||
-        (*p != 0x02 && *p != 0x03))
-        return (MBEDTLS_ERR_ECP_FEATURE_UNAVAILABLE);
-
-    /* Instead of calling mbedtls/library/pkparse.c:pk_get_ecpubkey() to call
-     * mbedtls_ecp_point_read_binary(), manually parse point into ecp_kp_Q */
-    mbedtls_mpi *X = &ecp_kp_Q->MBEDTLS_PRIVATE(X);
-    mbedtls_mpi *Y = &ecp_kp_Q->MBEDTLS_PRIVATE(Y);
-    mbedtls_mpi *Z = &ecp_kp_Q->MBEDTLS_PRIVATE(Z);
-    ret            = mbedtls_mpi_lset(Z, 1);
-    if (ret != 0)
-        return (ret);
-    ret = mbedtls_mpi_read_binary(X, p + 1, len);
-    if (ret != 0)
-        return (ret);
-    /* derive Y
-     * (similar derivation of Y in crypto_mbedtls.c:crypto_ecdh_set_peerkey())*/
-    ret = mbedtls_mpi_copy(Y, X) /*(Y is used as input and output obj below)*/
-          || crypto_mbedtls_short_weierstrass_derive_y(ecp_kp_grp, Y, (*p & 1));
-    if (ret != 0)
-        return (ret);
-
-    return mbedtls_ecp_check_pubkey(ecp_kp_grp, ecp_kp_Q);
+    return (struct crypto_ec_key *) pk;
 }
 
 struct crypto_ec_key *crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
 {
-    mbedtls_pk_context *ctx = os_malloc(sizeof(*ctx));
-    if (ctx == NULL)
+    mbedtls_pk_context *pk;
+
+    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    if (pk == NULL)
         return NULL;
-    mbedtls_pk_init(ctx);
-    /*int rc = mbedtls_pk_parse_subpubkey(&der, der+der_len, ctx);*/
-    int rc = mbedtls_pk_parse_public_key(ctx, der, der_len);
-    if (rc == 0)
-        return (struct crypto_ec_key *)ctx;
-    else if (rc == MBEDTLS_ERR_ECP_FEATURE_UNAVAILABLE)
-    {
-        /* mbedtls mbedtls_ecp_point_read_binary()
-         * does not handle point in COMPRESSED format; parse internally */
-        rc = crypto_mbedtls_pk_parse_subpubkey_compressed(ctx, der, der_len);
-        if (rc == 0)
-            return (struct crypto_ec_key *)ctx;
+
+    mbedtls_pk_init(pk);
+    if (mbedtls_pk_parse_public_key(pk, der, der_len) != 0) {
+        mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
     }
 
-    mbedtls_pk_free(ctx);
-    os_free(ctx);
-    return NULL;
+    return (struct crypto_ec_key *) pk;
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
-static struct crypto_ec_key *crypto_ec_key_set_pub_point_for_group(mbedtls_ecp_group_id grp_id,
-                                                                   const mbedtls_ecp_point *pub,
-                                                                   const u8 *buf,
-                                                                   size_t len)
-{
-    const mbedtls_pk_info_t *pk_info = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
-    if (pk_info == NULL)
-        return NULL;
-    mbedtls_pk_context *ctx = os_malloc(sizeof(*ctx));
-    if (ctx == NULL)
-        return NULL;
-    mbedtls_pk_init(ctx);
-    if (mbedtls_pk_setup(ctx, pk_info) == 0)
-    {
-        /* (Is private key generation necessary for callers?)
-         * alt: gen key then overwrite Q
-         *   mbedtls_ecp_gen_key(grp_id, ecp_kp, hostap_rng_fn, hostap_rng_ctx()) == 0
-         */
-        mbedtls_ecp_keypair *ecp_kp   = mbedtls_pk_ec(*ctx);
-        mbedtls_ecp_group *ecp_kp_grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
-        mbedtls_ecp_point *ecp_kp_Q   = &ecp_kp->MBEDTLS_PRIVATE(Q);
-        mbedtls_mpi *ecp_kp_d         = &ecp_kp->MBEDTLS_PRIVATE(d);
-        if (mbedtls_ecp_group_load(ecp_kp_grp, grp_id) == 0 &&
-            (pub ? mbedtls_ecp_copy(ecp_kp_Q, pub) == 0 :
-                   mbedtls_ecp_point_read_binary(ecp_kp_grp, ecp_kp_Q, buf, len) == 0) &&
-            mbedtls_ecp_gen_privkey(ecp_kp_grp, ecp_kp_d, hostap_rng_fn, hostap_rng_ctx()) == 0)
-        {
-            return (struct crypto_ec_key *)ctx;
-        }
-    }
-
-    mbedtls_pk_free(ctx);
-    os_free(ctx);
-    return NULL;
-}
 
 struct crypto_ec_key *crypto_ec_key_set_pub(int group, const u8 *x, const u8 *y, size_t len)
 {
-    mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
-    if (grp_id == MBEDTLS_ECP_DP_NONE)
-        return NULL;
-    if (len > MBEDTLS_MPI_MAX_SIZE)
-        return NULL;
-    u8 buf[1 + MBEDTLS_MPI_MAX_SIZE * 2];
-    buf[0] = 0x04; /* assume x,y for Short Weierstrass */
-    os_memcpy(buf + 1, x, len);
-    os_memcpy(buf + 1 + len, y, len);
+    mbedtls_pk_context *pk;
+    mbedtls_ecp_group_id group_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
+    uint8_t *raw_key_ptr;
+    psa_ecc_family_t ec_family;
+    psa_key_bits_t key_bits;
 
-    return crypto_ec_key_set_pub_point_for_group(grp_id, NULL, buf, 1 + len * 2);
+    ec_family = mbedtls_ecc_group_to_psa(group_id, (size_t *) &key_bits);
+    if (ec_family == 0) {
+        return NULL;
+    }
+
+    /* Ensure data will fit into pk->pub_raw */
+    if ((2 * len + 1) > MBEDTLS_PK_MAX_PUBKEY_RAW_LEN) {
+        return NULL;
+    }
+
+    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    if (pk == NULL) {
+        return NULL;
+    }
+
+    raw_key_ptr = pk->MBEDTLS_PRIVATE(pub_raw);
+    *raw_key_ptr = 0x04;
+    raw_key_ptr++;
+    memcpy(raw_key_ptr, x, len);
+    raw_key_ptr += len;
+    memcpy(raw_key_ptr, y, len);
+
+    pk->MBEDTLS_PRIVATE(ec_family) = ec_family;
+    pk->MBEDTLS_PRIVATE(bits) = key_bits;
+
+    return (struct crypto_ec_key *) pk;
 }
 
 struct crypto_ec_key *crypto_ec_key_set_pub_point(struct crypto_ec *e, const struct crypto_ec_point *pub)
 {
-    mbedtls_ecp_group_id grp_id = ((mbedtls_ecp_group *)e)->id;
-    mbedtls_ecp_point *p        = (mbedtls_ecp_point *)pub;
-    return crypto_ec_key_set_pub_point_for_group(grp_id, p, NULL, 0);
+    mbedtls_ecp_group *ecp_group = (mbedtls_ecp_group *) e;
+    mbedtls_ecp_point *ecp_point = (mbedtls_ecp_point *) pub;
+    uint8_t key[PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
+    uint8_t *x, *y;
+    size_t key_len, coord_len;
+    int crypto_group;
+
+    if (mbedtls_ecp_point_write_binary(ecp_group, ecp_point, MBEDTLS_ECP_PF_UNCOMPRESSED,
+                                       &key_len, key, sizeof(key)) != 0) {
+        return NULL;
+    }
+
+    coord_len = (key_len - 1) / 2;
+    crypto_group = crypto_mbedtls_ike_id_from_ecp_group_id(ecp_group->id);
+    x = &key[1];
+    y = x + coord_len;
+
+    return crypto_ec_key_set_pub(crypto_group, x, y, coord_len);
 }
 
 struct crypto_ec_key *crypto_ec_key_gen(int group)
 {
-    mbedtls_pk_context *ctx = os_malloc(sizeof(*ctx));
-    if (ctx == NULL)
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    mbedtls_pk_context *pk;
+    int ret;
+
+    if (crypto_mbedtls_keypair_gen(group, &key_id) != 0) {
         return NULL;
-    mbedtls_pk_init(ctx);
-    if (crypto_mbedtls_keypair_gen(group, ctx) == 0)
-        return (struct crypto_ec_key *)ctx;
-    mbedtls_pk_free(ctx);
-    os_free(ctx);
-    return NULL;
+    }
+
+    pk = os_malloc(sizeof(mbedtls_pk_context));
+    if (pk == NULL) {
+        psa_destroy_key(key_id);
+    }
+
+    mbedtls_pk_init(pk);
+    ret = mbedtls_pk_copy_from_psa(key_id, pk);
+    psa_destroy_key(key_id);
+    if (ret != 0) {
+        mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
+    }
+
+    return (struct crypto_ec_key *) pk;
 }
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
 void crypto_ec_key_deinit(struct crypto_ec_key *key)
 {
-    mbedtls_pk_free((mbedtls_pk_context *)key);
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+
+    mbedtls_pk_free(pk);
     os_free(key);
 }
 
+/* Internal - from pkwrite.h */
+#define MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES    \
+    (29 + PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS))
+
 struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
 {
-    /* (similar to crypto_ec_key_get_pubkey_point(),
-     *  but compressed point format and ASN.1 DER wrapping)*/
-#ifndef MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES /*(mbedtls/library/pkwrite.h)*/
-#define MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES (30 + 2 * MBEDTLS_ECP_MAX_BYTES)
-#endif
-    unsigned char buf[MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES];
-    int len = mbedtls_pk_write_pubkey_der((mbedtls_pk_context *)key, buf, sizeof(buf));
-    if (len < 0)
-        return NULL;
-    /*  Note: data is written at the end of the buffer! Use the
-     *        return value to determine where you should start
-     *        using the buffer */
-    unsigned char *p = buf + sizeof(buf) - len;
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    struct wpabuf *buf, *buf2;
+    uint8_t *p;
+    int ret;
 
-#ifdef MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED
-    mbedtls_ecp_keypair *ecp_kp = (mbedtls_ecp_keypair *)mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
+    buf = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
+    if (buf == NULL) {
         return NULL;
-    mbedtls_ecp_group *grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
-    /*  Note: sae_pk.c expects pubkey point in compressed format,
-     *        but mbedtls_pk_write_pubkey_der() writes uncompressed format.
-     *        Manually translate format and update lengths in DER format */
-    if (mbedtls_ecp_get_type(grp) == MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS)
-    {
-        unsigned char *end = buf + sizeof(buf);
-        size_t n;
-        /* SubjectPublicKeyInfo SEQUENCE */
-        mbedtls_asn1_get_tag(&p, end, &n, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-        /* algorithm AlgorithmIdentifier */
-        unsigned char *a = p;
-        size_t alen;
-        int ret;
-        mbedtls_asn1_get_tag(&p, end, &alen, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-        p += alen;
-        alen = (size_t)(p - a);
-        /* subjectPublicKey BIT STRING */
-        mbedtls_asn1_get_tag(&p, end, &n, MBEDTLS_ASN1_BIT_STRING);
-        /* rewrite into compressed point format and rebuild ASN.1 */
-        p[1] = (buf[sizeof(buf) - 1] & 1) ? 0x03 : 0x02;
-        n    = 1 + 1 + (n - 2) / 2;
-        len  = mbedtls_asn1_write_len(&p, buf, n) + (int)n;
-        len += mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_BIT_STRING);
-        os_memmove(p - alen, a, alen);
-        len += alen;
-        p -= alen;
-        if ((ret = mbedtls_asn1_write_len(&p, buf, (size_t)len)) < 0)
-        {
-            return NULL;
-        }
-        len += ret;
-        if ((ret = mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) < 0)
-        {
-            return NULL;
-        }
-        len += ret;
     }
-#endif
-    return wpabuf_alloc_copy(p, (size_t)len);
+
+    /* The buffer is written starting from the end! "ret" is the amount of data written. */
+    ret = mbedtls_pk_write_pubkey_der(pk, wpabuf_mhead(buf), wpabuf_len(buf));
+    if (ret < 0) {
+        wpabuf_free(buf);
+        return NULL;
+    }
+
+    p = wpabuf_mhead_u8(buf) + wpabuf_len(buf) - ret;
+
+    /* TODO: convert data to use compressed point format */
+
+    buf2 = wpabuf_alloc_copy(p, ret);
+    wpabuf_free(buf);
+
+    return buf2;
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
+
+/* Internal - from pkwrite.h */
+#define MBEDTLS_PK_ECP_PRV_DER_MAX_BYTES    \
+    (8 + PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS) + \
+     16 + 4 + PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS))
+
 struct wpabuf *crypto_ec_key_get_ecprivate_key(struct crypto_ec_key *key, bool include_pub)
 {
-#ifndef MBEDTLS_PK_ECP_PRV_DER_MAX_BYTES /*(mbedtls/library/pkwrite.h)*/
-#define MBEDTLS_PK_ECP_PRV_DER_MAX_BYTES (29 + 3 * MBEDTLS_ECP_MAX_BYTES)
-#endif
-    unsigned char priv[MBEDTLS_PK_ECP_PRV_DER_MAX_BYTES];
-    int privlen = mbedtls_pk_write_key_der((mbedtls_pk_context *)key, priv, sizeof(priv));
-    if (privlen < 0)
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    struct wpabuf *buf, *buf2;
+    uint8_t *p;
+    int ret;
+
+    buf = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
+    if (buf == NULL) {
         return NULL;
-
-    struct wpabuf *wbuf;
-
-    /*  Note: data is written at the end of the buffer! Use the
-     *        return value to determine where you should start
-     *        using the buffer */
-    /* mbedtls_pk_write_key_der() includes publicKey in DER */
-    if (include_pub)
-        wbuf = wpabuf_alloc_copy(priv + sizeof(priv) - privlen, privlen);
-    else
-    {
-        /* calculate publicKey offset and skip from end of buffer */
-        unsigned char *p   = priv + sizeof(priv) - privlen;
-        unsigned char *end = priv + sizeof(priv);
-        size_t len;
-        int ret;
-        /* ECPrivateKey SEQUENCE */
-        mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-        /* version INTEGER */
-        unsigned char *v = p;
-        mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_INTEGER);
-        p += len;
-        /* privateKey OCTET STRING */
-        mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_OCTET_STRING);
-        p += len;
-        /* parameters ECParameters */
-        mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONTEXT_SPECIFIC | MBEDTLS_ASN1_CONSTRUCTED);
-        p += len;
-
-        /* write new SEQUENCE header (we know that it fits in priv[]) */
-        len = (size_t)(p - v);
-        p   = v;
-        if ((ret = mbedtls_asn1_write_len(&p, priv, len)) < 0)
-        {
-            return NULL;
-        }
-        len += ret;
-        if ((ret = mbedtls_asn1_write_tag(&p, priv, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) < 0)
-        {
-            return NULL;
-        }
-        len += ret;
-        wbuf = wpabuf_alloc_copy(p, len);
     }
 
-    forced_memzero(priv, sizeof(priv));
-    return wbuf;
+    /* The buffer is written starting from the end! "ret" is the amount of data written. */
+    ret = mbedtls_pk_write_key_der(pk, wpabuf_mhead(buf), wpabuf_len(buf));
+    if (ret < 0) {
+        wpabuf_free(buf);
+        return NULL;
+    }
+
+    p = wpabuf_mhead_u8(buf) + wpabuf_len(buf) - ret;
+
+    buf2 = wpabuf_alloc_copy(p, ret);
+    wpabuf_free(buf);
+
+    return buf2;
 }
 
 struct wpabuf *crypto_ec_key_get_pubkey_point(struct crypto_ec_key *key, int prefix)
 {
-    /*(similarities to crypto_ecdh_get_pubkey(), but different struct)*/
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    uint8_t *key_ptr = pk->MBEDTLS_PRIVATE(pub_raw);
+    size_t key_len = pk->MBEDTLS_PRIVATE(pub_raw_len);
+    struct wpabuf *buf;
+
+    if (prefix) {
+        buf = wpabuf_alloc_copy(key_ptr, key_len);
+    } else {
+        buf = wpabuf_alloc_copy(key_ptr + 1, key_len - 1);
+    }
+    if (buf == NULL) {
         return NULL;
-    mbedtls_ecp_group *grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
-    size_t len             = CRYPTO_EC_plen(grp);
-#ifdef MBEDTLS_ECP_MONTGOMERY_ENABLED
-    /* len */
-#endif
-#ifdef MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED
-    if (mbedtls_ecp_get_type(grp) == MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS)
-        len = len * 2 + 1;
-#endif
-    struct wpabuf *buf = wpabuf_alloc(len);
-    if (buf == NULL)
-        return NULL;
-    mbedtls_ecp_point *ecp_kp_Q = &ecp_kp->MBEDTLS_PRIVATE(Q);
-    if (mbedtls_ecp_point_write_binary(grp, ecp_kp_Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &len, wpabuf_mhead_u8(buf), len) ==
-        0)
-    {
-        if (!prefix) /* Remove 0x04 prefix if requested */
-            os_memmove(wpabuf_mhead(buf), ((u8 *)wpabuf_mhead(buf) + 1), --len);
-        wpabuf_put(buf, len);
-        return buf;
     }
 
-    wpabuf_free(buf);
-    return NULL;
+    return buf;
 }
 
 struct crypto_ec_point *crypto_ec_key_get_public_key(struct crypto_ec_key *key)
 {
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    uint8_t *key_ptr = pk->MBEDTLS_PRIVATE(pub_raw);
+    size_t key_len = pk->MBEDTLS_PRIVATE(pub_raw_len);
+    mbedtls_ecp_point *ecp_point;
+    mbedtls_ecp_group ecp_group;
+    mbedtls_ecp_group_id ecp_group_id;
+    int ret;
+
+    ecp_group_id = mbedtls_ecc_group_from_psa(pk->MBEDTLS_PRIVATE(ec_family),
+                                              pk->MBEDTLS_PRIVATE(bits));
+    if (ecp_group_id == 0) {
         return NULL;
-    mbedtls_ecp_point *p = os_malloc(sizeof(*p));
-    if (p != NULL)
-    {
-        /*(mbedtls_ecp_export() uses &ecp_kp->MBEDTLS_PRIVATE(grp))*/
-        mbedtls_ecp_point_init(p);
-        mbedtls_ecp_point *ecp_kp_Q = &ecp_kp->MBEDTLS_PRIVATE(Q);
-        if (mbedtls_ecp_copy(p, ecp_kp_Q))
-        {
-            mbedtls_ecp_point_free(p);
-            os_free(p);
-            p = NULL;
-        }
     }
-    return (struct crypto_ec_point *)p;
+
+    ecp_point = os_malloc(sizeof(mbedtls_ecp_point));
+    if (ecp_point == NULL) {
+        return NULL;
+    }
+
+    mbedtls_ecp_point_init(ecp_point);
+    mbedtls_ecp_group_init(&ecp_group);
+    if (mbedtls_ecp_group_load(&ecp_group, ecp_group_id) != 0) {
+        os_free(ecp_point);
+        return NULL;
+    }
+    ret = mbedtls_ecp_point_read_binary(&ecp_group, ecp_point, key_ptr, key_len);
+    mbedtls_ecp_group_free(&ecp_group);
+    if (ret != 0) {
+        os_free(ecp_point);
+        return NULL;
+    }
+
+    return (struct crypto_ec_point *) ecp_point;
 }
 
 struct crypto_bignum *crypto_ec_key_get_private_key(struct crypto_ec_key *key)
 {
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    uint8_t priv_key[PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
+    size_t priv_key_len;
+    mbedtls_mpi *mpi;
+
+    mpi = os_malloc(sizeof(mbedtls_mpi));
+    if (mpi == NULL) {
         return NULL;
-    mbedtls_mpi *bn = os_malloc(sizeof(*bn));
-    if (bn)
-    {
-        /*(mbedtls_ecp_export() uses &ecp_kp->MBEDTLS_PRIVATE(grp))*/
-        mbedtls_mpi_init(bn);
-        mbedtls_mpi *ecp_kp_d = &ecp_kp->MBEDTLS_PRIVATE(d);
-        if (mbedtls_mpi_copy(bn, ecp_kp_d))
-        {
-            mbedtls_mpi_free(bn);
-            os_free(bn);
-            bn = NULL;
-        }
     }
-    return (struct crypto_bignum *)bn;
+
+    mbedtls_mpi_init(mpi);
+    if (psa_export_key(pk->MBEDTLS_PRIVATE(priv_id), priv_key, sizeof(priv_key), &priv_key_len) != PSA_SUCCESS) {
+        os_free(mpi);
+        return NULL;
+    }
+
+    if (mbedtls_mpi_read_binary(mpi, priv_key, priv_key_len) != 0) {
+        memset(priv_key, 0, sizeof(priv_key));
+        os_free(mpi);
+        return NULL;
+    }
+
+    return (struct crypto_bignum *) mpi;
 }
 
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
@@ -2804,93 +2448,65 @@ static mbedtls_md_type_t crypto_ec_key_sign_md(size_t len)
 
 struct wpabuf *crypto_ec_key_sign(struct crypto_ec_key *key, const u8 *data, size_t len)
 {
-#ifndef MBEDTLS_PK_SIGNATURE_MAX_SIZE /*(defined since mbedtls 2.20.0)*/
-#if MBEDTLS_ECDSA_MAX_LEN > MBEDTLS_MPI_MAX_SIZE
-#define MBEDTLS_PK_SIGNATURE_MAX_SIZE MBEDTLS_ECDSA_MAX_LEN
-#else
-#define MBEDTLS_PK_SIGNATURE_MAX_SIZE MBEDTLS_MPI_MAX_SIZE
-#endif
-#endif
-    size_t sig_len     = MBEDTLS_PK_SIGNATURE_MAX_SIZE;
-    struct wpabuf *buf = wpabuf_alloc(sig_len);
-    if (buf == NULL)
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    mbedtls_md_type_t md_alg = crypto_ec_key_sign_md(len);
+    uint8_t sig[MBEDTLS_PK_SIGNATURE_MAX_SIZE];
+    struct wpabuf *buf;
+    size_t sig_len;
+
+    if (mbedtls_pk_sign(pk, md_alg, data, len, sig, sizeof(sig), &sig_len) != 0) {
         return NULL;
-    if (mbedtls_pk_sign((mbedtls_pk_context *)key, crypto_ec_key_sign_md(len), data, len, wpabuf_mhead_u8(buf),
-                        sig_len,
-                        &sig_len, hostap_rng_fn, hostap_rng_ctx()) == 0)
-    {
-        wpabuf_put(buf, sig_len);
-        return buf;
     }
 
-    wpabuf_free(buf);
-    return NULL;
+    buf = wpabuf_alloc_copy(sig, sig_len);
+    if (buf == NULL) {
+        return NULL;
+    }
+
+    return buf;
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 struct wpabuf *crypto_ec_key_sign_r_s(struct crypto_ec_key *key, const u8 *data, size_t len)
 {
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    mbedtls_md_type_t md_alg = crypto_ec_key_sign_md(len);
+    uint8_t sig[MBEDTLS_PK_SIGNATURE_MAX_SIZE];
+    uint8_t sig_raw[MBEDTLS_PK_SIGNATURE_MAX_SIZE];
+    size_t sig_len, sig_raw_len;
+    size_t bits;
+    struct wpabuf *buf;
+
+    if (mbedtls_pk_sign(pk, md_alg, data, len, sig, sizeof(sig), &sig_len) != 0) {
         return NULL;
+    }
 
-    size_t sig_len = MBEDTLS_ECDSA_MAX_LEN;
-    u8 buf[MBEDTLS_ECDSA_MAX_LEN];
-    if (mbedtls_ecdsa_write_signature(ecp_kp, crypto_ec_key_sign_md(len), data, len, buf,
-                                      sig_len,
-                                      &sig_len, hostap_rng_fn, hostap_rng_ctx()))
-    {
+    bits = mbedtls_pk_get_bitlen(pk);
+    if (mbedtls_ecdsa_der_to_raw(bits, sig, sig_len, sig_raw, sizeof(sig_raw), &sig_raw_len) != 0) {
         return NULL;
     }
 
-    /*(mbedtls_ecdsa_write_signature() writes signature in ASN.1)*/
-    /* parse ASN.1 to get r and s and lengths */
-    u8 *p   = buf, *r, *s;
-    u8 *end = p + sig_len;
-    size_t rlen, slen;
-    mbedtls_asn1_get_tag(&p, end, &rlen, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-    mbedtls_asn1_get_tag(&p, end, &rlen, MBEDTLS_ASN1_INTEGER);
-    r = p;
-    p += rlen;
-    mbedtls_asn1_get_tag(&p, end, &slen, MBEDTLS_ASN1_INTEGER);
-    s = p;
+    buf = wpabuf_alloc_copy(sig_raw, sig_raw_len);
+    if (buf == NULL) {
+        return NULL;
+    }
 
-    /* write raw r and s into out
-     * (including removal of leading 0 if added for ASN.1 integer)
-     * note: DPP caller expects raw r, s each padded to prime len */
-    mbedtls_ecp_group *ecp_kp_grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
-    size_t plen                   = CRYPTO_EC_plen(ecp_kp_grp);
-    if (rlen > plen)
-    {
-        r += (rlen - plen);
-        rlen = plen;
-    }
-    if (slen > plen)
-    {
-        s += (slen - plen);
-        slen = plen;
-    }
-    struct wpabuf *out = wpabuf_alloc(plen * 2);
-    if (out)
-    {
-        wpabuf_put(out, plen * 2);
-        p = wpabuf_mhead_u8(out);
-        os_memset(p, 0, plen * 2);
-        os_memcpy(p + plen * 1 - rlen, r, rlen);
-        os_memcpy(p + plen * 2 - slen, s, slen);
-    }
-    return out;
+    return buf;
 }
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
-int crypto_ec_key_verify_signature(struct crypto_ec_key *key, const u8 *data, size_t len, const u8 *sig, size_t sig_len)
+int crypto_ec_key_verify_signature(struct crypto_ec_key *key, const u8 *data, size_t len,
+                                   const u8 *sig, size_t sig_len)
 {
-    switch (mbedtls_pk_verify((mbedtls_pk_context *)key, crypto_ec_key_sign_md(len), data, len, sig, sig_len))
-    {
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    mbedtls_md_type_t md_alg = crypto_ec_key_sign_md(len);
+    int ret;
+
+    ret = mbedtls_pk_verify(pk, md_alg, data, len, sig, sig_len);
+    switch (ret) {
         case 0:
-            /*case MBEDTLS_ERR_ECP_SIG_LEN_MISMATCH:*/ /* XXX: allow? */
             return 1;
-        case MBEDTLS_ERR_ECP_VERIFY_FAILED:
+        case PSA_ERROR_INVALID_SIGNATURE:
             return 0;
         default:
             return -1;
@@ -2898,55 +2514,64 @@ int crypto_ec_key_verify_signature(struct crypto_ec_key *key, const u8 *data, si
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
-int crypto_ec_key_verify_signature_r_s(
-    struct crypto_ec_key *key, const u8 *data, size_t len, const u8 *r, size_t r_len, const u8 *s, size_t s_len)
+int crypto_ec_key_verify_signature_r_s(struct crypto_ec_key *key, const u8 *data, size_t len,
+                                       const u8 *r, size_t r_len, const u8 *s, size_t s_len)
 {
-    /* reimplement mbedtls_ecdsa_read_signature() without encoding r and s
-     * into ASN.1 just for mbedtls_ecdsa_read_signature() to decode ASN.1 */
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
-        return -1;
-    mbedtls_ecp_group *ecp_kp_grp = &ecp_kp->MBEDTLS_PRIVATE(grp);
-    mbedtls_ecp_point *ecp_kp_Q   = &ecp_kp->MBEDTLS_PRIVATE(Q);
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    uint8_t sig[MBEDTLS_PK_SIGNATURE_MAX_SIZE] = { 0 };
+    uint8_t sig_raw[MBEDTLS_PK_SIGNATURE_MAX_SIZE] = { 0 };
+    size_t bits, sig_raw_len, sig_len;
 
-    mbedtls_mpi mpi_r;
-    mbedtls_mpi mpi_s;
-    mbedtls_mpi_init(&mpi_r);
-    mbedtls_mpi_init(&mpi_s);
-    int ret = mbedtls_mpi_read_binary(&mpi_r, r, r_len) || mbedtls_mpi_read_binary(&mpi_s, s, s_len) ? -1 : 0;
-    if (ret == 0)
-    {
-        ret = mbedtls_ecdsa_verify(ecp_kp_grp, data, len, ecp_kp_Q, &mpi_r, &mpi_s);
-        ret = ret ? ret == MBEDTLS_ERR_ECP_BAD_INPUT_DATA ? 0 : -1 : 1;
+    memcpy(sig_raw, r, r_len);
+    memcpy(sig_raw + r_len, s, s_len);
+    sig_raw_len = r_len + s_len;
+
+    bits = mbedtls_pk_get_bitlen(pk);
+    if (mbedtls_ecdsa_raw_to_der(bits, sig_raw, sig_raw_len, sig, sizeof(sig), &sig_len) != 0) {
+        return -1;
     }
-    mbedtls_mpi_free(&mpi_r);
-    mbedtls_mpi_free(&mpi_s);
-    return ret;
+
+    return crypto_ec_key_verify_signature(key, data, len, sig, sig_len);
 }
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC_DPP */
 
 int crypto_ec_key_group(struct crypto_ec_key *key)
 {
-    mbedtls_ecp_keypair *ecp_kp = mbedtls_pk_ec(*(mbedtls_pk_context *)key);
-    if (ecp_kp == NULL)
-        return -1;
-    mbedtls_ecp_group *ecp_group = &ecp_kp->MBEDTLS_PRIVATE(grp);
-    return crypto_mbedtls_ike_id_from_ecp_group_id(ecp_group->id);
+    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    mbedtls_ecp_group_id ecp_group_id;
+
+    ecp_group_id = mbedtls_ecc_group_from_psa(pk->MBEDTLS_PRIVATE(ec_family),
+                                              pk->MBEDTLS_PRIVATE(bits));
+    return crypto_mbedtls_ike_id_from_ecp_group_id(ecp_group_id);
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
 
 int crypto_ec_key_cmp(struct crypto_ec_key *key1, struct crypto_ec_key *key2)
 {
-    mbedtls_ecp_keypair *ecp_kp1 = mbedtls_pk_ec(*(mbedtls_pk_context *)key1);
-    mbedtls_ecp_keypair *ecp_kp2 = mbedtls_pk_ec(*(mbedtls_pk_context *)key2);
-    if (ecp_kp1 == NULL || ecp_kp2 == NULL)
+    mbedtls_pk_context *pk1 = (mbedtls_pk_context *) key1;
+    mbedtls_pk_context *pk2 = (mbedtls_pk_context *) key2;
+    uint8_t priv_key1[PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
+    uint8_t priv_key2[PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
+    size_t priv_key1_len, priv_key2_len;
+
+    if ((psa_export_key(pk1->MBEDTLS_PRIVATE(priv_id), priv_key1, sizeof(priv_key1), &priv_key1_len) != PSA_SUCCESS) ||
+        (psa_export_key(pk2->MBEDTLS_PRIVATE(priv_id), priv_key2, sizeof(priv_key2), &priv_key2_len) != PSA_SUCCESS)) {
+        memset(priv_key1, 0, sizeof(priv_key1));
+        memset(priv_key2, 0, sizeof(priv_key2));
         return -1;
-    mbedtls_ecp_group *ecp_kp1_grp = &ecp_kp1->MBEDTLS_PRIVATE(grp);
-    mbedtls_ecp_group *ecp_kp2_grp = &ecp_kp2->MBEDTLS_PRIVATE(grp);
-    mbedtls_ecp_point *ecp_kp1_Q = &ecp_kp1->MBEDTLS_PRIVATE(Q);
-    mbedtls_ecp_point *ecp_kp2_Q = &ecp_kp2->MBEDTLS_PRIVATE(Q);
-    return ecp_kp1_grp->id != ecp_kp2_grp->id || mbedtls_ecp_point_cmp(ecp_kp1_Q, ecp_kp2_Q) ? -1 : 0;
+    }
+
+    if ((priv_key1_len != priv_key2_len) ||
+        (pk1->MBEDTLS_PRIVATE(pub_raw_len) != pk2->MBEDTLS_PRIVATE(pub_raw_len)) ||
+        (memcmp(priv_key1, priv_key2, priv_key1_len) != 0) ||
+        (memcmp(pk1->MBEDTLS_PRIVATE(pub_raw), pk2->MBEDTLS_PRIVATE(pub_raw), pk1->MBEDTLS_PRIVATE(pub_raw_len)) != 0)) {
+        memset(priv_key1, 0, sizeof(priv_key1));
+        memset(priv_key2, 0, sizeof(priv_key2));
+        return -1;
+    }
+
+    return 0;
 }
 
 void crypto_ec_key_debug_print(const struct crypto_ec_key *key, const char *title)
@@ -3011,19 +2636,19 @@ struct crypto_csr *crypto_csr_verify(const struct wpabuf *req)
 
 void crypto_csr_deinit(struct crypto_csr *csr)
 {
-    if ((uintptr_t)csr & 1uL)
-    {
+    if ((uintptr_t)csr & 1uL) {
         csr = (struct crypto_csr *)((uintptr_t)csr & ~1uL);
-        mbedtls_x509_csr_free((mbedtls_x509_csr *)csr);
     }
-    else
-        mbedtls_x509write_csr_free((mbedtls_x509write_csr *)csr);
+
+    mbedtls_x509_csr *csr_ctx = (mbedtls_x509_csr *) csr;
+    mbedtls_x509_csr_free(csr_ctx);
     os_free(csr);
 }
 
 int crypto_csr_set_ec_public_key(struct crypto_csr *csr, struct crypto_ec_key *key)
 {
-    mbedtls_x509write_csr_set_key((mbedtls_x509write_csr *)csr, (mbedtls_pk_context *)key);
+    mbedtls_x509write_csr_set_key((mbedtls_x509write_csr *) csr, (mbedtls_pk_context *) key);
+
     return 0;
 }
 
@@ -3204,7 +2829,7 @@ struct wpabuf *crypto_csr_sign(struct crypto_csr *csr, struct crypto_ec_key *key
     mbedtls_x509write_csr_set_md_alg((mbedtls_x509write_csr *)csr, sig_md);
 
     unsigned char buf[4096]; /* XXX: large enough?  too large? */
-    int len = mbedtls_x509write_csr_der((mbedtls_x509write_csr *)csr, buf, sizeof(buf), hostap_rng_fn, hostap_rng_ctx());
+    int len = mbedtls_x509write_csr_der((mbedtls_x509write_csr *)csr, buf, sizeof(buf));
     if (len < 0)
         return NULL;
     /*  Note: data is written at the end of the buffer! Use the
