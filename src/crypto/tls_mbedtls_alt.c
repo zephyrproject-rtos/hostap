@@ -2307,8 +2307,7 @@ int tls_get_library_version(char *buf, size_t buf_len)
 #ifndef MBEDTLS_VERSION_C
     const char *const ver = "n/a";
 #else
-    char ver[9];
-    mbedtls_version_get_string(ver);
+    const char *ver = mbedtls_version_get_string();
 #endif
     return os_snprintf(buf, buf_len, "mbed TLS build=" MBEDTLS_VERSION_STRING " run=%s", ver);
 }
