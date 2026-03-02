@@ -2023,15 +2023,23 @@ struct wpabuf *tls_connection_handshake(void *tls_ctx,
         mbedtls_ssl_set_hostname(&conn->ssl, NULL);
     }
 
-#if MBEDTLS_VERSION_NUMBER >= 0x03020000 /* mbedtls 3.2.0 */
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
     if (conn->ssl.MBEDTLS_PRIVATE(state) == MBEDTLS_SSL_HANDSHAKE_OVER &&
         conn->ssl.MBEDTLS_PRIVATE(tls_version) == MBEDTLS_SSL_VERSION_TLS1_3)
     {
         int res = 0;
         *appl_data = wpabuf_alloc(wpabuf_len(in_data));
+retry:
         res = mbedtls_ssl_read(&conn->ssl, wpabuf_mhead(*appl_data), wpabuf_size(*appl_data));
         if (res < 0)
         {
+#if defined(MBEDTLS_SSL_SESSION_TICKETS)
+            if (MBEDTLS_ERR_SSL_WANT_READ == res ||
+                MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET == res)
+            {
+                goto retry;
+            }
+#endif
             wpa_printf(MSG_DEBUG, "%s failed: 0x%x", __func__, res);
             ret = -1;
         }
@@ -2039,16 +2047,8 @@ struct wpabuf *tls_connection_handshake(void *tls_ctx,
             wpabuf_put(*appl_data, res);
     }
     else
-        ret = mbedtls_ssl_handshake(&conn->ssl);
-#else
-    int ret = 0;
-    while (conn->ssl.MBEDTLS_PRIVATE(state) != MBEDTLS_SSL_HANDSHAKE_OVER)
-    {
-        ret = mbedtls_ssl_handshake_step(&conn->ssl);
-        if (ret != 0)
-            break;
-    }
 #endif
+        ret = mbedtls_ssl_handshake(&conn->ssl);
 
 #ifdef TLS_MBEDTLS_SESSION_TICKETS
     mbedtls_ssl_conf_session_tickets_cb(&conn->tls_conf->conf, tls_mbedtls_ssl_ticket_write,
