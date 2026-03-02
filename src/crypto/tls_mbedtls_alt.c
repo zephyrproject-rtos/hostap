@@ -376,8 +376,12 @@ __attribute_cold__ void *tls_init(const struct tls_config *conf)
 #endif
 #ifdef MBEDTLS_SSL_SESSION_TICKETS
     mbedtls_ssl_ticket_init(&tls_ctx_global.ticket_ctx);
-    mbedtls_ssl_ticket_setup(&tls_ctx_global.ticket_ctx, hostap_rng_fn, hostap_rng_ctx(),
-                             MBEDTLS_CIPHER_AES_256_GCM, 43200); /* ticket timeout: 12 hours */
+    if (mbedtls_ssl_ticket_setup(&tls_ctx_global.ticket_ctx, PSA_ALG_GCM, PSA_KEY_TYPE_AES, 256,
+                                 43200) != 0) /* ticket timeout: 12 hours */
+    {
+        wpa_printf(MSG_ERROR, "Failed to setup SSL ticket context");
+        return NULL;
+    }
 #endif
     /* copy struct for future use */
     tls_ctx_global.init_conf = *conf;
