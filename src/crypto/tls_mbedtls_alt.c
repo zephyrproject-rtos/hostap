@@ -59,10 +59,6 @@
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/pk.h>
-#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
-#include <../library/ssl_misc.h>
-#include <../library/ssl_tls13_keys.h>
-#endif
 
 extern int (*hostap_rng_fn)(void*, unsigned char*, size_t);
 extern void* hostap_rng_ctx(void);
