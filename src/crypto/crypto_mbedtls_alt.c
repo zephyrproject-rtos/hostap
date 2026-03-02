@@ -481,80 +481,130 @@ int hmac_sha256_kdf(
 /* sha256-prf.c sha384-prf.c sha512-prf.c */
 
 /* hmac_prf_bits - IEEE Std 802.11ac-2013, 11.6.1.7.2 Key derivation function */
-__attribute_noinline__ static int hmac_prf_bits(const u8 *key,
+__attribute_noinline__ static int hmac_prf_bits(const uint8_t *key,
                                                 size_t key_len,
                                                 const char *label,
-                                                const u8 *data,
+                                                const uint8_t *data,
                                                 size_t data_len,
-                                                u8 *buf,
+                                                uint8_t *buf,
                                                 size_t buf_len_bits,
-                                                mbedtls_md_type_t md_type)
+                                                psa_algorithm_t alg)
 {
+    psa_status_t status;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_mac_operation_t operation = PSA_MAC_OPERATION_INIT;
+    psa_algorithm_t hash_alg = PSA_ALG_HMAC_GET_HASH(alg);
+    size_t mac_len = PSA_HASH_LENGTH(hash_alg);
+    size_t buf_len = (buf_len_bits + 7) / 8;
+    u16 ctr;
+    u16 n_le = host_to_le16(buf_len_bits);
+    const u8 *const addr[] = {(u8 *)&ctr, (u8 *)label, data, (u8 *)&n_le};
+    const size_t len[] = {2, os_strlen(label), data_len, 2};
+
     if (TEST_FAIL())
         return -1;
 
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(md_type);
-    if (mbedtls_md_setup(&ctx, md_info, 1) != 0)
-    {
-        mbedtls_md_free(&ctx);
+    /* Import HMAC key into PSA */
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_VERIFY_HASH);
+    psa_set_key_algorithm(&attributes, alg);
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_HMAC);
+    psa_set_key_lifetime(&attributes, PSA_KEY_LIFETIME_VOLATILE);
+    status = psa_import_key(&attributes, key, key_len, &key_id);
+    if (status != PSA_SUCCESS) {
         return -1;
     }
-    mbedtls_md_hmac_starts(&ctx, key, key_len);
 
-    u16 ctr, n_le = host_to_le16(buf_len_bits);
-    const u8 *const addr[] = {(u8 *)&ctr, (u8 *)label, data, (u8 *)&n_le};
-    const size_t len[]     = {2, os_strlen(label), data_len, 2};
-    const size_t mac_len   = mbedtls_md_get_size(md_info);
-    size_t buf_len         = (buf_len_bits + 7) / 8;
-    for (ctr = 1; buf_len >= mac_len; buf_len -= mac_len, ++ctr)
-    {
+    /* Generate output in mac_len chunks */
+    for (ctr = 1; buf_len >= mac_len; buf_len -= mac_len, ++ctr) {
 #if __BYTE_ORDER == __BIG_ENDIAN
         ctr = host_to_le16(ctr);
 #endif
-        for (size_t i = 0; i < ARRAY_SIZE(addr); ++i)
-            mbedtls_md_hmac_update(&ctx, addr[i], len[i]);
-        mbedtls_md_hmac_finish(&ctx, buf);
-        mbedtls_md_hmac_reset(&ctx);
+        status = psa_mac_sign_setup(&operation, key_id, alg);
+        if (status != PSA_SUCCESS) {
+            goto cleanup;
+        }
+
+        /* Update MAC with all input chunks: counter || label || data || length */
+        for (size_t i = 0; i < ARRAY_SIZE(addr); ++i) {
+            status = psa_mac_update(&operation, addr[i], len[i]);
+            if (status != PSA_SUCCESS) {
+                psa_mac_abort(&operation);
+                goto cleanup;
+            }
+        }
+
+        /* Finalize MAC and write to output buffer */
+        size_t mac_output_len;
+        status = psa_mac_sign_finish(&operation, buf, mac_len, &mac_output_len);
+        if (status != PSA_SUCCESS) {
+            psa_mac_abort(&operation);
+            goto cleanup;
+        }
+
         buf += mac_len;
 #if __BYTE_ORDER == __BIG_ENDIAN
         ctr = le_to_host16(ctr);
 #endif
     }
 
-    if (buf_len)
-    {
-        u8 hash[MBEDTLS_MD_MAX_SIZE];
+    /* Handle remaining bytes (less than one full MAC length) */
+    if (buf_len) {
+        u8 hash[PSA_MAC_MAX_SIZE];
+        size_t mac_output_len;
+
 #if __BYTE_ORDER == __BIG_ENDIAN
         ctr = host_to_le16(ctr);
 #endif
-        for (size_t i = 0; i < ARRAY_SIZE(addr); ++i)
-            mbedtls_md_hmac_update(&ctx, addr[i], len[i]);
-        mbedtls_md_hmac_finish(&ctx, hash);
+        status = psa_mac_sign_setup(&operation, key_id, alg);
+        if (status != PSA_SUCCESS) {
+            goto cleanup;
+        }
+
+        for (size_t i = 0; i < ARRAY_SIZE(addr); ++i) {
+            status = psa_mac_update(&operation, addr[i], len[i]);
+            if (status != PSA_SUCCESS) {
+                psa_mac_abort(&operation);
+                goto cleanup;
+            }
+        }
+
+        status = psa_mac_sign_finish(&operation, hash, sizeof(hash), &mac_output_len);
+        if (status != PSA_SUCCESS) {
+            psa_mac_abort(&operation);
+            goto cleanup;
+        }
+
         os_memcpy(buf, hash, buf_len);
         buf += buf_len;
-        forced_memzero(hash, mac_len);
+        forced_memzero(hash, mac_output_len);
     }
 
-    /* Mask out unused bits in last octet if it does not use all the bits */
-    if ((buf_len_bits &= 0x7))
+    /* Mask out unused bits in last octet if needed */
+    if ((buf_len_bits &= 0x7)) {
         buf[-1] &= (u8)(0xff << (8 - buf_len_bits));
+    }
 
-    mbedtls_md_free(&ctx);
+    psa_destroy_key(key_id);
     return 0;
+
+cleanup:
+    if (key_id != PSA_KEY_ID_NULL) {
+        psa_destroy_key(key_id);
+    }
+    return -1;
 }
 
 int sha512_prf(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len)
 {
-    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA512);
+    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, PSA_ALG_HMAC(PSA_ALG_SHA_512));
 }
 
 int sha384_prf(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len)
 {
-    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, MBEDTLS_MD_SHA384);
+    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len * 8, PSA_ALG_HMAC(PSA_ALG_SHA_384));
 }
 
 /**
@@ -609,7 +659,7 @@ int sha256_prf(
 int sha256_prf_bits(
     const u8 *key, size_t key_len, const char *label, const u8 *data, size_t data_len, u8 *buf, size_t buf_len_bits)
 {
-    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, MBEDTLS_MD_SHA256);
+    return hmac_prf_bits(key, key_len, label, data, data_len, buf, buf_len_bits, PSA_ALG_HMAC(PSA_ALG_SHA_256));
 }
 
 #if defined(CONFIG_PSA_WANT_ALG_SHA_1)
