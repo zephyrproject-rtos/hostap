@@ -258,7 +258,7 @@ struct crypto_hash *crypto_hash_init(enum crypto_hash_alg alg, const u8 *key, si
         os_free(ctx);
         return NULL;
     }
-    ret = mbedtls_md_setup(&ctx->ctx, md_info, 1);
+    ret = mbedtls_md_setup(&ctx->ctx, md_info, 0);
     if (ret != 0)
     {
         os_free(ctx);
