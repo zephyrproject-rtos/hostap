@@ -2092,7 +2092,7 @@ void crypto_ec_point_debug_print(const struct crypto_ec *e, const struct crypto_
 #else
 void crypto_ec_point_debug_print(const struct crypto_ec *e, const struct crypto_ec_point *p, const char *title)
 {
-	// Fixing linking error undefined reference to `crypto_ec_point_debug_print'
+    // Fixing linking error undefined reference to `crypto_ec_point_debug_print'
 }
 #endif
 
@@ -2278,33 +2278,106 @@ void crypto_ec_key_deinit(struct crypto_ec_key *key)
 #define MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES    \
     (29 + PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS))
 
+#define MBEDTLS_ASN1_CHK(_op_) \
+    ret = _op_; \
+    if (ret < 0) { \
+        return ret; \
+    }
+
+static int public_key_convert_to_compressed(uint8_t *der_key, size_t der_key_len, uint8_t *out, size_t out_len)
+{
+    uint8_t *in_p = der_key;
+    uint8_t *in_end = der_key + der_key_len;
+    uint8_t *out_p = out + out_len; /* write from the end backward */
+    uint8_t *out_start = out;
+    uint8_t *info_p, *key_p;
+    size_t len, info_len, key_len, coord_len, written_len;
+    int ret;
+
+    /* Initial tag for the entire DER content */
+    MBEDTLS_ASN1_CHK(mbedtls_asn1_get_tag(&in_p, in_end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    /* Sequence of curve info and PK alg (only for Weierstrass curves) */
+    MBEDTLS_ASN1_CHK(mbedtls_asn1_get_tag(&in_p, in_end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+    info_p = in_p;
+    info_len = len;
+    in_p += len;
+
+    /* Read the tag of the public key */
+    MBEDTLS_ASN1_CHK(mbedtls_asn1_get_tag(&in_p, in_end, &len, MBEDTLS_ASN1_BIT_STRING));
+    key_p = in_p;
+    key_len = len;
+
+    /* From the content of "mbedtls_pk_write_pubkey_der()" in "pkwrite.c" we know that:
+     * - 1st byte is 0x00
+     * - 2nd byte is 0x04 (using uncompresed format by deafult)
+     * Therefore we can compute "coord_len" as follows.
+     */
+    coord_len = (key_len - 2) / 2;
+
+    /* Write data back starting from the end of the output buffer (as PK does) */
+    written_len = 0;
+
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_raw_buffer(&out_p, out_start, key_p, 2 + coord_len));
+    len = ret;
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_len(&out_p, out_start, len));
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_tag(&out_p, out_start, MBEDTLS_ASN1_BIT_STRING));
+
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_raw_buffer(&out_p, out_start, info_p, info_len));
+    len = ret;
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_len(&out_p, out_start, len));
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_tag(&out_p, out_start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_len(&out_p, out_start, written_len));
+    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_tag(&out_p, out_start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+
+    return written_len;
+}
+
 struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
 {
     mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
-    struct wpabuf *buf, *buf2;
-    uint8_t *p;
+    struct wpabuf *buf = NULL, *buf2 = NULL;
+    uint8_t *der_p;
+    size_t der_len;
     int ret;
 
     buf = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
-    if (buf == NULL) {
-        return NULL;
+    buf2 = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
+    if ((buf == NULL) || (buf2 == NULL)) {
+        goto error;
     }
 
     /* The buffer is written starting from the end! "ret" is the amount of data written. */
     ret = mbedtls_pk_write_pubkey_der(pk, wpabuf_mhead(buf), wpabuf_len(buf));
     if (ret < 0) {
-        wpabuf_free(buf);
-        return NULL;
+        goto error;
     }
+    der_len = ret;
+    der_p = wpabuf_mhead_u8(buf) + wpabuf_len(buf) - der_len;
 
-    p = wpabuf_mhead_u8(buf) + wpabuf_len(buf) - ret;
+    /* Read uncompressed version from "buf" and write the compressed format to "buf2" */
+    ret = public_key_convert_to_compressed(der_p, der_len, wpabuf_mhead(buf2), wpabuf_len(buf));
+    if (ret < 0) {
+        goto error;
+    }
+    der_len = ret;
+    der_p = wpabuf_mhead_u8(buf2) + wpabuf_len(buf2) - der_len;
 
-    /* TODO: convert data to use compressed point format */
-
-    buf2 = wpabuf_alloc_copy(p, ret);
+    /* Free "buf" to re-use it */
     wpabuf_free(buf);
+    buf = wpabuf_alloc_copy(der_p, der_len);
+    if (buf == NULL) {
+        goto error;
+    }
+    wpabuf_free(buf2);
 
-    return buf2;
+    return buf;
+
+error:
+    wpabuf_free(buf);
+    wpabuf_free(buf2);
+    return NULL;
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
