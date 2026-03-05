@@ -2107,6 +2107,12 @@ void crypto_ec_point_debug_print(const struct crypto_ec *e, const struct crypto_
 struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
 {
     mbedtls_pk_context *pk;
+    uint8_t key[PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
+    size_t key_len;
+    psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_type_t key_type;
+    psa_key_bits_t key_bits;
+    psa_key_id_t key_id = PSA_KEY_ID_NULL;
 
     pk = os_calloc(sizeof(mbedtls_pk_context), 1);
     if (pk == NULL)
@@ -2115,6 +2121,43 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
     mbedtls_pk_init(pk);
     if (mbedtls_pk_parse_key(pk, der, der_len, NULL, 0) != 0) {
         mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
+    }
+    /* By deafult "mbedlts_pk_parse_key()" assigns ECDSA(ANY_HASH) algorithm to the imported
+     * PSA key. We need to change that to ECDH. */
+
+    if (psa_get_key_attributes(pk->MBEDTLS_PRIVATE(priv_id), &key_attr) != PSA_SUCCESS) {
+        mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
+    }
+    if (psa_export_key(pk->MBEDTLS_PRIVATE(priv_id), key, sizeof(key), &key_len) != PSA_SUCCESS) {
+        mbedtls_pk_free(pk);
+        os_free(pk);
+        return NULL;
+    }
+    /* Free the PK context to re-use it below */
+    mbedtls_pk_free(pk);
+    /* Copy key attributes (key type and bits) and set key algorithm and usage. */
+    key_type = psa_get_key_type(&key_attr);
+    key_bits = psa_get_key_bits(&key_attr);
+    psa_reset_key_attributes(&key_attr);
+    key_attr = psa_key_attributes_init();
+    psa_set_key_type(&key_attr, key_type);
+    psa_set_key_bits(&key_attr, key_bits);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECDH);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE);
+    if (psa_import_key(&key_attr, key, key_len, &key_id) != PSA_SUCCESS) {
+        os_free(pk);
+        return NULL;
+    }
+
+    mbedtls_pk_init(pk);
+
+    if (mbedtls_pk_wrap_psa(pk, key_id) != 0) {
+        mbedtls_pk_free(pk);
+        psa_destroy_key(key_id);
         os_free(pk);
         return NULL;
     }
