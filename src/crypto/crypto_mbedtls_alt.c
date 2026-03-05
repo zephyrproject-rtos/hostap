@@ -1589,6 +1589,7 @@ static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id)
     psa_set_key_bits(&key_attr, key_bits);
     psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE |
                             PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_VERIFY_HASH);
+    psa_set_key_algorithm(&key_attr, PSA_ALG_ECDH);
     if (psa_generate_key(&key_attr, key_id) != PSA_SUCCESS) {
         return -1;
     }
@@ -1636,10 +1637,10 @@ struct crypto_ecdh *crypto_ecdh_init(int group)
     }
 
     mbedtls_pk_init(&ecdh->our_key);
-    ret = mbedtls_pk_copy_from_psa(key_id, &ecdh->our_key);
-    psa_destroy_key(key_id);
+    ret = mbedtls_pk_wrap_psa(&ecdh->our_key, key_id);
     if (ret != 0) {
         mbedtls_pk_free(&ecdh->our_key);
+        psa_destroy_key(key_id);
         os_free(ecdh);
         return NULL;
     }
@@ -1699,9 +1700,13 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
 
 void crypto_ecdh_deinit(struct crypto_ecdh *ecdh)
 {
-    if (ecdh == NULL)
-        return;
+    psa_key_id_t key_id;
+    mbedtls_pk_context *pk;
+
+    pk = (mbedtls_pk_context *) &ecdh->our_key;
+    key_id = pk->MBEDTLS_PRIVATE(priv_id);
     mbedtls_pk_free(&ecdh->our_key);
+    psa_destroy_key(key_id);
     os_free(ecdh);
 }
 
@@ -2148,10 +2153,10 @@ struct crypto_ec_key * crypto_ec_key_set_priv(int group, const u8 *raw, size_t r
     }
 
     mbedtls_pk_init(pk);
-    ret = mbedtls_pk_copy_from_psa(key_id, pk);
-    psa_destroy_key(key_id);
+    ret = mbedtls_pk_wrap_psa(pk, key_id);
     if (ret != 0) {
         mbedtls_pk_free(pk);
+        psa_destroy_key(key_id);
         os_free(pk);
         return NULL;
     }
@@ -2253,10 +2258,10 @@ struct crypto_ec_key *crypto_ec_key_gen(int group)
     }
 
     mbedtls_pk_init(pk);
-    ret = mbedtls_pk_copy_from_psa(key_id, pk);
-    psa_destroy_key(key_id);
+    ret = mbedtls_pk_wrap_psa(pk, key_id);
     if (ret != 0) {
         mbedtls_pk_free(pk);
+        psa_destroy_key(key_id);
         os_free(pk);
         return NULL;
     }
@@ -2269,8 +2274,10 @@ struct crypto_ec_key *crypto_ec_key_gen(int group)
 void crypto_ec_key_deinit(struct crypto_ec_key *key)
 {
     mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
+    psa_key_id_t key_id = pk->MBEDTLS_PRIVATE(priv_id);
 
     mbedtls_pk_free(pk);
+    psa_destroy_key(key_id);
     os_free(key);
 }
 
