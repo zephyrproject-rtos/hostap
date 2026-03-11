@@ -1778,14 +1778,32 @@ struct crypto_ecdh *crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
 
 struct wpabuf *crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 {
-    struct wpabuf *buf = wpabuf_alloc(PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS));
-    if (buf == NULL) {
+    psa_status_t status;
+    uint8_t pubkey_buf[PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(256)];
+    size_t pubkey_len = 0;
+    size_t prime_len = 0;
+    struct wpabuf *buf;
+
+    /* Export PSA public key (always in format: 0x04 + X + Y) */
+    status = psa_export_public_key(ecdh->our_key.MBEDTLS_PRIVATE(priv_id), pubkey_buf,
+                                    sizeof(pubkey_buf), &pubkey_len);
+    if (status != PSA_SUCCESS) {
         return NULL;
     }
 
-    if (mbedtls_pk_write_pubkey_der(&ecdh->our_key, wpabuf_mhead(buf), wpabuf_len(buf)) < 0) {
-        wpabuf_free(buf);
-        return NULL;
+    prime_len = (pubkey_len - 1) / 2;
+
+    if (inc_y) {
+        /* Uncompressed: copy entire key */
+        buf = wpabuf_alloc_copy(pubkey_buf, pubkey_len);
+    } else {
+        /* Compressed: convert format */
+        buf = wpabuf_alloc(1 + prime_len);
+        if (buf) {
+            uint8_t y_is_odd = pubkey_buf[pubkey_len - 1] & 0x01;
+            wpabuf_put_u8(buf, y_is_odd ? 0x03 : 0x02);
+            wpabuf_put_data(buf, pubkey_buf + 1, prime_len);
+        }
     }
 
     return buf;
@@ -1793,21 +1811,162 @@ struct wpabuf *crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 
 struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, const u8 *key, size_t len)
 {
-    struct wpabuf *buf;
-    size_t olen;
+    struct wpabuf *buf = NULL;
+    psa_status_t status;
+    size_t olen = 0;
+    u8 *peer_key_buf = NULL;
+    size_t peer_key_len = 0;
+    bool need_free = false;
+    size_t key_bits, prime_len;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
 
-    buf = wpabuf_alloc(sizeof(&ecdh->shared_secret));
-    if (buf == NULL) {
+    if (len == 0) {
         return NULL;
     }
 
-    if (psa_raw_key_agreement(PSA_ALG_ECDH, ecdh->our_key.MBEDTLS_PRIVATE(priv_id),
-                              key, len,
-                              wpabuf_mhead(buf), wpabuf_len(buf), &olen) != 0) {
+    /* Get curve information from our key */
+    status = psa_get_key_attributes(ecdh->our_key.MBEDTLS_PRIVATE(priv_id), &attributes);
+    if (status != PSA_SUCCESS) {
+        wpa_printf(MSG_ERROR, "%s: Failed to get key attributes", __FUNCTION__);
+        return NULL;
+    }
+    key_bits = psa_get_key_bits(&attributes);
+    psa_reset_key_attributes(&attributes);
+    prime_len = PSA_BITS_TO_BYTES(key_bits);
+    /* Process the peer's public key based on format */
+    if (inc_y) {
+        /* Uncompressed format: should contain X + Y coordinates */
+        if (key[0] == 0x04) {
+            /* Already in standard uncompressed format: 0x04 + X + Y */
+            peer_key_buf = (u8 *)key;
+            peer_key_len = len;
+        } else if (len == 2 * prime_len) {
+            /* Raw X + Y coordinates without prefix (some DPP implementations)
+             * Need to add 0x04 prefix */
+            peer_key_len = 1 + len;
+            peer_key_buf = os_malloc(peer_key_len);
+            if (!peer_key_buf) {
+                return NULL;
+            }
+            peer_key_buf[0] = 0x04;
+            os_memcpy(peer_key_buf + 1, key, len);
+            need_free = true;
+        } else {
+            wpa_printf(MSG_ERROR, "%s: Invalid uncompressed key length %zu", __FUNCTION__, len);
+            return NULL;
+        }
+    } else {
+        mbedtls_ecp_group_id grp_id;
+        size_t written_len = 0;
+
+        /* Compressed format: 0x02/0x03 + X coordinate only */
+        if (key[0] == 0x02 || key[0] == 0x03) {
+            /* Compressed format with prefix */
+            if (len != 1 + prime_len) {
+                wpa_printf(MSG_ERROR, "%s: Invalid compressed key length %zu", __FUNCTION__, len);
+                return NULL;
+            }
+
+            peer_key_len = 1 + 2 * prime_len;
+            peer_key_buf = os_malloc(peer_key_len);
+            if (!peer_key_buf) {
+                wpa_printf(MSG_ERROR, "%s: Memory allocation failed", __FUNCTION__);
+                return NULL;
+            }
+            need_free = true;
+            peer_key_buf[0] = 0x04;
+
+            /* Copy X coordinate */
+            os_memcpy(peer_key_buf + 1, key + 1, prime_len);
+
+            mbedtls_ecp_group grp;
+            mbedtls_ecp_point point;
+            mbedtls_ecp_group_init(&grp);
+            mbedtls_ecp_point_init(&point);
+
+            /* Load the curve group */
+            grp_id = (key_bits == 256) ? MBEDTLS_ECP_DP_SECP256R1 :
+                                          (key_bits == 384) ? MBEDTLS_ECP_DP_SECP384R1 :
+                                          (key_bits == 521) ? MBEDTLS_ECP_DP_SECP521R1 :
+                                          MBEDTLS_ECP_DP_NONE;
+
+            if (grp_id == MBEDTLS_ECP_DP_NONE) {
+                wpa_printf(MSG_ERROR, "%s: Unsupported curve size %zu bits", __FUNCTION__, key_bits);
+                os_free(peer_key_buf);
+                return NULL;
+            }
+
+            status = mbedtls_ecp_group_load(&grp, grp_id);
+            if (status != 0) {
+                wpa_printf(MSG_ERROR, "%s: Failed to load curve group: %d", __FUNCTION__, status);
+                mbedtls_ecp_point_free(&point);
+                mbedtls_ecp_group_free(&grp);
+                os_free(peer_key_buf);
+                return NULL;
+            }
+
+            /* Read the compressed point and decompress it */
+            status = mbedtls_ecp_point_read_binary(&grp, &point, key, len);
+            if (status != 0) {
+                wpa_printf(MSG_ERROR, "%s: Failed to read compressed point: %d", __FUNCTION__, status);
+                mbedtls_ecp_point_free(&point);
+                mbedtls_ecp_group_free(&grp);
+                os_free(peer_key_buf);
+                return NULL;
+            }
+
+            /* Write the uncompressed point */
+            status = mbedtls_ecp_point_write_binary(&grp, &point,
+                                                  MBEDTLS_ECP_PF_UNCOMPRESSED,
+                                                  &written_len,
+                                                  peer_key_buf,
+                                                  peer_key_len);
+
+            mbedtls_ecp_point_free(&point);
+            mbedtls_ecp_group_free(&grp);
+            if (status != 0) {
+                wpa_printf(MSG_ERROR, "%s: Failed to write uncompressed point: %d", __FUNCTION__, status);
+                os_free(peer_key_buf);
+                return NULL;
+            }
+
+            peer_key_len = written_len;
+        } else {
+            wpa_printf(MSG_ERROR, "%s: Invalid compressed key format", __FUNCTION__);
+            return NULL;
+        }
+    }
+
+    buf = wpabuf_alloc(prime_len);
+    if (!buf) {
+        wpa_printf(MSG_ERROR, "%s: Failed to allocate output buffer", __FUNCTION__);
+        if (need_free)
+            os_free(peer_key_buf);
+        return NULL;
+    }
+
+    /* Perform ECDH key agreement using PSA API */
+    status = psa_raw_key_agreement(
+        PSA_ALG_ECDH,
+        ecdh->our_key.MBEDTLS_PRIVATE(priv_id),
+        peer_key_buf,
+        peer_key_len,
+        wpabuf_mhead_u8(buf),
+        wpabuf_size(buf),
+        &olen
+    );
+
+    if (need_free) {
+        os_free(peer_key_buf);
+    }
+
+    if (status != PSA_SUCCESS) {
+        wpa_printf(MSG_ERROR, "%s: psa_raw_key_agreement failed: %d", __FUNCTION__, status);
         wpabuf_free(buf);
         return NULL;
     }
 
+    wpabuf_put(buf, olen);
     return buf;
 }
 
@@ -2451,105 +2610,139 @@ void crypto_ec_key_deinit(struct crypto_ec_key *key)
 #define MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES    \
     (29 + PSA_KEY_EXPORT_ECC_PUBLIC_KEY_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS))
 
-#define MBEDTLS_ASN1_CHK(_op_) \
-    ret = _op_; \
-    if (ret < 0) { \
-        return ret; \
-    }
-
-static int public_key_convert_to_compressed(uint8_t *der_key, size_t der_key_len, uint8_t *out, size_t out_len)
-{
-    uint8_t *in_p = der_key;
-    uint8_t *in_end = der_key + der_key_len;
-    uint8_t *out_p = out + out_len; /* write from the end backward */
-    uint8_t *out_start = out;
-    uint8_t *info_p, *key_p;
-    size_t len, info_len, key_len, coord_len, written_len;
-    int ret;
-
-    /* Initial tag for the entire DER content */
-    MBEDTLS_ASN1_CHK(mbedtls_asn1_get_tag(&in_p, in_end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-
-    /* Sequence of curve info and PK alg (only for Weierstrass curves) */
-    MBEDTLS_ASN1_CHK(mbedtls_asn1_get_tag(&in_p, in_end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-    info_p = in_p;
-    info_len = len;
-    in_p += len;
-
-    /* Read the tag of the public key */
-    MBEDTLS_ASN1_CHK(mbedtls_asn1_get_tag(&in_p, in_end, &len, MBEDTLS_ASN1_BIT_STRING));
-    key_p = in_p;
-    key_len = len;
-
-    /* From the content of "mbedtls_pk_write_pubkey_der()" in "pkwrite.c" we know that:
-     * - 1st byte is 0x00
-     * - 2nd byte is 0x04 (using uncompresed format by deafult)
-     * Therefore we can compute "coord_len" as follows.
-     */
-    coord_len = (key_len - 2) / 2;
-
-    /* Write data back starting from the end of the output buffer (as PK does) */
-    written_len = 0;
-
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_raw_buffer(&out_p, out_start, key_p, 2 + coord_len));
-    len = ret;
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_len(&out_p, out_start, len));
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_tag(&out_p, out_start, MBEDTLS_ASN1_BIT_STRING));
-
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_raw_buffer(&out_p, out_start, info_p, info_len));
-    len = ret;
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_len(&out_p, out_start, len));
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_tag(&out_p, out_start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_len(&out_p, out_start, written_len));
-    MBEDTLS_ASN1_CHK_ADD(written_len, mbedtls_asn1_write_tag(&out_p, out_start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-
-    return written_len;
-}
-
 struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
 {
-    mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
-    struct wpabuf *buf = NULL, *buf2 = NULL;
-    uint8_t *der_p;
-    size_t der_len;
-    int ret;
+    mbedtls_pk_context *pk = (mbedtls_pk_context *)key;
+    struct wpabuf *tmp = NULL;  /* holds the original DER from mbedtls_pk_write_pubkey_der() */
+    struct wpabuf *out = NULL;  /* final DER with compressed point (or original if not applicable) */
+    int der_len;
 
-    buf = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
-    buf2 = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
-    if ((buf == NULL) || (buf2 == NULL)) {
-        goto error;
+    tmp = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
+    if (!tmp)
+         return NULL;
+
+    der_len = mbedtls_pk_write_pubkey_der(pk,
+                                          wpabuf_mhead(tmp),
+                                          wpabuf_size(tmp));
+    if (der_len < 0) {
+        wpabuf_free(tmp);
+         return NULL;
     }
 
-    /* The buffer is written starting from the end! "ret" is the amount of data written. */
-    ret = mbedtls_pk_write_pubkey_der(pk, wpabuf_mhead(buf), wpabuf_len(buf));
-    if (ret < 0) {
-        goto error;
+    /* Effective DER lies at the end of the allocated buffer */
+    uint8_t *der = wpabuf_mhead_u8(tmp) + wpabuf_size(tmp) - der_len;
+    uint8_t *end = der + der_len;
+    /* Parse SPKI: SEQUENCE -> AlgorithmIdentifier(TLV) -> BIT STRING(content) */
+    unsigned char *p = der;
+    size_t seq_len, alg_len, bit_len;
+
+    /* SEQUENCE (SubjectPublicKeyInfo) */
+    if (mbedtls_asn1_get_tag(&p, end, &seq_len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) {
+        goto fail;
     }
-    der_len = ret;
-    der_p = wpabuf_mhead_u8(buf) + wpabuf_len(buf) - der_len;
-
-    /* Read uncompressed version from "buf" and write the compressed format to "buf2" */
-    ret = public_key_convert_to_compressed(der_p, der_len, wpabuf_mhead(buf2), wpabuf_len(buf));
-    if (ret < 0) {
-        goto error;
+    /* AlgorithmIdentifier (remember full TLV region to copy verbatim later) */
+    const uint8_t *alg_tlv_start = p;
+    if (mbedtls_asn1_get_tag(&p, end, &alg_len,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) {
+        goto fail;
     }
-    der_len = ret;
-    der_p = wpabuf_mhead_u8(buf2) + wpabuf_len(buf2) - der_len;
+    const uint8_t *alg_content = p;
+    p += alg_len;
+    /* Total bytes of the AlgId TLV (tag + len + contents) */
+    size_t alg_tlv_total = (size_t)(alg_content - alg_tlv_start) + alg_len;
 
-    /* Free "buf" to re-use it */
-    wpabuf_free(buf);
-    buf = wpabuf_alloc_copy(der_p, der_len);
-    if (buf == NULL) {
-        goto error;
+    /* subjectPublicKey (BIT STRING) – we only change its contents if uncompressed EC point is present */
+    if (mbedtls_asn1_get_tag(&p, end, &bit_len, MBEDTLS_ASN1_BIT_STRING)) {
+        goto fail;
     }
-    wpabuf_free(buf2);
+    const uint8_t *bit = p;
 
-    return buf;
+    /* Expect: 0x00 | 0x04 | X | Y  (uncompressed ECPoint)
+     * If not matching, just return the original DER unchanged.
+     */
+    if (bit_len < 2 || bit[0] != 0x00) {
+        out = wpabuf_alloc_copy(der, (size_t)der_len);
+        goto done;
+    }
+    if (bit[1] != 0x04) {
+        /* Already compressed (0x02/0x03) or some other format – keep as-is */
+        out = wpabuf_alloc_copy(der, (size_t)der_len);
+        goto done;
+    }
 
-error:
-    wpabuf_free(buf);
-    wpabuf_free(buf2);
+    /* Compute compressed point: 0x02/0x03 || X
+     * - point_len = len of (0x04 || X || Y), NOT including the initial 'unused bits' byte
+     * - coord_len  = |X| = |Y|
+     */
+    size_t point_len = bit_len - 1;                    /* drop unused-bits byte */
+    if (point_len < 1 || ((point_len - 1) % 2) != 0) {
+        /* Not in the expected SEC1 uncompressed format – keep as-is */
+        out = wpabuf_alloc_copy(der, (size_t)der_len);
+        goto done;
+    }
+
+    size_t coord_len = (point_len - 1) / 2;
+    const uint8_t *X = bit + 2;                        /* 0x00, 0x04, then X */
+    const uint8_t *Y = X + coord_len;
+    /* Choose 0x02 (even Y) or 0x03 (odd Y) by the least significant bit of Y */
+    uint8_t comp_tag = (Y[coord_len - 1] & 1) ? 0x03 : 0x02;
+
+    /* New BIT STRING content size: 0x00 | 0x02/0x03 | X */
+    size_t new_bit_len = 1 + 1 + coord_len;
+
+    /* Rebuild a fresh SPKI with the compressed point using backward ASN.1 writer */
+    uint8_t newbuf[MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES];
+    uint8_t *w = newbuf + sizeof(newbuf);
+    size_t total = 0;
+
+    /* BIT STRING content (compressed) */
+    w -= new_bit_len;
+    w[0] = 0x00;            /* number of unused bits */
+    w[1] = comp_tag;        /* 0x02 or 0x03 */
+    memcpy(w + 2, X, coord_len);
+    total += new_bit_len;
+
+    /* BIT STRING TL */
+    {
+        int t = mbedtls_asn1_write_len(&w, newbuf, new_bit_len);
+        if (t < 0)
+            goto fail;
+
+        total += (size_t)t;
+        t = mbedtls_asn1_write_tag(&w, newbuf, MBEDTLS_ASN1_BIT_STRING);
+        if (t < 0)
+            goto fail;
+
+        total += (size_t)t;
+    }
+
+    /* Copy AlgorithmIdentifier TLV as-is */
+    w -= alg_tlv_total;
+    memcpy(w, alg_tlv_start, alg_tlv_total);
+    total += alg_tlv_total;
+
+    /* Wrap everything in the outer SEQUENCE (SPKI) */
+    int t = mbedtls_asn1_write_len(&w, newbuf, total);
+    if (t < 0)
+        goto fail;
+
+    total += (size_t)t;
+
+    t = mbedtls_asn1_write_tag(&w, newbuf,
+            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (t < 0)
+        goto fail;
+
+    total += (size_t)t;
+
+    out = wpabuf_alloc_copy(w, total);
+done:
+    wpabuf_free(tmp);
+    return out;
+
+fail:
+    wpabuf_free(tmp);
     return NULL;
 }
 
