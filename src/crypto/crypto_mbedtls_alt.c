@@ -1975,11 +1975,14 @@ void crypto_ecdh_deinit(struct crypto_ecdh *ecdh)
     psa_key_id_t key_id;
     mbedtls_pk_context *pk;
 
-    pk = (mbedtls_pk_context *) &ecdh->our_key;
-    key_id = pk->MBEDTLS_PRIVATE(priv_id);
-    mbedtls_pk_free(&ecdh->our_key);
-    psa_destroy_key(key_id);
-    os_free(ecdh);
+    if (NULL != ecdh)
+    {
+        pk = (mbedtls_pk_context *) &ecdh->our_key;
+        key_id = pk->MBEDTLS_PRIVATE(priv_id);
+        mbedtls_pk_free(&ecdh->our_key);
+        psa_destroy_key(key_id);
+        os_free(ecdh);
+    }
 }
 
 size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
@@ -2606,11 +2609,15 @@ struct crypto_ec_key *crypto_ec_key_gen(int group)
 void crypto_ec_key_deinit(struct crypto_ec_key *key)
 {
     mbedtls_pk_context *pk = (mbedtls_pk_context *) key;
-    psa_key_id_t key_id = pk->MBEDTLS_PRIVATE(priv_id);
+    psa_key_id_t key_id;
 
-    mbedtls_pk_free(pk);
-    psa_destroy_key(key_id);
-    os_free(key);
+    if (NULL != key)
+    {
+        key_id = pk->MBEDTLS_PRIVATE(priv_id);
+        mbedtls_pk_free(pk);
+        psa_destroy_key(key_id);
+        os_free(key);
+    }
 }
 
 /* Internal - from pkwrite.h */
