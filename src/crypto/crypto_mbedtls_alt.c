@@ -1681,7 +1681,7 @@ struct crypto_ecdh *crypto_ecdh_init(int group)
         return NULL;
     }
 
-    ecdh = os_calloc(sizeof(struct crypto_ecdh), 1);
+    ecdh = os_calloc(1, sizeof(struct crypto_ecdh));
     if (ecdh == NULL) {
         psa_destroy_key(key_id);
         return NULL;
@@ -2391,7 +2391,7 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
     psa_key_id_t key_id = PSA_KEY_ID_NULL;
     psa_ecc_family_t ec_family;
 
-    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    pk = os_calloc(1, sizeof(mbedtls_pk_context));
     if (pk == NULL)
         return NULL;
 
@@ -2474,7 +2474,7 @@ struct crypto_ec_key * crypto_ec_key_set_priv(int group, const u8 *raw, size_t r
         return NULL;
     }
 
-    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    pk = os_calloc(1, sizeof(mbedtls_pk_context));
     if (pk == NULL) {
         psa_destroy_key(key_id);
         return NULL;
@@ -2496,7 +2496,7 @@ struct crypto_ec_key *crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
 {
     mbedtls_pk_context *pk;
 
-    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    pk = os_calloc(1, sizeof(mbedtls_pk_context));
     if (pk == NULL)
         return NULL;
 
@@ -2532,7 +2532,7 @@ struct crypto_ec_key *crypto_ec_key_set_pub(int group, const u8 *x, const u8 *y,
         return NULL;
     }
 
-    pk = os_calloc(sizeof(mbedtls_pk_context), 1);
+    pk = os_calloc(1, sizeof(mbedtls_pk_context));
     if (pk == NULL) {
         return NULL;
     }
@@ -2778,19 +2778,19 @@ struct wpabuf *crypto_ec_key_get_ecprivate_key(struct crypto_ec_key *key, bool i
     uint8_t *p;
     int ret;
 
-    buf = wpabuf_alloc(MBEDTLS_PK_ECP_PUB_DER_MAX_BYTES);
+    buf = wpabuf_alloc(MBEDTLS_PK_ECP_PRV_DER_MAX_BYTES);
     if (buf == NULL) {
         return NULL;
     }
 
     /* The buffer is written starting from the end! "ret" is the amount of data written. */
-    ret = mbedtls_pk_write_key_der(pk, wpabuf_mhead(buf), wpabuf_len(buf));
+    ret = mbedtls_pk_write_key_der(pk, wpabuf_mhead(buf), wpabuf_size(buf));
     if (ret < 0) {
         wpabuf_free(buf);
         return NULL;
     }
 
-    p = wpabuf_mhead_u8(buf) + wpabuf_len(buf) - ret;
+    p = wpabuf_mhead_u8(buf) + wpabuf_size(buf) - ret;
 
     buf2 = wpabuf_alloc_copy(p, ret);
     wpabuf_free(buf);
