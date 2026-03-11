@@ -1637,6 +1637,7 @@ static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id, psa_ecc_f
     psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(*ec_family));
     psa_set_key_bits(&key_attr, key_bits);
     psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE |
+                            PSA_KEY_USAGE_COPY |
                             PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_VERIFY_HASH);
     psa_set_key_algorithm(&key_attr, PSA_ALG_ECDH);
     if (psa_generate_key(&key_attr, key_id) != PSA_SUCCESS) {
@@ -2426,7 +2427,9 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
     psa_set_key_type(&key_attr, key_type);
     psa_set_key_bits(&key_attr, key_bits);
     psa_set_key_algorithm(&key_attr, PSA_ALG_ECDH);
-    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE
+                            | PSA_KEY_USAGE_COPY);
+    psa_set_key_lifetime(&key_attr, PSA_KEY_LIFETIME_VOLATILE);
     if (psa_import_key(&key_attr, key, key_len, &key_id) != PSA_SUCCESS) {
         os_free(pk);
         return NULL;
@@ -2465,7 +2468,8 @@ struct crypto_ec_key * crypto_ec_key_set_priv(int group, const u8 *raw, size_t r
     psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(ec_family));
     psa_set_key_bits(&key_attr, key_bits);
     psa_set_key_algorithm(&key_attr, PSA_ALG_ECDH);
-    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE);
+    psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE
+                            | PSA_KEY_USAGE_COPY);
     if (psa_import_key(&key_attr, raw, raw_len, &key_id) != PSA_SUCCESS) {
         return NULL;
     }
