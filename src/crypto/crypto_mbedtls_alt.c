@@ -1624,7 +1624,7 @@ mbedtls_ecp_group_id mbedtls_ecc_group_from_psa(psa_ecc_family_t family, size_t 
 static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id, psa_ecc_family_t *ec_family)
 {
     mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
-    psa_key_bits_t key_bits;
+    size_t key_bits;
     psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
 
     *key_id = PSA_KEY_ID_NULL;
@@ -2455,7 +2455,7 @@ struct crypto_ec_key * crypto_ec_key_set_priv(int group, const u8 *raw, size_t r
     psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
     psa_key_id_t key_id = PSA_KEY_ID_NULL;
     psa_ecc_family_t ec_family;
-    psa_key_bits_t key_bits;
+    size_t key_bits;
     mbedtls_ecp_group_id ecp_group_id;
     int ret;
 
@@ -2520,7 +2520,7 @@ struct crypto_ec_key *crypto_ec_key_set_pub(int group, const u8 *x, const u8 *y,
     mbedtls_ecp_group_id group_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
     uint8_t *raw_key_ptr;
     psa_ecc_family_t ec_family;
-    psa_key_bits_t key_bits;
+    size_t key_bits;
 
     ec_family = mbedtls_ecc_group_to_psa(group_id, (size_t *) &key_bits);
     if (ec_family == 0) {
