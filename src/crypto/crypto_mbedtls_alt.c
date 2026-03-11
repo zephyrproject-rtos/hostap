@@ -3008,23 +3008,14 @@ int crypto_ec_key_cmp(struct crypto_ec_key *key1, struct crypto_ec_key *key2)
 {
     mbedtls_pk_context *pk1 = (mbedtls_pk_context *) key1;
     mbedtls_pk_context *pk2 = (mbedtls_pk_context *) key2;
-    uint8_t priv_key1[PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
-    uint8_t priv_key2[PSA_KEY_EXPORT_ECC_KEY_PAIR_MAX_SIZE(PSA_VENDOR_ECC_MAX_CURVE_BITS)] = { 0 };
-    size_t priv_key1_len, priv_key2_len;
 
-    if ((psa_export_key(pk1->MBEDTLS_PRIVATE(priv_id), priv_key1, sizeof(priv_key1), &priv_key1_len) != PSA_SUCCESS) ||
-        (psa_export_key(pk2->MBEDTLS_PRIVATE(priv_id), priv_key2, sizeof(priv_key2), &priv_key2_len) != PSA_SUCCESS)) {
-        memset(priv_key1, 0, sizeof(priv_key1));
-        memset(priv_key2, 0, sizeof(priv_key2));
+    if (pk1->MBEDTLS_PRIVATE(pub_raw_len) != pk2->MBEDTLS_PRIVATE(pub_raw_len)) {
         return -1;
     }
 
-    if ((priv_key1_len != priv_key2_len) ||
-        (pk1->MBEDTLS_PRIVATE(pub_raw_len) != pk2->MBEDTLS_PRIVATE(pub_raw_len)) ||
-        (memcmp(priv_key1, priv_key2, priv_key1_len) != 0) ||
-        (memcmp(pk1->MBEDTLS_PRIVATE(pub_raw), pk2->MBEDTLS_PRIVATE(pub_raw), pk1->MBEDTLS_PRIVATE(pub_raw_len)) != 0)) {
-        memset(priv_key1, 0, sizeof(priv_key1));
-        memset(priv_key2, 0, sizeof(priv_key2));
+    if (memcmp(pk1->MBEDTLS_PRIVATE(pub_raw),
+               pk2->MBEDTLS_PRIVATE(pub_raw),
+               pk1->MBEDTLS_PRIVATE(pub_raw_len)) != 0) {
         return -1;
     }
 
