@@ -1621,21 +1621,20 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 psa_ecc_family_t mbedtls_ecc_group_to_psa(mbedtls_ecp_group_id grpid, size_t *bits);
 mbedtls_ecp_group_id mbedtls_ecc_group_from_psa(psa_ecc_family_t family, size_t bits);
 
-static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id)
+static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id, psa_ecc_family_t *ec_family)
 {
     mbedtls_ecp_group_id grp_id = crypto_mbedtls_ecp_group_id_from_ike_id(group);
-    psa_ecc_family_t ec_family;
     psa_key_bits_t key_bits;
     psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
 
     *key_id = PSA_KEY_ID_NULL;
 
-    ec_family = mbedtls_ecc_group_to_psa(grp_id, (size_t *) &key_bits);
-    if (ec_family == 0) {
+    *ec_family = mbedtls_ecc_group_to_psa(grp_id, (size_t *) &key_bits);
+    if (*ec_family == 0) {
         return -1;
     }
 
-    psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(ec_family));
+    psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(*ec_family));
     psa_set_key_bits(&key_attr, key_bits);
     psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_DERIVE |
                             PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_VERIFY_HASH);
@@ -1675,8 +1674,9 @@ struct crypto_ecdh *crypto_ecdh_init(int group)
     struct crypto_ecdh *ecdh = NULL;
     psa_key_id_t key_id;
     int ret;
+    psa_ecc_family_t ec_family;
 
-    if (crypto_mbedtls_keypair_gen(group, &key_id) != 0) {
+    if (crypto_mbedtls_keypair_gen(group, &key_id, &ec_family) != 0) {
         return NULL;
     }
 
@@ -1694,7 +1694,9 @@ struct crypto_ecdh *crypto_ecdh_init(int group)
         os_free(ecdh);
         return NULL;
     }
-
+#if defined(PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY)
+    ecdh->our_key.MBEDTLS_PRIVATE(ec_family) = ec_family;
+#endif
     return ecdh;
 }
 
@@ -2163,6 +2165,7 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
     psa_key_type_t key_type;
     psa_key_bits_t key_bits;
     psa_key_id_t key_id = PSA_KEY_ID_NULL;
+    psa_ecc_family_t ec_family;
 
     pk = os_calloc(sizeof(mbedtls_pk_context), 1);
     if (pk == NULL)
@@ -2174,6 +2177,9 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
         os_free(pk);
         return NULL;
     }
+#if defined(PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY)
+    ec_family = pk->MBEDTLS_PRIVATE(ec_family);
+#endif
     /* By deafult "mbedlts_pk_parse_key()" assigns ECDSA(ANY_HASH) algorithm to the imported
      * PSA key. We need to change that to ECDH. */
 
@@ -2211,7 +2217,9 @@ struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
         os_free(pk);
         return NULL;
     }
-
+#if defined(PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY)
+    pk->MBEDTLS_PRIVATE(ec_family) = ec_family;
+#endif
     return (struct crypto_ec_key *) pk;
 }
 
@@ -2340,14 +2348,16 @@ struct crypto_ec_key *crypto_ec_key_gen(int group)
     psa_key_id_t key_id = PSA_KEY_ID_NULL;
     mbedtls_pk_context *pk;
     int ret;
+    psa_ecc_family_t ec_family;
 
-    if (crypto_mbedtls_keypair_gen(group, &key_id) != 0) {
+    if (crypto_mbedtls_keypair_gen(group, &key_id, &ec_family) != 0) {
         return NULL;
     }
 
     pk = os_malloc(sizeof(mbedtls_pk_context));
     if (pk == NULL) {
         psa_destroy_key(key_id);
+        return NULL;
     }
 
     mbedtls_pk_init(pk);
@@ -2358,7 +2368,9 @@ struct crypto_ec_key *crypto_ec_key_gen(int group)
         os_free(pk);
         return NULL;
     }
-
+#if defined(PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY)
+    pk->MBEDTLS_PRIVATE(ec_family)= ec_family;
+#endif
     return (struct crypto_ec_key *) pk;
 }
 
