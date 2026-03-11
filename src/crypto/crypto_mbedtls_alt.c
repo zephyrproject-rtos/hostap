@@ -1704,13 +1704,74 @@ struct crypto_ecdh *crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
 {
     struct crypto_ecdh *ecdh = NULL;
     mbedtls_pk_context *pk = (mbedtls_pk_context *) own_key;
+    psa_key_id_t orig_key_id;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_status_t status;
+    psa_key_id_t new_key_id;
+    int ret;
 
-    ecdh = os_calloc(sizeof(struct crypto_ecdh), 1);
+    if (pk == NULL) {
+        return NULL;
+    }
+
+    /* Get the original PSA key ID from the pk context */
+    orig_key_id = pk->MBEDTLS_PRIVATE(priv_id);
+    if (mbedtls_svc_key_id_is_null(orig_key_id)) {
+        return NULL;
+    }
+
+    /* Allocate ECDH structure */
+    ecdh = os_calloc(1, sizeof(struct crypto_ecdh));
     if (ecdh == NULL) {
         return NULL;
     }
 
-    memcpy(&ecdh->our_key, pk, sizeof(mbedtls_pk_context));
+    status = psa_get_key_attributes(orig_key_id, &attributes);
+    if (status != PSA_SUCCESS) {
+        return NULL;
+    }
+    psa_set_key_lifetime(&attributes, PSA_KEY_LIFETIME_VOLATILE);
+
+    /* Copy the PSA key using psa_copy_key() */
+    status = psa_copy_key(orig_key_id, &attributes, &new_key_id);
+    psa_reset_key_attributes(&attributes);
+
+    if (status != PSA_SUCCESS) {
+        wpa_printf(MSG_ERROR, "%s: Failed to copy key: %d",
+                   __FUNCTION__, (int)status);
+        os_free(ecdh);
+        return NULL;
+    }
+
+    /* Initialize the new pk context */
+    mbedtls_pk_init(&ecdh->our_key);
+
+    /* Wrap the new PSA key with pk context */
+    ret = mbedtls_pk_wrap_psa(&ecdh->our_key, new_key_id);
+    if (ret != 0) {
+        wpa_printf(MSG_ERROR, "%s: Failed to wrap PSA key: %d",
+                   __FUNCTION__, ret);
+        mbedtls_pk_free(&ecdh->our_key);
+        psa_destroy_key(new_key_id);
+        os_free(ecdh);
+        return NULL;
+    }
+
+    /* Copy public key raw data if available */
+    if (pk->MBEDTLS_PRIVATE(pub_raw_len) > 0 ) {
+        os_memcpy(ecdh->our_key.MBEDTLS_PRIVATE(pub_raw),
+                  pk->MBEDTLS_PRIVATE(pub_raw),
+                  pk->MBEDTLS_PRIVATE(pub_raw_len));
+        ecdh->our_key.MBEDTLS_PRIVATE(pub_raw_len) = pk->MBEDTLS_PRIVATE(pub_raw_len);
+    }
+
+    /* Copy other key attributes */
+    ecdh->our_key.MBEDTLS_PRIVATE(bits) = pk->MBEDTLS_PRIVATE(bits);
+    ecdh->our_key.MBEDTLS_PRIVATE(psa_type) = pk->MBEDTLS_PRIVATE(psa_type);
+
+#if defined(PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY)
+    ecdh->our_key.MBEDTLS_PRIVATE(ec_family) = pk->MBEDTLS_PRIVATE(ec_family);
+#endif
 
     return ecdh;
 }
