@@ -2504,6 +2504,8 @@ struct crypto_ec_key *crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
 }
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_EC_DPP
+/* Internal to PK. Defined in "pk_wrap.c" */
+extern const mbedtls_pk_info_t mbedtls_eckey_info;
 
 struct crypto_ec_key *crypto_ec_key_set_pub(int group, const u8 *x, const u8 *y, size_t len)
 {
@@ -2531,12 +2533,17 @@ struct crypto_ec_key *crypto_ec_key_set_pub(int group, const u8 *x, const u8 *y,
     raw_key_ptr = pk->MBEDTLS_PRIVATE(pub_raw);
     *raw_key_ptr = 0x04;
     raw_key_ptr++;
+    pk->MBEDTLS_PRIVATE(pub_raw_len)++;
     memcpy(raw_key_ptr, x, len);
+    pk->MBEDTLS_PRIVATE(pub_raw_len) += len;
     raw_key_ptr += len;
     memcpy(raw_key_ptr, y, len);
-
+    pk->MBEDTLS_PRIVATE(pub_raw_len) += len;
+#if defined(PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY)
     pk->MBEDTLS_PRIVATE(ec_family) = ec_family;
+#endif
     pk->MBEDTLS_PRIVATE(bits) = key_bits;
+    pk->MBEDTLS_PRIVATE(pk_info) = &mbedtls_eckey_info;
 
     return (struct crypto_ec_key *) pk;
 }
