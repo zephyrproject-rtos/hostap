@@ -140,7 +140,7 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 		return NULL;
 	}
 
-	link_addr = &iface->if_dev->link_addr;
+	link_addr = net_if_get_link_addr(iface);
 	os_memcpy(l2->own_addr, link_addr->addr, link_addr->len);
 
 	l2->fd = socket(AF_PACKET, l2_hdr ? SOCK_RAW : SOCK_DGRAM,
