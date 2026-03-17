@@ -337,12 +337,14 @@ static int eap_ttls_v0_derive_key(struct eap_sm *sm,
 }
 
 
+#if defined(EAP_MSCHAPv2) || !defined(CONFIG_FIPS)
 static u8 * eap_ttls_implicit_challenge(struct eap_sm *sm,
 					struct eap_ttls_data *data, size_t len)
 {
 	return eap_peer_tls_derive_key(sm, &data->ssl, "ttls challenge",
 				       NULL, 0, len);
 }
+#endif /* EAP_MSCHAPv2 || !CONFIG_FIPS */
 
 
 static void eap_ttls_phase2_select_eap_method(struct eap_ttls_data *data,
