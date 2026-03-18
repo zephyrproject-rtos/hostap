@@ -360,10 +360,6 @@ struct tls_conf *tls_conf_deinit(struct tls_conf *tls_conf)
     return NULL;
 }
 
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-mbedtls_ctr_drbg_context *crypto_mbedtls_ctr_drbg(void); /*(not in header)*/
-#endif
-
 __attribute_cold__ void *tls_init(const struct tls_config *conf)
 {
     /* RFE: review struct tls_config *conf (different from tls_conf) */
@@ -371,9 +367,6 @@ __attribute_cold__ void *tls_init(const struct tls_config *conf)
     if (++tls_ctx_global.refcnt > 1)
         return &tls_ctx_global;
 
-#if !defined(MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG)
-    tls_ctx_global.ctr_drbg = crypto_mbedtls_ctr_drbg();
-#endif
 #ifdef MBEDTLS_SSL_SESSION_TICKETS
     mbedtls_ssl_ticket_init(&tls_ctx_global.ticket_ctx);
     if (mbedtls_ssl_ticket_setup(&tls_ctx_global.ticket_ctx, PSA_ALG_GCM, PSA_KEY_TYPE_AES, 256,
