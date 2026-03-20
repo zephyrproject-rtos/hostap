@@ -2007,7 +2007,18 @@ struct wpabuf *tls_connection_handshake(void *tls_ctx,
             return NULL;
         }
     } else if (conn->tls_conf->suffix_match != NULL) {
-        ret = mbedtls_ssl_set_hostname(&conn->ssl, conn->tls_conf->suffix_match);
+	/* Prepend wildcard to suffix match */
+	size_t suffix_len = os_strlen(conn->tls_conf->suffix_match);
+	char *wildcard_hostname = os_malloc(suffix_len + 3); /* "*." + suffix + '\0' */
+	if (wildcard_hostname == NULL) {
+	    wpa_printf(MSG_ERROR, "Failed to allocate memory for wildcard hostname");
+	    return NULL;
+	}
+	os_memcpy(wildcard_hostname, "*.", 2);
+	os_memcpy(wildcard_hostname + 2, conn->tls_conf->suffix_match, suffix_len + 1);
+
+	ret = mbedtls_ssl_set_hostname(&conn->ssl, wildcard_hostname);
+	os_free(wildcard_hostname);
         if (ret != 0) {
             wpa_printf(MSG_ERROR, "Failed to set hostname from suffix match");
             return NULL;
