@@ -1578,9 +1578,8 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
     else if (tls_conf->flags & TLS_CONN_SUITEB)
     {
         /* special-case a select set of ciphers for hwsim tests */
-        if (!tls_mbedtls_set_ciphers(tls_conf, (tls_conf->flags & TLS_CONN_SUITEB_NO_ECDH) ?
-                                                   "DHE-RSA-AES256-GCM-SHA384" :
-                                                   "ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384"))
+        /* DHE-RSA-AES256-GCM-SHA384 is removed in Mbed TLS 4.0 */
+        if (!tls_mbedtls_set_ciphers(tls_conf, "ECDHE-RSA-AES256-GCM-SHA384"))
             return -1;
     }
 
