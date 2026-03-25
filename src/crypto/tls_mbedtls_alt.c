@@ -1440,8 +1440,8 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf, const struct tls_con
 static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb128 = {
     /* Only SHA-256 and 384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA256) | MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA384),
-    /* Only ECDSA */
-    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA),
+    /* Only ECDSA and ECKEY */
+    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA) | MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA + 1),
 #if defined(MBEDTLS_ECP_C)
     /* Only NIST P-256 and P-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP256R1) | MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP384R1),
@@ -1457,8 +1457,8 @@ static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb128 = {
 static const mbedtls_x509_crt_profile tls_mbedtls_crt_profile_suiteb192 = {
     /* Only SHA-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA384),
-    /* Only ECDSA */
-    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA),
+    /* Only ECDSA and ECKEY */
+    MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA) | MBEDTLS_X509_ID_FLAG(MBEDTLS_PK_SIGALG_ECDSA + 1),
 #if defined(MBEDTLS_ECP_C)
     /* Only NIST P-384 */
     MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_SECP384R1),
