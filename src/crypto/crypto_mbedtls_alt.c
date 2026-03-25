@@ -1840,7 +1840,7 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
     /* Process the peer's public key based on format */
     if (inc_y) {
         /* Uncompressed format: should contain X + Y coordinates */
-        if (key[0] == 0x04) {
+        if (key[0] == 0x04 && (len == 1 + 2 * prime_len)) {
             /* Already in standard uncompressed format: 0x04 + X + Y */
             peer_key_buf = (u8 *)key;
             peer_key_len = len;
