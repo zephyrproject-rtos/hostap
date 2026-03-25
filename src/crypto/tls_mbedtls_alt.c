@@ -682,7 +682,6 @@ static void tls_mbedtls_set_allowed_tls_vers(struct tls_conf *tls_conf, mbedtls_
     /* mbed TLS 3.0.0 removes support for protocols < TLSv1.2 */
     if (min < 2 || max < 2)
     {
-        emsg(MSG_ERROR, "invalid tls_disable_tlsv* params; ignoring");
         if (min < 2)
             min = 2;
         if (max < 2)
