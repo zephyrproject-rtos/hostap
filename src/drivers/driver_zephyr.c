@@ -2494,6 +2494,7 @@ static int wpa_drv_zep_set_ap(void *priv,
 	}
 
 	if_ctx->beacon_set = 1;
+	if_ctx->ap_probe_req_listen = true;
 
 	ret = 0;
 
@@ -2587,6 +2588,7 @@ int wpa_drv_zep_stop_ap(void *priv, int link_id)
 out:
 	if (if_ctx) {
 		if_ctx->beacon_set = false;
+		if_ctx->ap_probe_req_listen = false;
 	}
 	return ret;
 }
