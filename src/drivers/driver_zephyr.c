@@ -377,6 +377,25 @@ void wpa_supplicant_event_wrapper(void *ctx,
 			data_tmp->unprot_disassoc.sa = sa;
 			os_memcpy(da, data->unprot_disassoc.da, ETH_ALEN);
 			data_tmp->unprot_disassoc.da = da;
+		} else if(event == EVENT_EXTERNAL_AUTH) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *bssid = os_zalloc(ETH_ALEN);
+			char *ssid = os_zalloc(data->external_auth.ssid_len);
+			if (!bssid || !ssid) {
+				wpa_printf(MSG_ERROR,
+				  "%s:%d event %u Failed to alloc ssid/bssid \n",
+				  __func__, __LINE__, event);
+				os_free(msg.data);
+				return;
+			}
+			os_memcpy(bssid, data->external_auth.bssid, ETH_ALEN);
+			data_tmp->external_auth.bssid = bssid;
+			os_memcpy(ssid, data->external_auth.ssid, data->external_auth.ssid_len);
+			data_tmp->external_auth.ssid = ssid;
+			data_tmp->external_auth.mld_addr = data->external_auth.mld_addr;
+			data_tmp->external_auth.ssid_len = data->external_auth.ssid_len;
+			data_tmp->external_auth.action = data->external_auth.action;
+			data_tmp->external_auth.key_mgmt_suite = data->external_auth.key_mgmt_suite;
 		}
 	}
 
@@ -700,6 +719,24 @@ static void wpa_drv_zep_event_proc_unprot_disassoc(struct zep_drv_if_ctx *if_ctx
 {
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_UNPROT_DISASSOC,
+			event);
+}
+
+/**
+ * wpa_drv_zep_event_ext_auth_req - Send the SAE external auth status to
+ * the driver, if the zephyr driver ops is registered for this.
+ *
+ * @if_ctx : Interface context
+ * @event : event data to be sent to supplicant
+ *
+ * This function notifies the supplicant to initiate a External Authentication process
+ * for WPA3 SAE STA connection.
+ */
+void wpa_drv_zep_event_ext_auth_req(struct zep_drv_if_ctx *if_ctx,
+						   union wpa_event_data *event)
+{
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
+			EVENT_EXTERNAL_AUTH,
 			event);
 }
 
@@ -1366,6 +1403,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.roc_complete = wpa_drv_zep_event_roc_complete;
 	callbk_fns.roc_cancel_complete = wpa_drv_zep_event_roc_cancel_complete;
 	callbk_fns.cookie_event = wpa_drv_zep_event_cookie_event;
+	callbk_fns.ext_auth_req = wpa_drv_zep_event_ext_auth_req;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
@@ -2353,6 +2391,72 @@ out:
 	return ret;
 }
 
+int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
+	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
+	unsigned int wait, int link_id)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->send_mlme) {
+		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported",
+			   __func__);
+		goto out;
+	}
+
+	if (freq == 0) {
+		freq = if_ctx->freq;
+	}
+
+	ret = dev_ops->send_mlme(if_ctx->dev_priv, data, data_len, noack, freq, 0, 0, wait, 0);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: send_mlme op failed: %d", __func__, ret);
+		goto out;
+	}
+	ret = 0;
+out:
+	return ret;
+}
+
+/**
+ * wpa_drv_zep_send_external_auth_status - Send the SAE external auth status to
+ * the driver, if the zephyr driver ops is registered for this.
+ *
+ * @priv: Interface context
+ * @params : External auth status parameters
+ *
+ * This function send the external auth status to the driver.
+ */
+int wpa_drv_zep_send_external_auth_status(void *priv,
+					     struct external_auth *params) {
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+
+	if (!dev_ops || !dev_ops->send_external_auth_status) {
+		wpa_printf(MSG_ERROR, "%s: send_external_auth_status op not supported",
+			   __func__);
+		goto out;
+	}
+
+	ret = dev_ops->send_external_auth_status(if_ctx->dev_priv, params);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: send_external_auth_status op failed: %d", __func__, ret);
+		goto out;
+	}
+	ret = 0;
+out:
+	return ret;
+}
+
 #ifdef CONFIG_AP
 #ifndef CONFIG_WIFI_NM_HOSTAPD_AP
 static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
@@ -2787,43 +2891,6 @@ out:
 	return ret;
 }
 
-int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
-	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
-	unsigned int wait, int link_id)
-{
-	struct zep_drv_if_ctx *if_ctx = priv;
-	const struct zep_wpa_supp_dev_ops *dev_ops;
-	int ret = -1;
-
-	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
-	(void)link_id;
-
-	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
-		goto out;
-	}
-
-	if (!dev_ops->send_mlme) {
-		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported",
-			   __func__);
-		goto out;
-	}
-
-	if (freq == 0) {
-		freq = if_ctx->freq;
-	}
-
-	ret = dev_ops->send_mlme(if_ctx->dev_priv, data, data_len, noack, freq, 0, 0, wait, 0);
-	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: send_mlme op failed: %d", __func__, ret);
-		goto out;
-	}
-	ret = 0;
-out:
-	return ret;
-}
-
 int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t data_len,
                             int encrypt, const u8 *own_addr, u32 flags, int link_id)
 {
@@ -3121,6 +3188,8 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
+	.send_mlme = wpa_drv_zep_send_mlme,
+	.send_external_auth_status = wpa_drv_zep_send_external_auth_status,
 #ifdef CONFIG_AP
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	.hapd_init = wpa_drv_zep_hapd_init,
@@ -3128,7 +3197,6 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.do_acs = wpa_drv_zep_do_acs,
 #endif
 	.hapd_send_eapol = wpa_drv_hapd_send_eapol,
-	.send_mlme = wpa_drv_zep_send_mlme,
 	.set_ap = wpa_drv_zep_set_ap,
 	.stop_ap = wpa_drv_zep_stop_ap,
 	.deinit_ap = wpa_drv_zep_deinit_ap,
