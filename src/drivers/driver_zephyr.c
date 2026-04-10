@@ -381,11 +381,12 @@ void wpa_supplicant_event_wrapper(void *ctx,
 			union wpa_event_data *data_tmp = msg.data;
 			char *bssid = os_zalloc(ETH_ALEN);
 			char *ssid = os_zalloc(data->external_auth.ssid_len);
+
 			if (!bssid || !ssid) {
 				wpa_printf(MSG_ERROR,
-				  "%s:%d event %u Failed to alloc ssid/bssid \n",
-				  __func__, __LINE__, event);
-				os_free(msg.data);
+					"%s:%d event %u Failed to alloc ssid/bssid \n",
+					__func__, __LINE__, event);
+					os_free(msg.data);
 				return;
 			}
 			os_memcpy(bssid, data->external_auth.bssid, ETH_ALEN);
@@ -519,6 +520,7 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 	}
 
 	struct wpa_scan_res *sr = os_zalloc(scan_res_len);
+
 	if (!sr) {
 		wpa_printf(MSG_ERROR, "%s: Failed to alloc scan results(%d bytes)", __func__, scan_res_len);
 		if_ctx->scan_res2->res = tmp;
@@ -2056,7 +2058,7 @@ out:
 }
 
 
-static int wpa_drv_zep_set_key(void* priv,
+static int wpa_drv_zep_set_key(void *priv,
 			       struct wpa_driver_set_key_params *params)
 {
 	return _wpa_drv_zep_set_key(priv,
@@ -2497,14 +2499,14 @@ static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
 		}
 	}
 #ifdef CONFIG_P2P
-        /* P2P Public Action */
-        if (wpa_drv_register_action_frame(if_ctx, (u8 *) "\x04\x09\x50\x6f\x9a\x09", 6) < 0) {
-                ret = -1;
-        }
-        /* P2P Action */
-        if (wpa_drv_register_action_frame(if_ctx, (u8 *) "\x7f\x50\x6f\x9a\x09", 5) < 0) {
-                ret = -1;
-        }
+		/* P2P Public Action */
+		if (wpa_drv_register_action_frame(if_ctx, (u8 *) "\x04\x09\x50\x6f\x9a\x09", 6) < 0) {
+			ret = -1;
+		}
+		/* P2P Action */
+		if (wpa_drv_register_action_frame(if_ctx, (u8 *) "\x7f\x50\x6f\x9a\x09", 5) < 0) {
+			ret = -1;
+		}
 #endif /* CONFIG_P2P */
 
 out:
@@ -2551,8 +2553,7 @@ static int wpa_drv_zep_set_ap(void *priv,
 	if (params->proberesp && params->proberesp_len) {
 		wpa_hexdump(MSG_EXCESSIVE, "proberesp (offload)", params->proberesp, params->proberesp_len);
 	}
-	switch (params->hide_ssid)
-	{
+	switch (params->hide_ssid) {
 		case NO_SSID_HIDING:
 			wpa_printf(MSG_EXCESSIVE, "hidden SSID not in use");
 			break;
@@ -2892,7 +2893,7 @@ out:
 }
 
 int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t data_len,
-                            int encrypt, const u8 *own_addr, u32 flags, int link_id)
+				int encrypt, const u8 *own_addr, u32 flags, int link_id)
 {
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	struct zep_drv_if_ctx *if_ctx = priv;
@@ -3091,7 +3092,7 @@ int wpa_drv_zep_probe_req_report(void *priv, int report)
 	}
 
 	if_ctx->probe_req_listen = true;
-	if(if_ctx->probe_req_set) {
+	if (if_ctx->probe_req_set) {
 		wpa_printf(MSG_DEBUG, "%s: Probe request already registered", __func__);
 		return 0;
 	}
