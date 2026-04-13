@@ -3210,10 +3210,10 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  "<addr> = request over-the-DS FT with <addr>" },
 #endif /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI) */
 #if !defined(__ZEPHYR__) || defined(CONFIG_WPS)
-	{ "wps_pbc", wpa_cli_cmd_wps_pbc, wpa_cli_complete_bss,
+	{ "wps_pbc", wpa_cli_cmd_wps_pbc, NULL,
 	  cli_cmd_flag_none,
 	  "[BSSID] = start Wi-Fi Protected Setup: Push Button Configuration" },
-	{ "wps_pin", wpa_cli_cmd_wps_pin, wpa_cli_complete_bss,
+	{ "wps_pin", wpa_cli_cmd_wps_pin, NULL,
 	  cli_cmd_flag_sensitive,
 	  "<BSSID> [PIN] = start WPS PIN method (returns PIN, if not "
 	  "hardcoded)" },
