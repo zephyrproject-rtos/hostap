@@ -233,6 +233,9 @@ struct zep_wpa_supp_dev_callbk_fns {
 			     int freq, u64 cookie);
 
 	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 host_cookie, u64 cookie);
+
+	void (*ext_auth_req)(struct zep_drv_if_ctx *if_ctx,
+			     union wpa_event_data *event);
 };
 
 struct zep_hostapd_dev_callbk_fns
@@ -315,6 +318,8 @@ struct zep_wpa_supp_dev_ops {
 			int offchanok,
 			unsigned int wait_time,
 			int cookie);
+	int (*send_external_auth_status)(void *priv,
+			  struct external_auth *params);
 	int (*get_wiphy)(void *if_priv);
 
 	int (*register_frame)(void *if_priv,
