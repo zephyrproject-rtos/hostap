@@ -862,7 +862,9 @@ static int wpa_cli_cmd_ft_ds(struct wpa_ctrl *ctrl, int argc, char *argv[])
 	return wpa_cli_cmd(ctrl, "FT_DS", 1, argc, argv);
 }
 
+#endif /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI) */
 
+#if !defined(__ZEPHYR__) || defined(CONFIG_WPS)
 static int wpa_cli_cmd_wps_pbc(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "WPS_PBC", 0, argc, argv);
@@ -895,7 +897,9 @@ static int wpa_cli_cmd_wps_cancel(struct wpa_ctrl *ctrl, int argc,
 {
 	return wpa_cli_cmd(ctrl, "WPS_CANCEL", 0, argc, argv);
 }
+#endif /* !__ZEPHYR__ || CONFIG_WPS */
 
+#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 
 #ifdef CONFIG_WPS_NFC
 
@@ -3204,6 +3208,8 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "ft_ds", wpa_cli_cmd_ft_ds, wpa_cli_complete_bss,
 	  cli_cmd_flag_none,
 	  "<addr> = request over-the-DS FT with <addr>" },
+#endif /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI) */
+#if !defined(__ZEPHYR__) || defined(CONFIG_WPS)
 	{ "wps_pbc", wpa_cli_cmd_wps_pbc, wpa_cli_complete_bss,
 	  cli_cmd_flag_none,
 	  "[BSSID] = start Wi-Fi Protected Setup: Push Button Configuration" },
@@ -3216,6 +3222,8 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  "<PIN> = verify PIN checksum" },
 	{ "wps_cancel", wpa_cli_cmd_wps_cancel, NULL, cli_cmd_flag_none,
 	  "Cancels the pending WPS operation" },
+#endif /* !__ZEPHYR__ || CONFIG_WPS */
+#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 #ifdef CONFIG_WPS_NFC
 	{ "wps_nfc", wpa_cli_cmd_wps_nfc, wpa_cli_complete_bss,
 	  cli_cmd_flag_none,
