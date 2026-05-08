@@ -2717,6 +2717,15 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 	} else {
 		wpa_s->no_suitable_network++;
 		wpa_dbg(wpa_s, MSG_DEBUG, "No suitable network found");
+#ifdef __ZEPHYR__
+		if (own_request && wpa_s->wpa_state == WPA_SCANNING) {
+			int conn_result = WIFI_STATUS_CONN_AP_NOT_FOUND;
+
+			supplicant_send_wifi_mgmt_event(wpa_s->ifname,
+							NET_EVENT_WIFI_CMD_CONNECT_RESULT,
+							&conn_result, sizeof(conn_result));
+		}
+#endif /* __ZEPHYR__ */
 		ssid = wpa_supplicant_pick_new_network(wpa_s);
 		if (ssid) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "Setup a new network");
