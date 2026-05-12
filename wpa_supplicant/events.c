@@ -2487,7 +2487,7 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_NO_RANDOM_POOL */
 
-	if (update_only) {
+	if (update_only || (data && data->scan_info.aborted)) {
 		ret = 1;
 		goto scan_work_done;
 	}
