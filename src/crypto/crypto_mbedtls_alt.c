@@ -9,7 +9,6 @@
 #include "utils/common.h"
 
 #ifndef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_NONE
-#include <mbedtls/version.h>
 #include <mbedtls/platform_util.h> /* mbedtls_platform_zeroize() */
 #include <mbedtls/asn1.h>
 #include <mbedtls/asn1write.h>
@@ -207,89 +206,178 @@ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 }
 #endif
 
+/*
+ * Mbed TLS 4 / tf-psa-crypto: legacy mbedtls_md_hmac_* is not available for
+ * these paths; use PSA MAC (psa_mac_*) instead.
+ */
 struct crypto_hash
 {
-    mbedtls_md_context_t ctx;
+    psa_mac_operation_t mac_op;
+    psa_key_id_t key_id;
+    psa_algorithm_t mac_alg;
+    size_t key_len;
+    psa_status_t status;
 };
+
+static void crypto_hash_psa_abort(struct crypto_hash *ctx)
+{
+    psa_mac_abort(&ctx->mac_op);
+    if (ctx->key_id != PSA_KEY_ID_NULL) {
+        psa_destroy_key(ctx->key_id);
+        ctx->key_id = PSA_KEY_ID_NULL;
+    }
+}
+
+static psa_status_t crypto_hash_md_type_to_hmac_alg(mbedtls_md_type_t md_type,
+                                                  psa_algorithm_t *mac_alg)
+{
+    psa_algorithm_t hash_alg = PSA_ALG_NONE;
+
+    switch (md_type) {
+    case MBEDTLS_MD_MD5:
+        hash_alg = PSA_ALG_MD5;
+        break;
+    case MBEDTLS_MD_SHA1:
+        hash_alg = PSA_ALG_SHA_1;
+        break;
+    case MBEDTLS_MD_SHA256:
+        hash_alg = PSA_ALG_SHA_256;
+        break;
+    case MBEDTLS_MD_SHA384:
+        hash_alg = PSA_ALG_SHA_384;
+        break;
+    case MBEDTLS_MD_SHA512:
+        hash_alg = PSA_ALG_SHA_512;
+        break;
+    default:
+        return PSA_ERROR_NOT_SUPPORTED;
+    }
+
+    *mac_alg = PSA_ALG_HMAC(hash_alg);
+    return PSA_SUCCESS;
+}
 
 struct crypto_hash *crypto_hash_init(enum crypto_hash_alg alg, const u8 *key, size_t key_len)
 {
     struct crypto_hash *ctx;
     mbedtls_md_type_t md_type;
-    const mbedtls_md_info_t *md_info;
-    int ret = 0;
+    psa_algorithm_t mac_alg;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_status_t st;
 
-    switch (alg)
-    {
-        case CRYPTO_HASH_ALG_HMAC_MD5:
-            md_type = MBEDTLS_MD_MD5;
-            break;
-        case CRYPTO_HASH_ALG_HMAC_SHA1:
-            md_type = MBEDTLS_MD_SHA1;
-            break;
-        case CRYPTO_HASH_ALG_HMAC_SHA256:
-            md_type = MBEDTLS_MD_SHA256;
-            break;
-        case CRYPTO_HASH_ALG_SHA384:
-            md_type = MBEDTLS_MD_SHA384;
-            break;
-        case CRYPTO_HASH_ALG_SHA512:
-            md_type = MBEDTLS_MD_SHA512;
-            break;
-        default:
-            return NULL;
+    switch (alg) {
+    case CRYPTO_HASH_ALG_HMAC_MD5:
+        md_type = MBEDTLS_MD_MD5;
+        break;
+    case CRYPTO_HASH_ALG_HMAC_SHA1:
+        md_type = MBEDTLS_MD_SHA1;
+        break;
+    case CRYPTO_HASH_ALG_HMAC_SHA256:
+        md_type = MBEDTLS_MD_SHA256;
+        break;
+    case CRYPTO_HASH_ALG_SHA384:
+        md_type = MBEDTLS_MD_SHA384;
+        break;
+    case CRYPTO_HASH_ALG_SHA512:
+        md_type = MBEDTLS_MD_SHA512;
+        break;
+    default:
+        return NULL;
     }
 
     ctx = os_zalloc(sizeof(*ctx));
-    if (ctx == NULL)
-    {
+    if (ctx == NULL) {
         return NULL;
     }
 
-    mbedtls_md_init(&ctx->ctx);
-    md_info = mbedtls_md_info_from_type(md_type);
-    if (!md_info)
-    {
-        os_free(ctx);
-        return NULL;
-    }
-    ret = mbedtls_md_setup(&ctx->ctx, md_info, 0);
-    if (ret != 0)
-    {
-        os_free(ctx);
-        return NULL;
-    }
-    mbedtls_md_hmac_starts(&ctx->ctx, key, key_len);
+    ctx->mac_op = psa_mac_operation_init();
+    ctx->key_id = PSA_KEY_ID_NULL;
+    ctx->key_len = key_len;
+    ctx->status = PSA_ERROR_GENERIC_ERROR;
 
+    st = crypto_hash_md_type_to_hmac_alg(md_type, &mac_alg);
+    if (st != PSA_SUCCESS) {
+        os_free(ctx);
+        return NULL;
+    }
+    ctx->mac_alg = mac_alg;
+
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_MESSAGE);
+    psa_set_key_lifetime(&attributes, PSA_KEY_LIFETIME_VOLATILE);
+    psa_set_key_algorithm(&attributes, mac_alg);
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_HMAC);
+    psa_set_key_bits(&attributes, PSA_BYTES_TO_BITS(key_len));
+
+    st = psa_import_key(&attributes, key, key_len, &ctx->key_id);
+    psa_reset_key_attributes(&attributes);
+    if (st != PSA_SUCCESS) {
+        os_free(ctx);
+        return NULL;
+    }
+
+    st = psa_mac_sign_setup(&ctx->mac_op, ctx->key_id, mac_alg);
+    if (st != PSA_SUCCESS) {
+        crypto_hash_psa_abort(ctx);
+        os_free(ctx);
+        return NULL;
+    }
+
+    ctx->status = PSA_SUCCESS;
     return ctx;
 }
 
 void crypto_hash_update(struct crypto_hash *ctx, const u8 *data, size_t len)
 {
-    if (ctx == NULL)
-    {
+    if (ctx == NULL || ctx->status != PSA_SUCCESS) {
         return;
     }
-    mbedtls_md_hmac_update(&ctx->ctx, data, len);
+
+    ctx->status = psa_mac_update(&ctx->mac_op, data, len);
 }
 
 int crypto_hash_finish(struct crypto_hash *ctx, u8 *mac, size_t *len)
 {
-    if (ctx == NULL)
-    {
+    size_t mac_len;
+    size_t out_len = 0;
+
+    if (ctx == NULL) {
         return -2;
     }
 
-    if (mac == NULL || len == NULL)
-    {
-        mbedtls_md_free(&ctx->ctx);
+    if (mac == NULL || len == NULL) {
+        crypto_hash_psa_abort(ctx);
         bin_clear_free(ctx, sizeof(*ctx));
         return 0;
     }
-    mbedtls_md_hmac_finish(&ctx->ctx, mac);
-    mbedtls_md_free(&ctx->ctx);
-    bin_clear_free(ctx, sizeof(*ctx));
 
+    if (ctx->status != PSA_SUCCESS) {
+        crypto_hash_psa_abort(ctx);
+        bin_clear_free(ctx, sizeof(*ctx));
+        return -2;
+    }
+
+    mac_len = PSA_MAC_LENGTH(PSA_KEY_TYPE_HMAC, PSA_BYTES_TO_BITS(ctx->key_len), ctx->mac_alg);
+    if (*len < mac_len) {
+        *len = mac_len;
+        crypto_hash_psa_abort(ctx);
+        bin_clear_free(ctx, sizeof(*ctx));
+        return -1;
+    }
+
+    ctx->status = psa_mac_sign_finish(&ctx->mac_op, mac, mac_len, &out_len);
+    psa_mac_abort(&ctx->mac_op);
+    if (ctx->key_id != PSA_KEY_ID_NULL) {
+        psa_destroy_key(ctx->key_id);
+        ctx->key_id = PSA_KEY_ID_NULL;
+    }
+
+    *len = out_len;
+    if (ctx->status != PSA_SUCCESS) {
+        bin_clear_free(ctx, sizeof(*ctx));
+        return -2;
+    }
+
+    bin_clear_free(ctx, sizeof(*ctx));
     return 0;
 }
 
@@ -391,7 +479,6 @@ __attribute_noinline__ static int hmac_kdf_expand(const u8 *prk,
     if (TEST_FAIL())
         return -1;
 
-    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(md_type);
     /* RFC 5869 HKDF-Expand when (label == NULL) */
     if (label == NULL) {
         psa_key_derivation_operation_t psa_op = PSA_KEY_DERIVATION_OPERATION_INIT;
@@ -404,53 +491,42 @@ __attribute_noinline__ static int hmac_kdf_expand(const u8 *prk,
                                                  info, info_len), -1);
         PSA_CHECK(psa_key_derivation_output_bytes(&psa_op, okm, okm_len), -1);
         PSA_CHECK(psa_key_derivation_abort(&psa_op), -1);
+        return 0;
     }
 
-    const size_t mac_len = mbedtls_md_get_size(md_info);
-    /* okm_len must not exceed 255 times hash len (RFC 5869 Section 2.3) */
-    if (okm_len > ((mac_len << 8) - mac_len))
-        return -1;
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, md_info, 0) != 0) {
-        return -1;
-    }
-    if (mbedtls_md_hmac_setup(&ctx, md_info) != 0) {
-        mbedtls_md_free(&ctx);
-        return -1;
-    }
-    if (mbedtls_md_hmac_starts(&ctx, prk, prk_len) != 0) {
-        mbedtls_md_free(&ctx);
-        return -1;
-    }
-
-    u8 iter           = 1;
-    const u8 *addr[4] = {okm, (const u8 *)label, info, &iter};
-    size_t len[4]     = {0, label ? os_strlen(label) + 1 : 0, info_len, 1};
-
-    for (; okm_len >= mac_len; okm_len -= mac_len, ++iter)
     {
-        for (size_t i = 0; i < ARRAY_SIZE(addr); ++i)
-            mbedtls_md_hmac_update(&ctx, addr[i], len[i]);
-        mbedtls_md_hmac_finish(&ctx, okm);
-        mbedtls_md_hmac_reset(&ctx);
-        addr[0] = okm;
-        okm += mac_len;
-        len[0] = mac_len; /*(include digest in subsequent rounds)*/
+        psa_algorithm_t hash_alg = mbedtls_md_psa_alg_from_type(md_type);
+        const size_t mac_len = PSA_HASH_LENGTH(hash_alg);
+
+        /* okm_len must not exceed 255 times hash len (RFC 5869 Section 2.3) */
+        if (okm_len > ((mac_len << 8) - mac_len)) {
+            return -1;
+        }
+
+        u8 iter = 1;
+        const u8 *addr[4] = {okm, (const u8 *)label, info, &iter};
+        size_t lens[4] = {0, label ? (size_t)os_strlen(label) + 1 : 0, info_len, 1};
+
+        for (; okm_len >= mac_len; okm_len -= mac_len, ++iter) {
+            if (hmac_vector_psa(prk, prk_len, 4, addr, lens, okm, md_type) != 0) {
+                return -1;
+            }
+            addr[0] = okm;
+            okm += mac_len;
+            lens[0] = mac_len; /*(include digest in subsequent rounds)*/
+        }
+
+        if (okm_len) {
+            u8 hash[MBEDTLS_MD_MAX_SIZE];
+
+            if (hmac_vector_psa(prk, prk_len, 4, addr, lens, hash, md_type) != 0) {
+                return -1;
+            }
+            os_memcpy(okm, hash, okm_len);
+            forced_memzero(hash, mac_len);
+        }
     }
 
-    if (okm_len)
-    {
-        u8 hash[MBEDTLS_MD_MAX_SIZE];
-        for (size_t i = 0; i < ARRAY_SIZE(addr); ++i)
-            mbedtls_md_hmac_update(&ctx, addr[i], len[i]);
-        mbedtls_md_hmac_finish(&ctx, hash);
-        os_memcpy(okm, hash, okm_len);
-        forced_memzero(hash, mac_len);
-    }
-
-    mbedtls_md_free(&ctx);
     return 0;
 }
 
@@ -757,7 +833,6 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 
 #ifdef CRYPTO_MBEDTLS_PBKDF2_SHA1
 /* sha1-pbkdf2.c */
-#include <mbedtls/pkcs5.h>
 int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int iterations, u8 *buf, size_t buflen)
 {
     return pbkdf2_sha1_psa(MBEDTLS_MD_SHA1, (const u8 *)passphrase,
@@ -833,8 +908,6 @@ int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher, u8 *plain
 #if defined(CONFIG_PSA_WANT_ALG_CMAC)
 
 /* aes-omac1.c */
-
-#include <mbedtls/cmac.h>
 
 int omac1_aes_vector(const u8 *key, size_t key_len, size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
@@ -1608,6 +1681,18 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 #endif /* CRYPTO_MBEDTLS_CRYPTO_EC */
 
 #if defined(CRYPTO_MBEDTLS_CRYPTO_ECDH) || defined(CRYPTO_MBEDTLS_CRYPTO_EC_DPP)
+
+/*
+ * PSA-focused configuration may omit MBEDTLS_PK_PARSE_C and MBEDTLS_PK_WRITE_C;
+ * mbedtls/pk.h gates parse/write prototypes on those macros. Define them before
+ * the first include of pk.h in this translation unit if not already set.
+ */
+#if !defined(MBEDTLS_PK_PARSE_C)
+#define MBEDTLS_PK_PARSE_C
+#endif
+#if !defined(MBEDTLS_PK_WRITE_C)
+#define MBEDTLS_PK_WRITE_C
+#endif
 
 #include <mbedtls/ecp.h>
 #include <mbedtls/pk.h>
