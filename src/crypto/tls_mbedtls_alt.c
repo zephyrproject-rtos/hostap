@@ -48,7 +48,7 @@
 #ifndef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_NONE
 
 #include <psa/crypto.h>
-#include <mbedtls/version.h>
+#include <mbedtls/build_info.h>
 #include <mbedtls/error.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pem.h>
@@ -699,41 +699,23 @@ static void tls_mbedtls_set_allowed_tls_vers(struct tls_conf *tls_conf, mbedtls_
 __attribute_noinline__ static int tls_mbedtls_readfile(const char *path, u8 **buf, size_t *n);
 
 #ifdef MBEDTLS_DHM_C
+/*
+ * Mbed TLS 4.x removes DHE configuration on the SSL stack
+ * (mbedtls_ssl_conf_dh_param_ctx, mbedtls_ssl_conf_dhm_min_bitlen). Custom DH
+ * blobs from the caller cannot be applied; warn and succeed so TLS setup
+ * continues without legacy DHE.
+ */
 static int tls_mbedtls_set_dhparams(struct tls_conf *tls_conf, const struct tls_connection_params *params)
 {
-    size_t len;
-    const u8 *data;
-    // if (tls_mbedtls_readfile(dh_file, &data, &len))
-    //    return 0;
+    (void)tls_conf;
 
-    data = params->dh_blob;
-    len  = params->dh_blob_len;
-
-    /* parse only if DH parameters if in PEM format */
-    if (tls_mbedtls_data_is_pem(data) && NULL == os_strstr((char *)data, "-----BEGIN DH PARAMETERS-----"))
+    if (params->dh_blob && params->dh_blob_len)
     {
-        if (os_strstr((char *)data, "-----BEGIN DSA PARAMETERS-----"))
-            wpa_printf(MSG_WARNING, "DSA parameters not handled (%s)", "dh_file");
-        else
-            wpa_printf(MSG_WARNING, "unexpected DH param content (%s)", "dh_file");
-        //forced_memzero(data, len);
-        // os_free(data);
-        return 0;
+        wpa_printf(MSG_WARNING,
+                   "MTLS: custom DH parameters are not applied with mbed TLS %d",
+                   MBEDTLS_VERSION_MAJOR);
     }
-
-    /* mbedtls_dhm_parse_dhm() expects "-----BEGIN DH PARAMETERS-----" if PEM */
-    mbedtls_dhm_context dhm;
-    mbedtls_dhm_init(&dhm);
-    int rc = mbedtls_dhm_parse_dhm(&dhm, data, len);
-    if (0 == rc)
-        rc = mbedtls_ssl_conf_dh_param_ctx(&tls_conf->conf, &dhm);
-    if (0 != rc)
-        elog(rc, "dh_file");
-    mbedtls_dhm_free(&dhm);
-
-    // forced_memzero(data, len);
-    // os_free(data);
-    return (0 == rc);
+    return 1;
 }
 #endif
 
@@ -1533,24 +1515,15 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf, const struct tls_co
     if (suiteb128)
     {
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb128);
-#if defined(MBEDTLS_DHM_C)
-        mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 2048);
-#endif
     }
     else if (suiteb192)
     {
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb192);
-#if defined(MBEDTLS_DHM_C)
-        mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 3072);
-#endif
     }
     else if (tls_conf->flags & TLS_CONN_SUITEB)
     {
         /* treat as suiteb192 while allowing any PK algorithm */
         mbedtls_ssl_conf_cert_profile(&tls_conf->conf, &tls_mbedtls_crt_profile_suiteb192_anypk);
-#if defined(MBEDTLS_DHM_C)
-        mbedtls_ssl_conf_dhm_min_bitlen(&tls_conf->conf, 3072);
-#endif
     }
 
     tls_mbedtls_set_allowed_tls_vers(tls_conf, &tls_conf->conf);
