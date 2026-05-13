@@ -19,7 +19,7 @@
 
 #include "mbedtls/dhm.h"
 #include "mbedtls/platform_util.h"
-#include "mbedtls/error_common.h"
+#include "mbedtls/private/error_common.h"
 
 #include <string.h>
 

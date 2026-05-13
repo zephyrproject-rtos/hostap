@@ -53,7 +53,7 @@
 #include "mbedtls/private_access.h"
 
 #include "tf-psa-crypto/build_info.h"
-#include "mbedtls/bignum.h"
+#include "mbedtls/private/bignum.h"
 
 /*
  * DHM Error codes

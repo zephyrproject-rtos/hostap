@@ -1827,7 +1827,7 @@ int tls_connection_export_key(void *tls_ctx,
 /* keyblock size info is not exposed in mbed TLS 3.0.0 */
 /* extracted from mbedtls library/ssl_tls.c:ssl_tls12_populate_transform() */
 #include <mbedtls/ssl_ciphersuites.h>
-#include <mbedtls/cipher.h>
+#include <mbedtls/private/cipher.h>
 static size_t tls_mbedtls_ssl_keyblock_size(mbedtls_ssl_context *ssl)
 {
 #if defined(MBEDTLS_SSL_PROTO_TLS1_3)
