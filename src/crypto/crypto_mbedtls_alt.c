@@ -146,11 +146,6 @@
 
 #endif /* crypto_rsa_*() */
 
-#ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
-#include <mbedtls/bignum.h>
-static mbedtls_mpi mpi_sw_A;
-#endif
-
 __attribute_cold__ void crypto_unload(void)
 {
     /* Nothing to do */
@@ -1999,6 +1994,9 @@ size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
 #if defined(CRYPTO_MBEDTLS_CRYPTO_EC)
 
 #include <mbedtls/ecp.h>
+
+/* MPI buffer for crypto_ec_get_a() return value; not thread-safe. */
+static mbedtls_mpi mpi_sw_A;
 
 struct crypto_ec *crypto_ec_init(int group)
 {
