@@ -12,7 +12,7 @@
 #include <mbedtls/platform_util.h> /* mbedtls_platform_zeroize() */
 #include <mbedtls/asn1.h>
 #include <mbedtls/asn1write.h>
-#include <mbedtls/bignum.h>
+#include <mbedtls/private/bignum.h>
 
 #include <psa/crypto.h>
 #include <mbedtls/psa_util.h>
@@ -93,7 +93,8 @@
 #endif /* crypto_cipher_*() */
 
 #if defined(EAP_PWD) || defined(EAP_SERVER_PWD) /* CONFIG_EAP_PWD=y */ \
-    || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)                      /* CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3=y */
+    || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)                      /* CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3=y */ \
+    || defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 #endif /* crypto_bignum_*() */
 
@@ -115,8 +116,6 @@
 #if defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_ECDH
 #endif /* crypto_ecdh_*() */
-
-#define CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 
 #if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK) || defined(EAP_PWD) \
     || defined(EAP_SERVER_PWD) || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)
@@ -1001,7 +1000,7 @@ int aes_128_cbc_decrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_CIPHER
 
-#include <mbedtls/cipher.h>
+#include <mbedtls/private/cipher.h>
 
 struct crypto_cipher
 {
@@ -1092,7 +1091,7 @@ void crypto_cipher_deinit(struct crypto_cipher *ctx)
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 
-#include <mbedtls/bignum.h>
+#include <mbedtls/private/bignum.h>
 
 /* crypto.h bignum interfaces */
 
@@ -1367,7 +1366,7 @@ int crypto_bignum_legendre(const struct crypto_bignum *a, const struct crypto_bi
 
 /* crypto_internal-modexp.c */
 
-#include <mbedtls/bignum.h>
+#include <mbedtls/private/bignum.h>
 #include <mbedtls/dhm.h>
 
 static int crypto_mbedtls_dh_set_bin_pg(mbedtls_dhm_context *ctx, u8 generator, const u8 *prime, size_t prime_len)
@@ -1564,7 +1563,7 @@ void dh5_free(void *ctx)
 
 #if defined(CRYPTO_MBEDTLS_CRYPTO_ECDH) || defined(CRYPTO_MBEDTLS_CRYPTO_EC)
 
-#include <mbedtls/ecp.h>
+#include <mbedtls/private/ecp.h>
 
 #define CRYPTO_EC_pbits(e) (((mbedtls_ecp_group *)(e))->pbits)
 #define CRYPTO_EC_plen(e)  ((((mbedtls_ecp_group *)(e))->pbits + 7) >> 3)
@@ -1694,7 +1693,7 @@ static int crypto_mbedtls_ike_id_from_ecp_group_id(mbedtls_ecp_group_id grp_id)
 #define MBEDTLS_PK_WRITE_C
 #endif
 
-#include <mbedtls/ecp.h>
+#include <mbedtls/private/ecp.h>
 #include <mbedtls/pk.h>
 
 /* tf-psa-crypto internal functions */
@@ -1734,8 +1733,8 @@ static int crypto_mbedtls_keypair_gen(int group, psa_key_id_t *key_id, psa_ecc_f
 
 #ifdef CRYPTO_MBEDTLS_CRYPTO_ECDH
 
-#include <mbedtls/ecdsa.h>
-#include <mbedtls/ecp.h>
+#include <mbedtls/private/ecdsa.h>
+#include <mbedtls/private/ecp.h>
 #include <mbedtls/pk.h>
 
 struct crypto_ecdh {
@@ -2078,7 +2077,7 @@ size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
 
 #if defined(CRYPTO_MBEDTLS_CRYPTO_EC)
 
-#include <mbedtls/ecp.h>
+#include <mbedtls/private/ecp.h>
 
 /* MPI buffer for crypto_ec_get_a() return value; not thread-safe. */
 static mbedtls_mpi mpi_sw_A;
