@@ -2834,6 +2834,11 @@ static int tls_mbedtls_verify_cb(void *arg, mbedtls_x509_crt *crt, int depth, ui
     struct tls_conf *tls_conf   = conn->tls_conf;
     uint32_t flags_in           = *flags;
 
+    /* Clear the MBEDTLS_X509_BADCERT_CN_MISMATCH flag (0x4) to allow
+     * custom certificate verification logic to be applied */
+    if (*flags & MBEDTLS_X509_BADCERT_CN_MISMATCH)
+	    *flags &= ~MBEDTLS_X509_BADCERT_CN_MISMATCH;
+
 #if defined(TLS_MBEDTLS_CERT_DISABLE_KEY_USAGE_CHECK)
     crt->MBEDTLS_PRIVATE(ext_types) &= ~MBEDTLS_X509_EXT_KEY_USAGE;
     crt->MBEDTLS_PRIVATE(ext_types) &= ~MBEDTLS_X509_EXT_EXTENDED_KEY_USAGE;
