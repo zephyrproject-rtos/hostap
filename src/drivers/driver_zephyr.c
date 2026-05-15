@@ -2121,7 +2121,7 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 				     authorized,
 				     if_ctx->bssid);
 
-#ifdef CONFIG_NET_DHCPV4
+#ifdef CONFIG_WIFI_STA_AUTO_DHCPV4
 	if (authorized) {
 #ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_SKIP_DHCP_ON_ROAMING
 		if (if_ctx->ft_roaming == true || if_ctx->roaming == true) {
