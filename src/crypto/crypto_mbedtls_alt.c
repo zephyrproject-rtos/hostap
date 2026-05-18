@@ -2077,7 +2077,24 @@ size_t crypto_ecdh_prime_len(struct crypto_ecdh *ecdh)
 
 #if defined(CRYPTO_MBEDTLS_CRYPTO_EC)
 
+/*
+ * PSA-focused configuration may omit MBEDTLS_PK_PARSE_C and MBEDTLS_PK_WRITE_C;
+ * mbedtls/pk.h gates parse/write prototypes on those macros. Define them before
+ * the first include of pk.h in this translation unit if not already set.
+ */
+#if !defined(MBEDTLS_PK_PARSE_C)
+#define MBEDTLS_PK_PARSE_C
+#endif
+#if !defined(MBEDTLS_PK_WRITE_C)
+#define MBEDTLS_PK_WRITE_C
+#endif
+
 #include <mbedtls/private/ecp.h>
+#include <mbedtls/pk.h>
+
+/* tf-psa-crypto internal functions */
+psa_ecc_family_t mbedtls_ecc_group_to_psa(mbedtls_ecp_group_id grpid, size_t *bits);
+mbedtls_ecp_group_id mbedtls_ecc_group_from_psa(psa_ecc_family_t family, size_t bits);
 
 /* MPI buffer for crypto_ec_get_a() return value; not thread-safe. */
 static mbedtls_mpi mpi_sw_A;
