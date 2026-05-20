@@ -2303,9 +2303,13 @@ struct crypto_ec_point *crypto_ec_point_from_bin(struct crypto_ec *e, const u8 *
     if (TEST_FAIL())
         return NULL;
 
+#if !defined(MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED) && !defined(MBEDTLS_ECP_MONTGOMERY_ENABLED)
+    return NULL;
+#else
     size_t len           = CRYPTO_EC_plen(e);
     mbedtls_ecp_point *p = os_malloc(sizeof(*p));
     u8 buf[1 + MBEDTLS_MPI_MAX_SIZE * 2];
+
     if (p == NULL)
         return NULL;
     mbedtls_ecp_point_init(p);
@@ -2336,6 +2340,7 @@ struct crypto_ec_point *crypto_ec_point_from_bin(struct crypto_ec *e, const u8 *
     mbedtls_ecp_point_free(p);
     os_free(p);
     return NULL;
+#endif /* MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED || MBEDTLS_ECP_MONTGOMERY_ENABLED */
 }
 
 int crypto_ec_point_add(struct crypto_ec *e,
@@ -2346,6 +2351,9 @@ int crypto_ec_point_add(struct crypto_ec *e,
     if (TEST_FAIL())
         return -1;
 
+#if !defined(MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED)
+    return -1;
+#else
     /* mbedtls does not provide an mbedtls_ecp_point add function */
     mbedtls_mpi one;
     mbedtls_mpi_init(&one);
@@ -2354,8 +2362,10 @@ int crypto_ec_point_add(struct crypto_ec *e,
                                          (const mbedtls_ecp_point *)a, &one, (const mbedtls_ecp_point *)b) ?
                   -1 :
                   0;
+
     mbedtls_mpi_free(&one);
     return ret;
+#endif /* MBEDTLS_ECP_SHORT_WEIERSTRASS_ENABLED */
 }
 
 int crypto_ec_point_mul(struct crypto_ec *e,
