@@ -94,6 +94,7 @@
 
 #if defined(EAP_PWD) || defined(EAP_SERVER_PWD) /* CONFIG_EAP_PWD=y */ \
     || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)                      /* CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3=y */ \
+    || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3_COMMON)               /* WPA3 INT or EXT */ \
     || defined(CONFIG_PSA_WANT_ALG_ECDH)
 #define CRYPTO_MBEDTLS_CRYPTO_BIGNUM
 #endif /* crypto_bignum_*() */
@@ -118,7 +119,8 @@
 #endif /* crypto_ecdh_*() */
 
 #if defined(CONFIG_DPP) || defined(CONFIG_SAE_PK) || defined(EAP_PWD) \
-    || defined(EAP_SERVER_PWD) || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3)
+    || defined(EAP_SERVER_PWD) || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3) \
+    || defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_WPA3_COMMON)
 #define CRYPTO_MBEDTLS_CRYPTO_EC
 #endif
 
@@ -2488,9 +2490,6 @@ void crypto_ec_point_debug_print(const struct crypto_ec *e, const struct crypto_
     // Fixing linking error undefined reference to `crypto_ec_point_debug_print'
 }
 #endif
-
-#include <psa/crypto.h>
-#include <mbedtls/oid.h>
 
 struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
 {
