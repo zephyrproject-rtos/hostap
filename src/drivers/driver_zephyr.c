@@ -2966,6 +2966,7 @@ int wpa_drv_zep_remain_on_channel(void *priv, unsigned int freq,
 	ret = dev_ops->remain_on_channel(if_ctx->dev_priv, freq, duration, host_cookie);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "%s: remain_on_channel op failed: %d", __func__, ret);
+		if_ctx->pending_remain_on_channel = false;
 		goto out;
 	}
 
