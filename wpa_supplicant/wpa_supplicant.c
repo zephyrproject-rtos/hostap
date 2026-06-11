@@ -2665,12 +2665,24 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 		if (!(wpa_s->drv_flags & WPA_DRIVER_FLAGS_AP)) {
 			wpa_msg(wpa_s, MSG_INFO, "Driver does not support AP "
 				"mode");
+#ifdef __ZEPHYR__
+			if (ssid->mode == WPAS_MODE_AP)
+				supplicant_send_wifi_mgmt_ap_status(wpa_s,
+					NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					WIFI_STATUS_AP_OP_NOT_SUPPORTED);
+#endif /* __ZEPHYR__ */
 			return;
 		}
 		if (wpa_supplicant_create_ap(wpa_s, ssid) < 0) {
 			wpa_supplicant_set_state(wpa_s, WPA_DISCONNECTED);
 			if (ssid->mode == WPAS_MODE_P2P_GROUP_FORMATION)
 				wpas_p2p_ap_setup_failed(wpa_s);
+#ifdef __ZEPHYR__
+			if (ssid->mode == WPAS_MODE_AP)
+				supplicant_send_wifi_mgmt_ap_status(wpa_s,
+					NET_EVENT_WIFI_CMD_AP_ENABLE_RESULT,
+					WIFI_STATUS_AP_FAIL);
+#endif /* __ZEPHYR__ */
 			return;
 		}
 		wpa_s->current_bss = bss;
