@@ -217,11 +217,11 @@ int wpa_eapol_key_mic(const u8 *key, size_t key_len, int akmp, int ver,
 	}
 
 	switch (ver) {
-#ifndef CONFIG_FIPS
+#if !defined(CONFIG_FIPS) || defined(CONFIG_PSA_WANT_ALG_MD5)
 	case WPA_KEY_INFO_TYPE_HMAC_MD5_RC4:
 		wpa_printf(MSG_DEBUG, "WPA: EAPOL-Key MIC using HMAC-MD5");
 		return hmac_md5(key, key_len, buf, len, mic);
-#endif /* CONFIG_FIPS */
+#endif /* !CONFIG_FIPS || CONFIG_PSA_WANT_ALG_MD5 */
 	case WPA_KEY_INFO_TYPE_HMAC_SHA1_AES:
 		wpa_printf(MSG_DEBUG, "WPA: EAPOL-Key MIC using HMAC-SHA1");
 		if (hmac_sha1(key, key_len, buf, len, hash))

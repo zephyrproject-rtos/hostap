@@ -3220,11 +3220,11 @@ static void wpa_supplicant_process_1_of_2_wpa(struct wpa_sm *sm,
 	gd.keyidx = (key_info & WPA_KEY_INFO_KEY_INDEX_MASK) >>
 		WPA_KEY_INFO_KEY_INDEX_SHIFT;
 	if (ver == WPA_KEY_INFO_TYPE_HMAC_MD5_RC4 && sm->ptk.kek_len == 16) {
-#if defined(CONFIG_NO_RC4) || defined(CONFIG_FIPS)
+#if defined(CONFIG_NO_RC4) || (defined(CONFIG_FIPS) && !defined(CONFIG_PSA_WANT_ALG_MD5))
 		wpa_msg(sm->ctx->msg_ctx, MSG_WARNING,
 			"WPA: RC4 not supported in the build");
 		goto failed;
-#else /* CONFIG_NO_RC4 || CONFIG_FIPS */
+#else /* CONFIG_NO_RC4 || (CONFIG_FIPS && !CONFIG_PSA_WANT_ALG_MD5) */
 		u8 ek[32];
 		if (key_data_len > sizeof(gd.gtk)) {
 			wpa_msg(sm->ctx->msg_ctx, MSG_WARNING,
@@ -3242,7 +3242,7 @@ static void wpa_supplicant_process_1_of_2_wpa(struct wpa_sm *sm,
 			goto failed;
 		}
 		forced_memzero(ek, sizeof(ek));
-#endif /* CONFIG_NO_RC4 || CONFIG_FIPS */
+#endif /* CONFIG_NO_RC4 || (CONFIG_FIPS && !CONFIG_PSA_WANT_ALG_MD5) */
 	} else if (ver == WPA_KEY_INFO_TYPE_HMAC_SHA1_AES) {
 		if (maxkeylen % 8) {
 			wpa_msg(sm->ctx->msg_ctx, MSG_WARNING,
@@ -3523,11 +3523,11 @@ static int wpa_supplicant_decrypt_key_data(struct wpa_sm *sm,
 	/* Decrypt key data here so that this operation does not need
 	 * to be implemented separately for each message type. */
 	if (ver == WPA_KEY_INFO_TYPE_HMAC_MD5_RC4 && sm->ptk.kek_len == 16) {
-#if defined(CONFIG_NO_RC4) || defined(CONFIG_FIPS)
+#if defined(CONFIG_NO_RC4) || (defined(CONFIG_FIPS) && !defined(CONFIG_PSA_WANT_ALG_MD5))
 		wpa_msg(sm->ctx->msg_ctx, MSG_WARNING,
 			"WPA: RC4 not supported in the build");
 		return -1;
-#else /* CONFIG_NO_RC4 || CONFIG_FIPS */
+#else /* CONFIG_NO_RC4 || (CONFIG_FIPS && !CONFIG_PSA_WANT_ALG_MD5) */
 		u8 ek[32];
 
 		wpa_printf(MSG_DEBUG, "WPA: Decrypt Key Data using RC4");
@@ -3540,7 +3540,7 @@ static int wpa_supplicant_decrypt_key_data(struct wpa_sm *sm,
 			return -1;
 		}
 		forced_memzero(ek, sizeof(ek));
-#endif /* CONFIG_NO_RC4 || CONFIG_FIPS */
+#endif /* CONFIG_NO_RC4 || (CONFIG_FIPS && !CONFIG_PSA_WANT_ALG_MD5) */
 	} else if (ver == WPA_KEY_INFO_TYPE_HMAC_SHA1_AES ||
 		   ver == WPA_KEY_INFO_TYPE_AES_128_CMAC ||
 		   wpa_use_aes_key_wrap(sm->key_mgmt)) {
