@@ -2353,6 +2353,43 @@ out:
 	return ret;
 }
 
+int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
+	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
+	unsigned int wait, int link_id)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops) {
+		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
+		goto out;
+	}
+
+	if (!dev_ops->send_mlme) {
+		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported",
+			   __func__);
+		goto out;
+	}
+
+	if (freq == 0) {
+		freq = if_ctx->freq;
+	}
+
+	ret = dev_ops->send_mlme(if_ctx->dev_priv, data, data_len, noack, freq, 0, 0, wait, 0);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: send_mlme op failed: %d", __func__, ret);
+		goto out;
+	}
+	ret = 0;
+out:
+	return ret;
+}
+
 #ifdef CONFIG_AP
 #ifndef CONFIG_WIFI_NM_HOSTAPD_AP
 static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
@@ -2787,43 +2824,6 @@ out:
 	return ret;
 }
 
-int wpa_drv_zep_send_mlme(void *priv, const u8 *data, size_t data_len, int noack,
-	unsigned int freq, const u16 *csa_offs, size_t csa_offs_len, int no_encrypt,
-	unsigned int wait, int link_id)
-{
-	struct zep_drv_if_ctx *if_ctx = priv;
-	const struct zep_wpa_supp_dev_ops *dev_ops;
-	int ret = -1;
-
-	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
-	(void)link_id;
-
-	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
-		goto out;
-	}
-
-	if (!dev_ops->send_mlme) {
-		wpa_printf(MSG_ERROR, "%s: send_mlme op not supported",
-			   __func__);
-		goto out;
-	}
-
-	if (freq == 0) {
-		freq = if_ctx->freq;
-	}
-
-	ret = dev_ops->send_mlme(if_ctx->dev_priv, data, data_len, noack, freq, 0, 0, wait, 0);
-	if (ret) {
-		wpa_printf(MSG_ERROR, "%s: send_mlme op failed: %d", __func__, ret);
-		goto out;
-	}
-	ret = 0;
-out:
-	return ret;
-}
-
 int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t data_len,
                             int encrypt, const u8 *own_addr, u32 flags, int link_id)
 {
@@ -3121,6 +3121,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
+	.send_mlme = wpa_drv_zep_send_mlme,
 #ifdef CONFIG_AP
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	.hapd_init = wpa_drv_zep_hapd_init,
@@ -3128,7 +3129,6 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.do_acs = wpa_drv_zep_do_acs,
 #endif
 	.hapd_send_eapol = wpa_drv_hapd_send_eapol,
-	.send_mlme = wpa_drv_zep_send_mlme,
 	.set_ap = wpa_drv_zep_set_ap,
 	.stop_ap = wpa_drv_zep_stop_ap,
 	.deinit_ap = wpa_drv_zep_deinit_ap,
