@@ -2140,6 +2140,35 @@ out:
 	return ret;
 }
 
+static int wpa_drv_zep_tx_control_port(void *priv, const u8 *dest, u16 proto,
+				       const u8 *buf, size_t len, int no_encrypt,
+				       int link_id)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
+	(void)link_id;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->tx_control_port) {
+		wpa_printf(MSG_ERROR, "%s: tx_control_port op not supported",
+			   __func__);
+		goto out;
+	}
+
+	ret = dev_ops->tx_control_port(if_ctx->dev_priv, dest, proto, buf, len,
+				       no_encrypt);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: tx_control_port op failed: %d",
+			   __func__, ret);
+		goto out;
+	}
+
+out:
+	return ret;
+}
 
 static int wpa_drv_zep_signal_poll(void *priv, struct wpa_signal_info *si)
 {
@@ -3114,6 +3143,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_bssid = wpa_drv_zep_get_bssid,
 	.get_ssid = wpa_drv_zep_get_ssid,
 	.set_supp_port = wpa_drv_zep_set_supp_port,
+	.tx_control_port = wpa_drv_zep_tx_control_port,
 	.deauthenticate = wpa_drv_zep_deauthenticate,
 	.set_key = wpa_drv_zep_set_key,
 	.signal_poll = wpa_drv_zep_signal_poll,
