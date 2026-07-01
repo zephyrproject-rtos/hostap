@@ -307,6 +307,12 @@ struct zep_wpa_supp_dev_ops {
 	int (*set_supp_port)(void *if_priv,
 			     int authorized,
 			     char *bssid);
+	int (*tx_control_port)(void *if_priv,
+			       const unsigned char *dest,
+			       unsigned short proto,
+			       const unsigned char *buf,
+			       size_t len,
+			       int no_encrypt);
 	int (*signal_poll)(void *if_priv, struct wpa_signal_info *si,
 			   unsigned char *bssid);
 	int (*send_mlme)(void *if_priv, const u8 *data,
