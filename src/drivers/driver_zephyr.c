@@ -3173,8 +3173,19 @@ int wpa_drv_zep_probe_req_report(void *priv, int report)
 	if_ctx = priv;
 
 	if (!report) {
-		wpa_printf(MSG_DEBUG, "%s: Unregister probe request report", __func__);
+		if (if_ctx->ap_probe_req_listen) {
+			/*
+			 * Do not disable Probe Request reporting while in AP/GO mode,
+			 * it was registered by AP setup independently.
+			 */
+			wpa_printf(MSG_DEBUG,
+				   "%s: Skip disabling probe req report while in AP mode",
+				   __func__);
+			if_ctx->probe_req_listen = false;
+			return 0;
+		}
 		if_ctx->probe_req_listen = false;
+		if_ctx->probe_req_set = false;
 		return 0;
 	}
 
