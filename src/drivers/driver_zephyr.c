@@ -2994,9 +2994,7 @@ out:
 int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t data_len,
                             int encrypt, const u8 *own_addr, u32 flags, int link_id)
 {
-#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	struct zep_drv_if_ctx *if_ctx = priv;
-	struct hostapd_data *hapd     = NULL;
 	int ret                       = -1;
 
 	/* TODO: Unused for now, but might need for rekeying */
@@ -3006,47 +3004,36 @@ int wpa_drv_hapd_send_eapol(void *priv, const u8 *addr, const u8 *data, size_t d
 	/* Unused till Wi-Fi7 MLO is supported in Zephyr */
 	(void)link_id;
 
-	hapd = if_ctx->hapd;
-
-	wpa_printf(MSG_DEBUG, "hostapd: Send EAPOL frame (encrypt=%d)", encrypt);
-
-	ret = l2_packet_send(hapd->l2, addr, ETH_P_EAPOL, data, data_len);
-	if (ret < 0) {
-		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
-		goto out;
-	}
-#else
-	struct zep_drv_if_ctx *if_ctx = priv;
-	const struct zep_wpa_supp_dev_ops *dev_ops;
-	int ret = -1;
-	struct wpa_supplicant *wpa_s = NULL;
-
-	/* TODO: Unused for now, but might need for rekeying */
-	(void)own_addr;
-	(void)flags;
-	(void)encrypt;
-
-	wpa_s = if_ctx->supp_if_ctx;
-	dev_ops = get_dev_ops(if_ctx->dev_ctx);
-	if (!dev_ops) {
-		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
-		goto out;
-	}
-
-	wpa_printf(MSG_DEBUG, "wpa_supp: Send EAPOL frame (encrypt=%d)", encrypt);
-
-	ret = l2_packet_send(wpa_s->l2, addr, ETH_P_EAPOL, data, data_len);
-	if (ret < 0) {
-		wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
-		goto out;
-	}
+#ifdef CONFIG_WIFI_NM_HOSTAPD_AP
+	if (if_ctx->hapd != NULL) {
+		struct hostapd_data *hapd = if_ctx->hapd;
+		wpa_printf(MSG_DEBUG, "hostapd: Send EAPOL frame (encrypt=%d)", encrypt);
+		ret = l2_packet_send(hapd->l2, addr, ETH_P_EAPOL, data, data_len);
+		if (ret < 0) {
+			wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
+			goto out;
+		}
+	} else
 #endif
+	{
+		/* wpa_supplicant path: STA or P2P GO */
+		struct wpa_supplicant *wpa_s = if_ctx->supp_if_ctx;
+		if (wpa_s == NULL) {
+			wpa_printf(MSG_ERROR, "%s: wpa_s is NULL", __func__);
+			goto out;
+		}
+		wpa_printf(MSG_DEBUG, "wpa_supp: Send EAPOL frame (encrypt=%d)", encrypt);
+		ret = l2_packet_send(wpa_s->l2, addr, ETH_P_EAPOL, data, data_len);
+		if (ret < 0) {
+			wpa_printf(MSG_ERROR, "%s: l2_packet_send failed: %d", __func__, ret);
+			goto out;
+		}
+	}
 
 	ret = 0;
 out:
 	return ret;
 }
-
 
 int wpa_drv_zep_get_inact_sec(void *priv, const u8 *addr)
 {
@@ -3179,7 +3166,7 @@ int wpa_drv_zep_probe_req_report(void *priv, int report)
 	int ret = -1;
 
 	if (!priv) {
-		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		wpa_printf(MSG_DEBUG, "%s: Unregister probe request report", __func__);
 		goto out;
 	}
 
