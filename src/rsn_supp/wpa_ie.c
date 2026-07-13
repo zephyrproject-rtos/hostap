@@ -194,11 +194,19 @@ static int wpa_gen_wpa_ie_rsn(u8 *rsn_ie, size_t rsn_ie_len,
 #endif /* CONFIG_SHA384 */
 	} else if (key_mgmt == WPA_KEY_MGMT_FT_PSK) {
 		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_FT_PSK);
+#ifdef CONFIG_SHA384
+	} else if (key_mgmt == WPA_KEY_MGMT_FT_PSK_SHA384) {
+		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_FT_PSK_SHA384);
+#endif /* CONFIG_SHA384 */
 #endif /* CONFIG_IEEE80211R */
 	} else if (key_mgmt == WPA_KEY_MGMT_IEEE8021X_SHA256) {
 		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_802_1X_SHA256);
 	} else if (key_mgmt == WPA_KEY_MGMT_PSK_SHA256) {
 		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_PSK_SHA256);
+#ifdef CONFIG_SHA384
+	} else if (key_mgmt == WPA_KEY_MGMT_PSK_SHA384) {
+		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_PSK_SHA384);
+#endif /* CONFIG_SHA384 */
 #ifdef CONFIG_SAE
 	} else if (key_mgmt == WPA_KEY_MGMT_SAE) {
 		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_SAE);

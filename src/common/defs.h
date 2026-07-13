@@ -53,11 +53,14 @@
 #define WPA_KEY_MGMT_SAE_EXT_KEY BIT(26)
 #define WPA_KEY_MGMT_FT_SAE_EXT_KEY BIT(27)
 #define WPA_KEY_MGMT_IEEE8021X_SHA384 BIT(28)
+#define WPA_KEY_MGMT_FT_PSK_SHA384 BIT(29)
+#define WPA_KEY_MGMT_PSK_SHA384 BIT(30)
 
 
 #define WPA_KEY_MGMT_FT (WPA_KEY_MGMT_FT_PSK | \
 			 WPA_KEY_MGMT_FT_IEEE8021X | \
 			 WPA_KEY_MGMT_FT_IEEE8021X_SHA384 | \
+			 WPA_KEY_MGMT_FT_PSK_SHA384 | \
 			 WPA_KEY_MGMT_FT_SAE | \
 			 WPA_KEY_MGMT_FT_SAE_EXT_KEY | \
 			 WPA_KEY_MGMT_FT_FILS_SHA256 | \
@@ -84,7 +87,9 @@ static inline int wpa_key_mgmt_wpa_psk_no_sae(int akm)
 {
 	return !!(akm & (WPA_KEY_MGMT_PSK |
 			 WPA_KEY_MGMT_FT_PSK |
-			 WPA_KEY_MGMT_PSK_SHA256));
+			 WPA_KEY_MGMT_PSK_SHA256 |
+			 WPA_KEY_MGMT_PSK_SHA384 |
+			 WPA_KEY_MGMT_FT_PSK_SHA384));
 }
 
 static inline int wpa_key_mgmt_wpa_psk(int akm)
@@ -92,6 +97,8 @@ static inline int wpa_key_mgmt_wpa_psk(int akm)
 	return !!(akm & (WPA_KEY_MGMT_PSK |
 			 WPA_KEY_MGMT_FT_PSK |
 			 WPA_KEY_MGMT_PSK_SHA256 |
+			 WPA_KEY_MGMT_PSK_SHA384 |
+			 WPA_KEY_MGMT_FT_PSK_SHA384 |
 			 WPA_KEY_MGMT_SAE |
 			 WPA_KEY_MGMT_SAE_EXT_KEY |
 			 WPA_KEY_MGMT_FT_SAE |
