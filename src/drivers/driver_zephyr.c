@@ -1491,16 +1491,27 @@ static void wpa_drv_zep_hapd_deinit(void *priv)
 	struct zep_drv_if_ctx *if_ctx              = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops = NULL;
 
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
+		return;
+	}
+
 	if_ctx = priv;
 
-	dev_ops = (struct zep_wpa_supp_dev_ops *)if_ctx->dev_ops;
-	if (!dev_ops->hapd_deinit) {
+	if (!if_ctx->dev_ctx) {
+		wpa_printf(MSG_ERROR, "%s: dev_ctx is NULL", __func__);
+		goto out;
+	}
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->hapd_deinit) {
 		wpa_printf(MSG_ERROR, "%s: No op registered for hapd deinit", __func__);
-		return;
+		goto out;
 	}
 
 	dev_ops->hapd_deinit(if_ctx->dev_priv);
 
+out:
 	os_free(if_ctx);
 }
 
