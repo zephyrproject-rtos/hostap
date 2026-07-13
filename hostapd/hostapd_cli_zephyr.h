@@ -20,5 +20,6 @@ int hostapd_ctrl_command_interactive(struct wpa_ctrl *ctrl, const char *cmd);
 int zephyr_hostapd_cli_cmd_resp(struct wpa_ctrl *ctrl, const char *cmd, char *resp);
 int zephyr_hostapd_cli_cmd_v(struct wpa_ctrl *ctrl, const char *fmt, ...);
 int zephyr_hostapd_ctrl_init(void *ctx);
+void zephyr_hostapd_ctrl_deinit(void *hapd);
 int zephyr_hostapd_ctrl_zephyr_cmd(struct wpa_ctrl *ctrl, int argc, const char *argv[]);
 #endif /* __HOSTAPD_CLI_ZEPHYR_H_ */
