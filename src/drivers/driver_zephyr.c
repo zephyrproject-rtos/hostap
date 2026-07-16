@@ -385,6 +385,12 @@ void wpa_supplicant_event_wrapper(void *ctx,
 
 void wpa_drv_zep_event_chan_list_changed(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_CHANNEL_LIST_CHANGED, event);
@@ -397,6 +403,10 @@ void wpa_drv_zep_event_chan_list_changed(struct zep_drv_if_ctx *if_ctx, union wp
 
 void wpa_drv_zep_event_mac_changed(struct zep_drv_if_ctx *if_ctx)
 {
+	if (!if_ctx) {
+		wpa_printf(MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	const struct net_linkaddr *link_addr = NULL;
 
@@ -458,6 +468,12 @@ void wpa_drv_zep_scan_timeout(void *eloop_ctx, void *timeout_ctx)
 
 void wpa_drv_zep_event_proc_scan_start(struct zep_drv_if_ctx *if_ctx)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_SCAN_STARTED,
 			NULL);
@@ -467,6 +483,12 @@ void wpa_drv_zep_event_proc_scan_start(struct zep_drv_if_ctx *if_ctx)
 void wpa_drv_zep_event_proc_scan_done(struct zep_drv_if_ctx *if_ctx,
 				      union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	eloop_cancel_timeout(wpa_drv_zep_scan_timeout,
 			     if_ctx,
 			     if_ctx->supp_if_ctx);
@@ -486,6 +508,12 @@ void wpa_drv_zep_event_proc_scan_res(struct zep_drv_if_ctx *if_ctx,
 {
 	struct wpa_scan_res **tmp = NULL;
 	size_t scan_res_len  = sizeof(struct wpa_scan_res) + r->ie_len + r->beacon_ie_len;
+
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 
 	if (!if_ctx->scan_res2)
 		return;
@@ -527,6 +555,12 @@ err:
  */
 void wpa_drv_zep_event_proc_sched_scan_stopped(struct zep_drv_if_ctx *if_ctx)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_SCHED_SCAN_STOPPED,
 			NULL);
@@ -535,6 +569,13 @@ void wpa_drv_zep_event_proc_sched_scan_stopped(struct zep_drv_if_ctx *if_ctx)
 void wpa_drv_zep_event_proc_auth_resp(struct zep_drv_if_ctx *if_ctx,
 				      union wpa_event_data *event)
 {
+
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			     EVENT_AUTH,
 			     event);
@@ -545,6 +586,12 @@ void wpa_drv_zep_event_proc_assoc_resp(struct zep_drv_if_ctx *if_ctx,
 				       union wpa_event_data *event,
 				       unsigned int status)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	if (status != WLAN_STATUS_SUCCESS) {
 		if (if_ctx->ft_roaming) {
 			if_ctx->ft_roaming = false;
@@ -573,6 +620,12 @@ void wpa_drv_zep_event_proc_deauth(struct zep_drv_if_ctx *if_ctx,
 				union wpa_event_data *event, const struct ieee80211_mgmt *mgmt)
 {
 	const u8 *bssid = NULL;
+
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 
 	bssid = mgmt->bssid;
 
@@ -605,6 +658,12 @@ void wpa_drv_zep_event_proc_deauth(struct zep_drv_if_ctx *if_ctx,
 void wpa_drv_zep_event_proc_disassoc(struct zep_drv_if_ctx *if_ctx,
 				     union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_DISASSOC,
 			event);
@@ -653,6 +712,12 @@ static void wpa_drv_zep_event_mgmt_tx_status(struct zep_drv_if_ctx *if_ctx,
 	const struct ieee80211_hdr *hdr;
 	u16 fc;
 
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	wpa_printf(MSG_DEBUG, "wpa_supp: Frame TX status event");
 
 	hdr = (const struct ieee80211_hdr *) frame;
@@ -690,6 +755,11 @@ static void wpa_drv_zep_event_mgmt_tx_status(struct zep_drv_if_ctx *if_ctx,
 static void wpa_drv_zep_event_proc_unprot_deauth(struct zep_drv_if_ctx *if_ctx,
 						 union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_UNPROT_DEAUTH,
 			event);
@@ -698,6 +768,11 @@ static void wpa_drv_zep_event_proc_unprot_deauth(struct zep_drv_if_ctx *if_ctx,
 static void wpa_drv_zep_event_proc_unprot_disassoc(struct zep_drv_if_ctx *if_ctx,
 						   union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
 			EVENT_UNPROT_DISASSOC,
 			event);
@@ -940,6 +1015,11 @@ static int phy_info_band_cfg(struct phy_info_arg *phy_info,
 
 static void wpa_drv_zep_event_get_wiphy(struct zep_drv_if_ctx *if_ctx, void *band_info)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 	if (!band_info) {
 		/* Done with all bands */
 		k_sem_give(&if_ctx->drv_resp_sem);
@@ -1019,6 +1099,12 @@ static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 	u16 fc, stype;
 	int rx_freq = 0;
 
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	wpa_printf(MSG_MSGDUMP, "wpa_supp: Frame event");
 	mgmt = (const struct ieee80211_mgmt *)frame;
 
@@ -1055,6 +1141,10 @@ static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 
 static void wpa_drv_zep_event_ecsa_complete(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_CH_SWITCH, event);
@@ -1066,6 +1156,10 @@ static void wpa_drv_zep_event_ecsa_complete(struct zep_drv_if_ctx *if_ctx, union
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 static void wpa_drv_zep_event_dfs_cac_started(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(MSG_WARNING, "%s: if_ctx is not inited", __func__);
+		return;
+	}
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_DFS_CAC_STARTED, event);
 	else
@@ -1074,6 +1168,10 @@ static void wpa_drv_zep_event_dfs_cac_started(struct zep_drv_if_ctx *if_ctx, uni
 
 static void wpa_drv_zep_event_dfs_cac_finished(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(MSG_WARNING, "%s: if_ctx is not inited", __func__);
+		return;
+	}
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_DFS_CAC_FINISHED, event);
 	else
@@ -1084,6 +1182,11 @@ static void wpa_drv_zep_event_dfs_cac_finished(struct zep_drv_if_ctx *if_ctx, un
 static void wpa_drv_zep_event_signal_change(struct zep_drv_if_ctx *if_ctx,
 					    union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx, EVENT_SIGNAL_CHANGE, event);
 }
 
@@ -1091,6 +1194,12 @@ static void wpa_drv_zep_event_roc_complete(struct zep_drv_if_ctx *if_ctx,
 					    int freq, unsigned int duration, u64 cookie)
 {
 	union wpa_event_data event;
+
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 
 	if (cookie != if_ctx->remain_on_channel_cookie) {
 		wpa_printf(MSG_DEBUG, "wpa_supp: No matching cookie found for ROC complete event");
@@ -1109,6 +1218,12 @@ static void wpa_drv_zep_event_roc_cancel_complete(struct zep_drv_if_ctx *if_ctx,
 {
 	union wpa_event_data event;
 
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
 	if (cookie == if_ctx->remain_on_channel_cookie) {
 		os_memset(&event, 0, sizeof(event));
 		event.remain_on_channel.freq = freq;
@@ -1120,6 +1235,11 @@ static void wpa_drv_zep_event_roc_cancel_complete(struct zep_drv_if_ctx *if_ctx,
 static void wpa_drv_zep_event_cookie_event(struct zep_drv_if_ctx *if_ctx,
 					  u64 host_cookie, u64 cookie)
 {
+	if (!if_ctx) {
+		wpa_printf(
+		    MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
 	if (if_ctx->pending_remain_on_channel) {
 		if_ctx->remain_on_channel_cookie = cookie;
 		if_ctx->pending_remain_on_channel = false;
@@ -1413,6 +1533,11 @@ static void wpa_drv_zep_deinit(void *priv)
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 static void wpa_drv_zep_event_acs_channel_selected(struct zep_drv_if_ctx *if_ctx, union wpa_event_data *event)
 {
+	if (!if_ctx) {
+		wpa_printf(MSG_WARNING, "%s: if_ctx is not inited", __func__);
+		return;
+	}
+
 	if (if_ctx->hapd)
 		hostapd_event_wrapper(if_ctx->hapd, EVENT_ACS_CHANNEL_SELECTED, event);
 	else
