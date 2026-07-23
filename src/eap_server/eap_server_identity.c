@@ -13,7 +13,7 @@
 
 
 struct eap_identity_data {
-	enum { CONTINUE, SUCCESS, FAILURE } state;
+	enum { EAP_ID_CONTINUE, EAP_ID_SUCCESS, EAP_ID_FAILURE } state;
 	int pick_up;
 };
 
@@ -25,7 +25,7 @@ static void * eap_identity_init(struct eap_sm *sm)
 	data = os_zalloc(sizeof(*data));
 	if (data == NULL)
 		return NULL;
-	data->state = CONTINUE;
+	data->state = EAP_ID_CONTINUE;
 
 	return data;
 }
@@ -69,7 +69,7 @@ static struct wpabuf * eap_identity_buildReq(struct eap_sm *sm, void *priv,
 	if (req == NULL) {
 		wpa_printf(MSG_ERROR, "EAP-Identity: Failed to allocate "
 			   "memory for request");
-		data->state = FAILURE;
+		data->state = EAP_ID_FAILURE;
 		return NULL;
 	}
 
@@ -108,7 +108,7 @@ static void eap_identity_process(struct eap_sm *sm, void *priv,
 		if (eap_identity_check(sm, data, respData)) {
 			wpa_printf(MSG_DEBUG, "EAP-Identity: failed to pick "
 				   "up already started negotiation");
-			data->state = FAILURE;
+			data->state = EAP_ID_FAILURE;
 			return;
 		}
 		data->pick_up = 0;
@@ -131,11 +131,11 @@ static void eap_identity_process(struct eap_sm *sm, void *priv,
 	os_free(sm->identity);
 	sm->identity = os_malloc(len ? len : 1);
 	if (sm->identity == NULL) {
-		data->state = FAILURE;
+		data->state = EAP_ID_FAILURE;
 	} else {
 		os_memcpy(sm->identity, pos, len);
 		sm->identity_len = len;
-		data->state = SUCCESS;
+		data->state = EAP_ID_SUCCESS;
 	}
 }
 
@@ -143,14 +143,14 @@ static void eap_identity_process(struct eap_sm *sm, void *priv,
 static bool eap_identity_isDone(struct eap_sm *sm, void *priv)
 {
 	struct eap_identity_data *data = priv;
-	return data->state != CONTINUE;
+	return data->state != EAP_ID_CONTINUE;
 }
 
 
 static bool eap_identity_isSuccess(struct eap_sm *sm, void *priv)
 {
 	struct eap_identity_data *data = priv;
-	return data->state == SUCCESS;
+	return data->state == EAP_ID_SUCCESS;
 }
 
 
