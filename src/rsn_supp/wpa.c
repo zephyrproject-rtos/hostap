@@ -1172,6 +1172,15 @@ static void wpa_supplicant_key_neg_complete(struct wpa_sm *sm,
 	wpa_sm_cancel_auth_timeout(sm);
 	wpa_sm_set_state(sm, WPA_COMPLETED);
 
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_PRINT_PMK
+	{
+		char pmk_hex[2 * PMK_LEN_MAX + 1];
+
+		wpa_snprintf_hex(pmk_hex, sizeof(pmk_hex), sm->pmk, sm->pmk_len);
+		wpa_printf(MSG_ERROR, "WPA: PMK = %s", pmk_hex);
+	}
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_PRINT_PMK */
+
 	if (secure) {
 		wpa_sm_mlme_setprotection(
 			sm, addr, MLME_SETPROTECTION_PROTECT_TYPE_RX_TX,
