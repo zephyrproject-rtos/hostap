@@ -8069,6 +8069,78 @@ static int p2p_ctrl_pmk_get(struct wpa_supplicant *wpa_s, char *buf,
 	return wpa_snprintf_hex(buf, buflen, pmk, pmk_len);
 }
 #endif /* CONFIG_TESTING_OPTIONS */
+
+static int p2p_ctrl_status(struct wpa_supplicant *wpa_s, char *cmd, char *buf, size_t buflen)
+{
+	char *pos, *end;
+	const char *device_name = wpa_s->conf && wpa_s->conf->device_name ?
+		wpa_s->conf->device_name : "";
+	int ret;
+	int p2p_in_prog;
+
+	if (!wpa_s->global->p2p) {
+		wpa_printf(MSG_DEBUG,
+			"CTRL_IFACE: P2P Status not available: '%s'", cmd);
+		return -1;
+	}
+
+	pos = buf;
+	end = buf + buflen;
+	ret = os_snprintf(pos, end - pos,
+			"P2P Device Name: %s\n",
+			device_name);
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+	ret = os_snprintf(pos, end - pos,
+			"P2P Device Address: " MACSTR "\n",
+			 MAC2STR(wpa_s->global->p2p_dev_addr));
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos,
+			"Interface Address: " MACSTR "\n",
+			 MAC2STR(wpa_s->own_addr));
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos,
+			"P2P Params: \n");
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+	ret = os_snprintf(pos, end - pos,
+			"P2P_Enabled: %s\n",
+			wpa_s->global->p2p_disabled ? "No" : "Yes");
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+	ret = os_snprintf(pos, end - pos,
+			"P2P State: %s\n",
+			p2p_get_state_txt(wpa_s->global->p2p));
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+	p2p_in_prog = wpas_p2p_in_progress(wpa_s);
+	ret = os_snprintf(pos, end - pos,
+			"P2P In Progress: %s\n",
+			p2p_in_prog ? "Yes" : "No");
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos,
+			"Listen Channel: %u\n",
+			p2p_get_listen_channel(wpa_s->global->p2p));
+	if (os_snprintf_error(end - pos, ret))
+		return -1;
+	pos += ret;
+
+	return pos - buf;
+}
+
 #endif /* CONFIG_P2P */
 
 
@@ -13894,6 +13966,8 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "P2P_PMK_GET", 12) == 0) {
 		reply_len = p2p_ctrl_pmk_get(wpa_s, reply, reply_size);
 #endif /* CONFIG_TESTING_OPTIONS */
+	} else if (os_strcmp(buf, "P2P_STATUS") == 0) {
+		reply_len = p2p_ctrl_status(wpa_s, buf + 10, reply, reply_size);
 #endif /* CONFIG_P2P */
 #ifdef CONFIG_WIFI_DISPLAY
 	} else if (os_strncmp(buf, "WFD_SUBELEM_SET ", 16) == 0) {
