@@ -67,6 +67,7 @@
 #include "wpas_kay.h"
 #include "mesh.h"
 #include "dpp_supplicant.h"
+#include "common/nan_de.h"
 #include "nan_usd.h"
 #ifdef CONFIG_MESH
 #include "ap/ap_config.h"
@@ -5668,6 +5669,11 @@ int wpa_supplicant_update_mac_addr(struct wpa_supplicant *wpa_s)
 
 	wpa_sm_set_own_addr(wpa_s->wpa, wpa_s->own_addr);
 	wpas_wps_update_mac_addr(wpa_s);
+
+#ifdef CONFIG_NAN_USD
+	if (wpa_s->nan_de)
+		nan_de_update_nmi(wpa_s->nan_de, wpa_s->own_addr);
+#endif /* CONFIG_NAN_USD */
 
 #ifdef CONFIG_FST
 	if (wpa_s->fst)
