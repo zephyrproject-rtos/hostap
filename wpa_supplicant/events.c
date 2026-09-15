@@ -54,7 +54,11 @@
 #include "mesh.h"
 #include "mesh_mpm.h"
 #include "wmm_ac.h"
+#ifdef CONFIG_NAN
+#include "nan_supplicant.h"
+#else /* CONFIG_NAN */
 #include "nan_usd.h"
+#endif /* CONFIG_NAN */
 #include "dpp_supplicant.h"
 
 
@@ -5527,16 +5531,21 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_FST */
 
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 	if (category == WLAN_ACTION_PUBLIC && plen >= 5 &&
 	    payload[0] == WLAN_PA_VENDOR_SPECIFIC &&
 	    WPA_GET_BE32(&payload[1]) == NAN_SDF_VENDOR_TYPE) {
 		payload += 5;
 		plen -= 5;
+#ifdef CONFIG_NAN
+		wpas_nan_de_rx_sdf(wpa_s, mgmt->sa, mgmt->bssid, freq,
+				   payload, plen, rssi);
+#else /* CONFIG_NAN */
 		wpas_nan_usd_rx_sdf(wpa_s, mgmt->sa, freq, payload, plen);
+#endif /* CONFIG_NAN */
 		return;
 	}
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 
 #ifdef CONFIG_DPP
 	if (category == WLAN_ACTION_PUBLIC && plen >= 5 &&
@@ -6674,11 +6683,11 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			wpa_s, data->remain_on_channel.freq,
 			data->remain_on_channel.duration);
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 		wpas_nan_usd_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq,
 			data->remain_on_channel.duration);
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 		break;
 	case EVENT_CANCEL_REMAIN_ON_CHANNEL:
 #ifdef CONFIG_OFFCHANNEL
@@ -6691,10 +6700,10 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		wpas_dpp_cancel_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq);
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 		wpas_nan_usd_cancel_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq);
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 		break;
 	case EVENT_EAPOL_RX:
 		wpa_supplicant_rx_eapol(wpa_s, data->eapol_rx.src,
@@ -7030,9 +7039,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 #ifdef CONFIG_DPP
 		wpas_dpp_tx_wait_expire(wpa_s);
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 		wpas_nan_usd_tx_wait_expire(wpa_s);
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 		break;
 	case EVENT_TID_LINK_MAP:
 		if (data)

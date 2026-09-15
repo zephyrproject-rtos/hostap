@@ -12,6 +12,14 @@
 #ifndef PASN_COMMON_H
 #define PASN_COMMON_H
 
+#include "common/wpa_common.h"
+#include "crypto/sha384.h"
+#ifdef CONFIG_SAE
+#include "common/sae.h"
+#endif /* CONFIG_SAE */
+
+struct sae_pt;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

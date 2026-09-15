@@ -1003,6 +1003,14 @@ bool int_array_includes(int *arr, int val)
 }
 
 
+int * int_array_dup(const int *a)
+{
+	if (!a)
+		return NULL;
+	return os_memdup(a, (int_array_len(a) + 1) * sizeof(int));
+}
+
+
 void str_clear_free(char *str)
 {
 	if (str) {

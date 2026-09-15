@@ -21,6 +21,7 @@
 #include "config_ssid.h"
 #include "wmm_ac.h"
 #include "pasn/pasn_common.h"
+#include "nan/nan.h"
 
 extern const char *const wpa_supplicant_version;
 extern const char *const wpa_supplicant_license;
@@ -375,6 +376,8 @@ int radio_add_work(struct wpa_supplicant *wpa_s, unsigned int freq,
 void radio_work_done(struct wpa_radio_work *work);
 void radio_remove_works(struct wpa_supplicant *wpa_s,
 			const char *type, int remove_all);
+void radio_remove_work(struct wpa_supplicant *wpa_s,
+		       struct wpa_radio_work *work);
 void radio_remove_pending_work(struct wpa_supplicant *wpa_s, void *ctx);
 void radio_work_check_next(struct wpa_supplicant *wpa_s);
 struct wpa_radio_work *
@@ -1620,11 +1623,39 @@ struct wpa_supplicant {
 	int *owe_trans_scan_freq;
 #endif /* CONFIG_OWE */
 
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 	struct nan_de *nan_de;
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 	struct wpa_radio_work *nan_usd_listen_work;
 	struct wpa_radio_work *nan_usd_tx_work;
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
+
+	bool nan_mgmt;
+	bool nan_data;
+
+#ifdef CONFIG_NAN
+#define MAX_NAN_RADIOS 2
+	struct nan_capa nan_capa;
+	struct nan_data *nan;
+	struct nan_cluster_config nan_cluster_config;
+	u8 schedule_sequence_id;
+	struct nan_schedule_config nan_sched[MAX_NAN_RADIOS];
+	u16 nan_supported_csids;
+	struct nan_schedule_update {
+		struct nan_schedule_config sched;
+		u8 map_id;
+	} nan_sched_update;
+	struct wpabuf *nan_ulw_attr;
+	struct wpa_freq_range_list nan_disallowed_freqs;
+	u16 nan_max_bw;
+	struct nan_channels nan_override_potential_avail;
+	unsigned int nan_ndi_ndp_refcount;
+	struct nan_gtk ndi_gtk;
+#ifdef CONFIG_TESTING_OPTIONS
+	bool nan_force_conditional_sched;
+#endif /* CONFIG_TESTING_OPTIONS */
+#endif /* CONFIG_NAN */
 
 	bool ssid_verified;
 	bool bigtk_set;

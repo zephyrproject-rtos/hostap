@@ -297,6 +297,9 @@ u8 country_to_global_op_class(const char *country, u8 op_class);
 
 const struct oper_class_map * get_oper_class(const char *country, u8 op_class);
 int oper_class_bw_to_int(const struct oper_class_map *map);
+u8 op_class_idx_to_chan(const struct oper_class_map *op, u8 idx);
+int op_class_chan_to_idx(const struct oper_class_map *op, u8 chan);
+int ieee80211_get_center_freq(int ctrl_freq, u32 bw);
 int center_idx_to_bw_6ghz(u8 idx);
 bool is_6ghz_freq(int freq);
 bool is_6ghz_op_class(u8 op_class);

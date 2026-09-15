@@ -67,7 +67,7 @@
 #include "wpas_kay.h"
 #include "mesh.h"
 #include "dpp_supplicant.h"
-#include "nan_usd.h"
+#include "nan_supplicant.h"
 #ifdef CONFIG_MESH
 #include "ap/ap_config.h"
 #include "ap/hostapd.h"
@@ -752,9 +752,12 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 	wpa_s->dpp = NULL;
 #endif /* CONFIG_DPP */
 
-#ifdef CONFIG_NAN_USD
-	wpas_nan_usd_deinit(wpa_s);
-#endif /* CONFIG_NAN_USD */
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
+	wpas_nan_de_deinit(wpa_s);
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
+#ifdef CONFIG_NAN
+	wpas_nan_deinit(wpa_s);
+#endif /* CONFIG_NAN */
 
 #ifdef CONFIG_PASN
 	wpas_pasn_auth_stop(wpa_s);
@@ -6778,6 +6781,20 @@ void radio_remove_works(struct wpa_supplicant *wpa_s,
 }
 
 
+void radio_remove_work(struct wpa_supplicant *wpa_s,
+		       struct wpa_radio_work *work)
+{
+	if (!work)
+		return;
+
+	wpa_dbg(wpa_s, MSG_DEBUG, "Remove radio work '%s'@%p%s",
+		work->type, work, work->started ? " (started)" : "");
+	work->cb(work, 1);
+	radio_work_free(work);
+	radio_work_check_next(wpa_s);
+}
+
+
 void radio_remove_pending_work(struct wpa_supplicant *wpa_s, void *ctx)
 {
 	struct wpa_radio_work *work;
@@ -7310,10 +7327,15 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		return -1;
 #endif /* CONFIG_DPP */
 
-#ifdef CONFIG_NAN_USD
-	if (wpas_nan_usd_init(wpa_s) < 0)
+#ifdef CONFIG_NAN
+	if (wpas_nan_init(wpa_s) < 0)
 		return -1;
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN */
+
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
+	if (wpas_nan_de_init(wpa_s) < 0)
+		return -1;
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 
 	if (wpa_supplicant_init_eapol(wpa_s) < 0)
 		return -1;

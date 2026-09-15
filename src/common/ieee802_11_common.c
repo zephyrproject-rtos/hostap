@@ -2907,6 +2907,151 @@ int oper_class_bw_to_int(const struct oper_class_map *map)
 }
 
 
+static const u8 channels_80mhz[] = { 42, 58, 106, 122, 138, 155 };
+static const u8 channels_160mhz[] = { 50, 114, 163 };
+
+
+static u8 op_class_idx_to_chan_vht(u8 op_class, u8 idx)
+{
+	const u8 *chans_array;
+	unsigned int size;
+
+	if (op_class == 128 || op_class == 130) {
+		chans_array = channels_80mhz;
+		size = ARRAY_SIZE(channels_80mhz);
+	} else if (op_class == 129) {
+		chans_array = channels_160mhz;
+		size = ARRAY_SIZE(channels_160mhz);
+	} else {
+		return 0;
+	}
+
+	if (idx >= size)
+		return 0;
+
+	return chans_array[idx];
+}
+
+/**
+ * op_class_idx_to_chan - Channel index in the operating class to channel number
+ * @op: A pointer to the operating class object
+ * @idx: The channel index within the operating class. The channels are ordered
+ *	from the lowest number to the highest, index starting from 0.
+ */
+u8 op_class_idx_to_chan(const struct oper_class_map *op, u8 idx)
+{
+	u8 chan;
+
+	if (op->bw == BW80 || op->bw == BW80P80 || op->bw == BW160)
+		return op_class_idx_to_chan_vht(op->op_class, idx);
+
+	chan = op->min_chan + idx * op->inc;
+	if (chan > op->max_chan)
+		return 0;
+
+	return chan;
+}
+
+
+static int op_class_chan_to_idx_vht(u8 op_class, u8 chan)
+{
+	const u8 *chans_array;
+	unsigned int i, size;
+
+	if (op_class == 128 || op_class == 130) {
+		chans_array = channels_80mhz;
+		size = ARRAY_SIZE(channels_80mhz);
+	} else if (op_class == 129) {
+		chans_array = channels_160mhz;
+		size = ARRAY_SIZE(channels_160mhz);
+	} else {
+		return -1;
+	}
+
+	for (i = 0; i < size; i++) {
+		if (chan == chans_array[i])
+			return i;
+	}
+
+	return -1;
+}
+
+/**
+ * op_class_chan_to_idx - Channel number to channel index in the operating class
+ * @op: A pointer to the operating class object
+ * @chan: The channel number
+ * Returns: Channel index or -1 if channel not found
+ */
+int op_class_chan_to_idx(const struct oper_class_map *op, u8 chan)
+{
+	if (op->bw == BW80 || op->bw == BW80P80 || op->bw == BW160)
+		return op_class_chan_to_idx_vht(op->op_class, chan);
+
+	if (chan < op->min_chan || chan > op->max_chan ||
+	    (chan - op->min_chan) % op->inc)
+		return -1;
+
+	return (chan - op->min_chan) / op->inc;
+}
+
+
+static int get_center_freq_80mhz(int ctrl_freq)
+{
+	static const int center_freqs[] =
+		{ 5210, 5290, 5530, 5610, 5690, 5775 };
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(center_freqs); i++) {
+		if (ctrl_freq >= center_freqs[i] - 30 &&
+		    ctrl_freq <= center_freqs[i] + 30)
+			return center_freqs[i];
+	}
+
+	return 0;
+}
+
+
+static int get_center_freq_160mhz(int ctrl_freq)
+{
+	static const int center_freqs[] = { 5250, 5570 };
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(center_freqs); i++) {
+		if (ctrl_freq >= center_freqs[i] - 70 &&
+		    ctrl_freq <= center_freqs[i] + 70)
+			return center_freqs[i];
+	}
+
+	return 0;
+}
+
+/**
+ * ieee80211_get_center_freq - Get center frequency based on control
+ *     frequency and operating class information
+ *
+ * @ctrl_freq: Control frequency in MHz
+ * @bw: The bandwidth as defined in struct oper_class_map
+ */
+int ieee80211_get_center_freq(int ctrl_freq, u32 bw)
+{
+	switch (bw) {
+	case BW20:
+		return ctrl_freq;
+	case BW40PLUS:
+		return ctrl_freq + 10;
+	case BW40MINUS:
+		return ctrl_freq - 10;
+	case BW80:
+	case BW80P80:
+		return get_center_freq_80mhz(ctrl_freq);
+	case BW160:
+		return get_center_freq_160mhz(ctrl_freq);
+	default:
+		return -1;
+	}
+}
+
+
 int center_idx_to_bw_6ghz(u8 idx)
 {
 	/* Channel: 2 */

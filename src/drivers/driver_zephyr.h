@@ -337,6 +337,12 @@ struct zep_wpa_supp_dev_ops {
 
 	int (*get_country)(void *priv, char *alpha2);
 
+#ifdef CONFIG_NAN
+	int (*nan_start)(void *if_priv,
+			const struct nan_cluster_config *conf);
+	void (*nan_stop)(void *if_priv);
+#endif /* CONFIG_NAN */
+
 	/* AP mode (shared headers, so, skip compile time flags protection)*/
 	void *(*hapd_init)(void *hapd_drv_if_ctx, const char *iface_name,
                            struct zep_hostapd_dev_callbk_fns *hostapd_callbk_fns);

@@ -1153,6 +1153,13 @@ struct ieee80211_mgmt {
 				} STRUCT_PACKED slf_prot_action;
 				struct {
 					u8 action;
+					u8 oui[3];
+					u8 oui_type;
+					u8 subtype;
+					u8 variable[0];
+				} STRUCT_PACKED naf;
+				struct {
+					u8 action;
 					u8 variable[];
 				} STRUCT_PACKED fst_action;
 				struct {
@@ -1164,6 +1171,11 @@ struct ieee80211_mgmt {
 		} STRUCT_PACKED action;
 	} u;
 } STRUCT_PACKED;
+
+
+#define IEEE80211_MIN_ACTION_LEN(type)	\
+	(offsetof(struct ieee80211_mgmt, u.action.u.type) + \
+	 sizeof(((struct ieee80211_mgmt *) 0)->u.action.u.type))
 
 
 #define IEEE80211_MAX_MMPDU_SIZE 2304
@@ -1434,6 +1446,7 @@ struct ieee80211_ampe_ie {
 #define NAN_OUI_TYPE 0x13
 #define MBO_IE_VENDOR_TYPE 0x506f9a16
 #define NAN_NAF_VENDOR_TYPE 0x506f9a18
+#define NAN_NAF_OUI_TYPE 0x18
 #define MBO_OUI_TYPE 22
 #define OWE_IE_VENDOR_TYPE 0x506f9a1c
 #define OWE_OUI_TYPE 28

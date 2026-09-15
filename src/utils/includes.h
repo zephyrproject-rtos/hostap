@@ -47,6 +47,7 @@
 
 #if defined(__ZEPHYR__)
 #include <strings.h>
+#include <zephyr/arch/common/ffs.h>
 #if defined(CONFIG_POSIX_API)
 #include <zephyr/posix/arpa/inet.h>
 #include <zephyr/posix/sys/select.h>
@@ -60,6 +61,9 @@
 #include <zephyr/shell/shell.h>
 
 #define signal(a, b) (void)(b)
+#ifndef ffs
+#define ffs(x) find_lsb_set(x)
+#endif
 #endif /* defined(__ZEPHYR__) */
 
 #endif /* INCLUDES_H */

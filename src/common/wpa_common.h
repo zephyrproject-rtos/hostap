@@ -347,6 +347,13 @@ struct rsn_error_kde {
 	be16 error_type;
 } STRUCT_PACKED;
 
+#define WPA_GTK_KDE_PREFIX_LEN 2
+struct wpa_gtk_kde {
+	u8 keyid;
+	u8 reserved;
+	u8 gtk[WPA_GTK_MAX_LEN];
+} STRUCT_PACKED;
+
 #define WPA_IGTK_KDE_PREFIX_LEN (2 + RSN_PN_LEN)
 struct wpa_igtk_kde {
 	u8 keyid[2];

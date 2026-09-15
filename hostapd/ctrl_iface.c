@@ -3710,6 +3710,7 @@ static int hostapd_ctrl_nan_publish(struct hostapd_data *hapd, char *cmd,
 	struct wpabuf *ssi = NULL;
 	int ret = -1;
 	enum nan_service_protocol_type srv_proto_type = 0;
+	bool p2p = false;
 
 	os_memset(&params, 0, sizeof(params));
 	/* USD shall use both solicited and unsolicited transmissions */
@@ -3743,6 +3744,11 @@ static int hostapd_ctrl_nan_publish(struct hostapd_data *hapd, char *cmd,
 			continue;
 		}
 
+		if (os_strcmp(token, "p2p=1") == 0) {
+			p2p = true;
+			continue;
+		}
+
 		if (os_strcmp(token, "solicited=0") == 0) {
 			params.solicited = false;
 			continue;
@@ -3764,7 +3770,7 @@ static int hostapd_ctrl_nan_publish(struct hostapd_data *hapd, char *cmd,
 	}
 
 	publish_id = hostapd_nan_usd_publish(hapd, service_name, srv_proto_type,
-					     ssi, &params);
+					     ssi, &params, p2p);
 	if (publish_id > 0)
 		ret = os_snprintf(buf, buflen, "%d", publish_id);
 fail:
@@ -3847,6 +3853,7 @@ static int hostapd_ctrl_nan_subscribe(struct hostapd_data *hapd, char *cmd,
 	struct wpabuf *ssi = NULL;
 	int ret = -1;
 	enum nan_service_protocol_type srv_proto_type = 0;
+	bool p2p = false;
 
 	os_memset(&params, 0, sizeof(params));
 
@@ -3880,6 +3887,11 @@ static int hostapd_ctrl_nan_subscribe(struct hostapd_data *hapd, char *cmd,
 			continue;
 		}
 
+		if (os_strcmp(token, "p2p=1") == 0) {
+			p2p = true;
+			continue;
+		}
+
 		wpa_printf(MSG_INFO,
 			   "CTRL: Invalid NAN_SUBSCRIBE parameter: %s",
 			   token);
@@ -3888,7 +3900,7 @@ static int hostapd_ctrl_nan_subscribe(struct hostapd_data *hapd, char *cmd,
 
 	subscribe_id = hostapd_nan_usd_subscribe(hapd, service_name,
 						 srv_proto_type, ssi,
-						 &params);
+						 &params, p2p);
 	if (subscribe_id > 0)
 		ret = os_snprintf(buf, buflen, "%d", subscribe_id);
 fail:
