@@ -63,6 +63,7 @@ struct nan_de_service {
 struct nan_de {
 	u8 nmi[ETH_ALEN];
 	bool ap;
+	unsigned int max_listen;
 	struct nan_callbacks cb;
 
 	struct nan_de_service *service[NAN_DE_MAX_SERVICE];
@@ -78,6 +79,7 @@ struct nan_de {
 
 
 struct nan_de * nan_de_init(const u8 *nmi, bool ap,
+			    unsigned int max_listen,
 			    const struct nan_callbacks *cb)
 {
 	struct nan_de *de;
@@ -88,6 +90,7 @@ struct nan_de * nan_de_init(const u8 *nmi, bool ap,
 
 	os_memcpy(de->nmi, nmi, ETH_ALEN);
 	de->ap = ap;
+	de->max_listen = max_listen ? max_listen : 1000;
 	os_memcpy(&de->cb, cb, sizeof(*cb));
 
 	return de;
@@ -478,6 +481,16 @@ static int nan_de_srv_time_to_next(struct nan_de *de,
 			next = tmp;
 	}
 
+	if (srv->type == NAN_DE_PUBLISH &&
+	    srv->publish.fsd &&
+	    os_reltime_initialized(&srv->pause_state_end)) {
+		os_reltime_sub(&srv->pause_state_end, now, &diff);
+		tmp = os_reltime_in_ms(&diff);
+		if (next == -1 || tmp < next)
+			next = tmp;
+		return next;
+	}
+
 	tmp = nan_de_next_multicast(de, srv, now);
 	if (tmp >= 0 && (next == -1 || tmp < next))
 		next = tmp;
@@ -589,6 +602,30 @@ static void nan_de_timer(void *eloop_ctx, void *timeout_ctx)
 		srv_next = nan_de_srv_time_to_next(de, srv, &now);
 		if (srv_next >= 0 && (next == -1 || srv_next < next))
 			next = srv_next;
+
+		if (srv->type == NAN_DE_PUBLISH &&
+		    srv->publish.fsd &&
+		    os_reltime_initialized(&srv->pause_state_end) &&
+		    de->tx_wait_end_freq == 0 &&
+		    de->listen_freq == 0 && de->ext_listen_freq == 0) {
+			struct os_reltime diff;
+			int duration;
+
+			os_reltime_sub(&srv->pause_state_end, &now, &diff);
+			duration = os_reltime_in_ms(&diff);
+			if (duration < 0)
+				continue;
+			if ((unsigned int) duration > de->max_listen)
+				duration = de->max_listen;
+			if (de->cb.listen(de->cb.ctx, srv->freq, duration) ==
+			    0) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Publisher in pauseState - started listen on %u MHz",
+					   srv->freq);
+				de->listen_freq = srv->freq;
+				return;
+			}
+		}
 
 		if (srv_next == 0 && !started &&
 		    de->listen_freq == 0 && de->ext_listen_freq == 0 &&

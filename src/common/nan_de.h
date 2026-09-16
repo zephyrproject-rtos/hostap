@@ -56,6 +56,7 @@ struct nan_callbacks {
 };
 
 struct nan_de * nan_de_init(const u8 *nmi, bool ap,
+			    unsigned int max_listen,
 			    const struct nan_callbacks *cb);
 void nan_de_flush(struct nan_de *de);
 void nan_de_deinit(struct nan_de *de);
