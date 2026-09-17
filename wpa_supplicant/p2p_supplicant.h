@@ -351,6 +351,12 @@ static inline int wpas_p2p_group_remove(struct wpa_supplicant *wpa_s,
 	return 0;
 }
 
+static inline struct wpabuf * wpas_p2p_usd_elems(struct wpa_supplicant *wpa_s,
+						 const char *service_name)
+{
+	return NULL;
+}
+
 #endif /* CONFIG_P2P */
 
 #endif /* P2P_SUPPLICANT_H */

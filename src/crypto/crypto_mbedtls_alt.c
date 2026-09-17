@@ -840,6 +840,22 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int ite
                            os_strlen(passphrase), ssid, ssid_len,
                            iterations, 32, buf) ? -1: 0;
 }
+
+int pbkdf2_sha256(const char *passphrase, const u8 *salt, size_t salt_len,
+                  int iterations, u8 *buf, size_t buflen)
+{
+    return pbkdf2_sha1_psa(MBEDTLS_MD_SHA256, (const u8 *)passphrase,
+                           os_strlen(passphrase), salt, salt_len,
+                           iterations, (uint32_t)buflen, buf) ? -1 : 0;
+}
+
+int pbkdf2_sha384(const char *passphrase, const u8 *salt, size_t salt_len,
+                  int iterations, u8 *buf, size_t buflen)
+{
+    return pbkdf2_sha1_psa(MBEDTLS_MD_SHA384, (const u8 *)passphrase,
+                           os_strlen(passphrase), salt, salt_len,
+                           iterations, (uint32_t)buflen, buf) ? -1 : 0;
+}
 #endif
 
 #include "aes_wrap.h"

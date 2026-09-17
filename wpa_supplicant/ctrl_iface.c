@@ -59,7 +59,7 @@
 #include "mesh.h"
 #include "dpp_supplicant.h"
 #include "sme.h"
-#include "nan_usd.h"
+#include "nan_supplicant.h"
 
 #ifdef __NetBSD__
 #include <net/if_ether.h>
@@ -4911,14 +4911,14 @@ static int wpa_supplicant_ctrl_iface_get_capability(
 	}
 #endif /* CONFIG_DPP */
 
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 	if (os_strcmp(field, "nan") == 0) {
 		res = os_snprintf(buf, buflen, "USD");
 		if (os_snprintf_error(buflen, res))
 			return -1;
 		return res;
 	}
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 
 #ifdef CONFIG_SAE
 	if (os_strcmp(field, "sae") == 0 &&
@@ -8994,9 +8994,9 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 
 	wpa_s->conf->ignore_old_scan_res = 0;
 
-#ifdef CONFIG_NAN_USD
-	wpas_nan_usd_flush(wpa_s);
-#endif /* CONFIG_NAN_USD */
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
+	wpas_nan_de_flush(wpa_s);
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 }
 
 
@@ -12193,7 +12193,7 @@ static int wpas_ctrl_ml_probe(struct wpa_supplicant *wpa_s, char *cmd)
 #endif /* CONFIG_TESTING_OPTIONS */
 
 
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 
 static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 				 char *buf, size_t buflen)
@@ -12286,8 +12286,8 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 		goto fail;
 	}
 
-	publish_id = wpas_nan_usd_publish(wpa_s, service_name, srv_proto_type,
-					  ssi, &params);
+	publish_id = wpas_nan_publish(wpa_s, service_name, srv_proto_type,
+				      ssi, &params, false);
 	if (publish_id > 0)
 		ret = os_snprintf(buf, buflen, "%d", publish_id);
 fail:
@@ -12318,7 +12318,7 @@ static int wpas_ctrl_nan_cancel_publish(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
-	wpas_nan_usd_cancel_publish(wpa_s, publish_id);
+	wpas_nan_cancel_publish(wpa_s, publish_id);
 	return 0;
 }
 
@@ -12354,7 +12354,7 @@ static int wpas_ctrl_nan_update_publish(struct wpa_supplicant *wpa_s,
 		goto fail;
 	}
 
-	ret = wpas_nan_usd_update_publish(wpa_s, publish_id, ssi);
+	ret = wpas_nan_update_publish(wpa_s, publish_id, ssi);
 fail:
 	wpabuf_free(ssi);
 	return ret;
@@ -12416,9 +12416,8 @@ static int wpas_ctrl_nan_subscribe(struct wpa_supplicant *wpa_s, char *cmd,
 		goto fail;
 	}
 
-	subscribe_id = wpas_nan_usd_subscribe(wpa_s, service_name,
-					      srv_proto_type, ssi,
-					      &params);
+	subscribe_id = wpas_nan_subscribe(wpa_s, service_name, srv_proto_type,
+					  ssi, &params, false);
 	if (subscribe_id > 0)
 		ret = os_snprintf(buf, buflen, "%d", subscribe_id);
 fail:
@@ -12448,7 +12447,7 @@ static int wpas_ctrl_nan_cancel_subscribe(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
-	wpas_nan_usd_cancel_subscribe(wpa_s, subscribe_id);
+	wpas_nan_cancel_subscribe(wpa_s, subscribe_id);
 	return 0;
 }
 
@@ -12460,6 +12459,7 @@ static int wpas_ctrl_nan_transmit(struct wpa_supplicant *wpa_s, char *cmd)
 	int req_instance_id = 0;
 	struct wpabuf *ssi = NULL;
 	u8 peer_addr[ETH_ALEN];
+	u32 cookie = 0;
 	int ret = -1;
 
 	os_memset(peer_addr, 0, ETH_ALEN);
@@ -12504,14 +12504,14 @@ static int wpas_ctrl_nan_transmit(struct wpa_supplicant *wpa_s, char *cmd)
 		goto fail;
 	}
 
-	ret = wpas_nan_usd_transmit(wpa_s, handle, ssi, NULL, peer_addr,
-				    req_instance_id);
+	ret = wpas_nan_transmit(wpa_s, handle, ssi, NULL, peer_addr,
+				req_instance_id, &cookie);
 fail:
 	wpabuf_free(ssi);
 	return ret;
 }
 
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 
 
 char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
@@ -13512,7 +13512,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			reply_len = -1;
 #endif /* CONFIG_DPP3 */
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN_USD) || defined(CONFIG_NAN)
 	} else if (os_strncmp(buf, "NAN_PUBLISH ", 12) == 0) {
 		reply_len = wpas_ctrl_nan_publish(wpa_s, buf + 12, reply,
 						  reply_size);
@@ -13531,7 +13531,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "NAN_TRANSMIT ", 13) == 0) {
 		if (wpas_ctrl_nan_transmit(wpa_s, buf + 13) < 0)
 			reply_len = -1;
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN_USD || CONFIG_NAN */
 #ifdef CONFIG_PASN
 	} else if (os_strncmp(buf, "PASN_START ", 11) == 0) {
 		if (wpas_ctrl_iface_pasn_start(wpa_s, buf + 11) < 0)

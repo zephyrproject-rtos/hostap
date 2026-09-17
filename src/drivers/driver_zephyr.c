@@ -2490,6 +2490,57 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_NAN
+static int wpa_drv_zep_nan_start(void *priv,
+				 const struct nan_cluster_config *conf)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret;
+
+	if (!priv || !conf) {
+		wpa_printf(MSG_ERROR, "%s: Invalid params", __func__);
+		return -1;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_start) {
+		wpa_printf(MSG_ERROR, "%s: nan_start op not supported", __func__);
+		return -1;
+	}
+
+	ret = dev_ops->nan_start(if_ctx->dev_priv, conf);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: nan_start op failed: %d",
+			   __func__, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void wpa_drv_zep_nan_stop(void *priv)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		return;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_stop) {
+		wpa_printf(MSG_ERROR, "%s: nan_stop op not supported", __func__);
+		return;
+	}
+
+	dev_ops->nan_stop(if_ctx->dev_priv);
+}
+#endif /* CONFIG_NAN */
+
 static int wpa_drv_zep_get_country(void *priv, char *alpha2)
 {
 	struct zep_drv_if_ctx *if_ctx              = NULL;
@@ -3278,6 +3329,10 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
+#ifdef CONFIG_NAN
+	.nan_start = wpa_drv_zep_nan_start,
+	.nan_stop = wpa_drv_zep_nan_stop,
+#endif /* CONFIG_NAN */
 #ifdef CONFIG_AP
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	.hapd_init = wpa_drv_zep_hapd_init,

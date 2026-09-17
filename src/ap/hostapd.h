@@ -496,6 +496,8 @@ struct hostapd_data {
 
 #ifdef CONFIG_NAN_USD
 	struct nan_de *nan_de;
+	/* Whether nan_de should be freed on deinit */
+	bool nan_de_is_owned;
 #endif /* CONFIG_NAN_USD */
 
 	u64 scan_cookie; /* Scan instance identifier for the ongoing HT40 scan
