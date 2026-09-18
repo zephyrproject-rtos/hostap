@@ -452,13 +452,10 @@ static char ** wpa_cli_complete_set(const char *str, int pos)
 	return NULL;
 }
 
-#if CONFIG_AP || CONFIG_P2P || \
-	!defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 static void wpa_cli_msg_cb(char *msg, size_t len)
 {
 	wpa_printf(MSG_INFO, "%s\n", msg);
 }
-#endif
 
 #ifdef CONFIG_AP
 static int wpa_cli_cmd_sta(struct wpa_ctrl *ctrl, int argc, char *argv[])
@@ -615,7 +612,6 @@ static int wpa_cli_cmd_update_beacon(struct wpa_ctrl *ctrl, int argc,
 }
 #endif /* CONFIG_AP */
 
-#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 static int wpa_cli_cmd_ifname(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "IFNAME", 0, argc, argv);
@@ -862,9 +858,6 @@ static int wpa_cli_cmd_ft_ds(struct wpa_ctrl *ctrl, int argc, char *argv[])
 	return wpa_cli_cmd(ctrl, "FT_DS", 1, argc, argv);
 }
 
-#endif /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI) */
-
-#if !defined(__ZEPHYR__) || defined(CONFIG_WPS)
 static int wpa_cli_cmd_wps_pbc(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return wpa_cli_cmd(ctrl, "WPS_PBC", 0, argc, argv);
@@ -897,9 +890,6 @@ static int wpa_cli_cmd_wps_cancel(struct wpa_ctrl *ctrl, int argc,
 {
 	return wpa_cli_cmd(ctrl, "WPS_CANCEL", 0, argc, argv);
 }
-#endif /* !__ZEPHYR__ || CONFIG_WPS */
-
-#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 
 #ifdef CONFIG_WPS_NFC
 
@@ -2943,9 +2933,6 @@ static int wpa_cli_cmd_dscp_query(struct wpa_ctrl *ctrl, int argc, char *argv[])
 	return wpa_cli_cmd(ctrl, "DSCP_QUERY", 1, argc, argv);
 }
 
-#endif /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI)*/
-
-
 enum wpa_cli_cmd_flags {
 	cli_cmd_flag_none		= 0x00,
 	cli_cmd_flag_sensitive		= 0x01
@@ -3038,7 +3025,6 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  cli_cmd_flag_none,
 	  "= update Beacon frame contents"},
 #endif /* CONFIG_AP */
-#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 	{ "ifname", wpa_cli_cmd_ifname, NULL,
 	  cli_cmd_flag_none,
 	  "= get current interface name" },
@@ -3208,8 +3194,6 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "ft_ds", wpa_cli_cmd_ft_ds, wpa_cli_complete_bss,
 	  cli_cmd_flag_none,
 	  "<addr> = request over-the-DS FT with <addr>" },
-#endif /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI) */
-#if !defined(__ZEPHYR__) || defined(CONFIG_WPS)
 	{ "wps_pbc", wpa_cli_cmd_wps_pbc, NULL,
 	  cli_cmd_flag_none,
 	  "[BSSID] = start Wi-Fi Protected Setup: Push Button Configuration" },
@@ -3222,8 +3206,6 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  "<PIN> = verify PIN checksum" },
 	{ "wps_cancel", wpa_cli_cmd_wps_cancel, NULL, cli_cmd_flag_none,
 	  "Cancels the pending WPS operation" },
-#endif /* !__ZEPHYR__ || CONFIG_WPS */
-#if !defined(__ZEPHYR__) || (defined(__ZEPHYR__) && defined(CONFIG_WPA_CLI))
 #ifdef CONFIG_WPS_NFC
 	{ "wps_nfc", wpa_cli_cmd_wps_nfc, wpa_cli_complete_bss,
 	  cli_cmd_flag_none,
@@ -3653,7 +3635,6 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "dscp_query", wpa_cli_cmd_dscp_query, NULL,
 	  cli_cmd_flag_none,
 	  "wildcard/domain_name=<string> = Send DSCP Query" },
-#endif  /* !__ZEPHYR__ || (__ZEPHYR__ && CONFIG_WPA_CLI)*/
 	{ NULL, NULL, NULL, cli_cmd_flag_none, NULL }
 };
 
