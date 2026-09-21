@@ -2065,6 +2065,15 @@ static int wpa_drv_zep_associate(void *priv,
 			goto out;
 		}
 
+		/* For non-SME drivers authenticate() is not called, so cache
+		 * the SSID here to keep wpa_drv_zep_get_ssid() functional
+		 * after association.
+		 */
+		if (params->ssid && params->ssid_len > 0) {
+			os_memcpy(if_ctx->ssid, params->ssid, params->ssid_len);
+			if_ctx->ssid_len = params->ssid_len;
+		}
+
 		ret = dev_ops->associate(if_ctx->dev_priv,
 				   params);
 	} else {
