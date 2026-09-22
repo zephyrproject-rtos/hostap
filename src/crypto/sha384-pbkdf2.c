@@ -1,0 +1,94 @@
+/*
+ * SHA384-based key derivation function (PBKDF2)
+ * Copyright (c) 2003-2025, Jouni Malinen <j@w1.fi>
+ *
+ * This software may be distributed under the terms of the BSD license.
+ * See README for more details.
+ */
+
+#include "includes.h"
+
+#include "common.h"
+#include "sha384.h"
+
+static int pbkdf2_sha384_f(const char *passphrase, const u8 *salt,
+			   size_t salt_len, int iterations, unsigned int count,
+			   u8 *digest)
+{
+	unsigned char tmp[SHA384_MAC_LEN], tmp2[SHA384_MAC_LEN];
+	int i, j;
+	unsigned char count_buf[4];
+	const u8 *addr[2];
+	size_t len[2];
+	size_t passphrase_len = os_strlen(passphrase);
+
+	addr[0] = salt;
+	len[0] = salt_len;
+	addr[1] = count_buf;
+	len[1] = 4;
+
+	/* F(P, S, c, i) = U1 xor U2 xor ... Uc
+	 * U1 = PRF(P, S || i)
+	 * U2 = PRF(P, U1)
+	 * Uc = PRF(P, Uc-1)
+	 */
+
+	count_buf[0] = (count >> 24) & 0xff;
+	count_buf[1] = (count >> 16) & 0xff;
+	count_buf[2] = (count >> 8) & 0xff;
+	count_buf[3] = count & 0xff;
+	if (hmac_sha384_vector((u8 *) passphrase, passphrase_len, 2, addr, len,
+			       tmp))
+		return -1;
+	os_memcpy(digest, tmp, SHA384_MAC_LEN);
+
+	for (i = 1; i < iterations; i++) {
+		if (hmac_sha384((u8 *) passphrase, passphrase_len, tmp,
+				SHA384_MAC_LEN, tmp2))
+			return -1;
+		os_memcpy(tmp, tmp2, SHA384_MAC_LEN);
+		for (j = 0; j < SHA384_MAC_LEN; j++)
+			digest[j] ^= tmp2[j];
+	}
+	forced_memzero(tmp, SHA384_MAC_LEN);
+	forced_memzero(tmp2, SHA384_MAC_LEN);
+
+	return 0;
+}
+
+
+/**
+ * pbkdf2_sha384 - SHA384-based key derivation function (PBKDF2)
+ * @passphrase: ASCII passphrase
+ * @salt: Salt
+ * @salt_len: Salt length in bytes
+ * @iterations: Number of iterations to run
+ * @buf: Buffer for the generated key
+ * @buflen: Length of the buffer in bytes
+ * Returns: 0 on success, -1 of failure
+ *
+ * This function is described in RFC 2898. The main construction is from
+ * PKCS#5 v2.0.
+ */
+int pbkdf2_sha384(const char *passphrase, const u8 *salt, size_t salt_len,
+		  int iterations, u8 *buf, size_t buflen)
+{
+	unsigned int count = 0;
+	unsigned char *pos = buf;
+	size_t left = buflen, plen;
+	unsigned char digest[SHA384_MAC_LEN];
+
+	while (left > 0) {
+		count++;
+		if (pbkdf2_sha384_f(passphrase, salt, salt_len, iterations,
+				    count, digest))
+			return -1;
+		plen = left > SHA384_MAC_LEN ? SHA384_MAC_LEN : left;
+		os_memcpy(pos, digest, plen);
+		pos += plen;
+		left -= plen;
+	}
+	forced_memzero(digest, SHA384_MAC_LEN);
+
+	return 0;
+}
