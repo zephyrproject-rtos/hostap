@@ -10,6 +10,7 @@
 #define HOSTAPD_H
 
 #ifdef CONFIG_SQLITE
+#include <net/if.h>
 #include <sqlite3.h>
 #endif /* CONFIG_SQLITE */
 
