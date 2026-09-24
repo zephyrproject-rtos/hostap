@@ -337,6 +337,24 @@ struct zep_wpa_supp_dev_ops {
 
 	int (*get_country)(void *priv, char *alpha2);
 
+	/** Start or join a NAN cluster. */
+	int (*nan_start)(void *if_priv,
+			const struct nan_cluster_config *conf);
+	/** Update the NAN cluster configuration. */
+	int (*nan_change_config)(void *if_priv,
+			const struct nan_cluster_config *conf);
+	/** Stop NAN operation. */
+	void (*nan_stop)(void *if_priv);
+	/** Configure the local NAN schedule. */
+	int (*nan_config_schedule)(void *if_priv, u8 map_id,
+				   struct nan_schedule_config *conf);
+	/** Configure a peer's NAN schedule. */
+	int (*nan_config_peer_schedule)(void *if_priv, const u8 *peer,
+					 u16 cdw, u8 sequence_id,
+					 u16 max_chan_switch_time,
+					 const struct wpabuf *ulw,
+					 struct nan_peer_schedule_config *cfg);
+
 	/* AP mode (shared headers, so, skip compile time flags protection)*/
 	void *(*hapd_init)(void *hapd_drv_if_ctx, const char *iface_name,
                            struct zep_hostapd_dev_callbk_fns *hostapd_callbk_fns);
