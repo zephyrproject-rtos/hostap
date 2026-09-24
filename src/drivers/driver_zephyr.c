@@ -2525,6 +2525,157 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_NAN
+static int wpa_drv_zep_nan_start(void *priv,
+				 const struct nan_cluster_config *conf)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret;
+
+	if (!priv || !conf) {
+		wpa_printf(MSG_ERROR, "%s: Invalid parameters", __func__);
+		return -1;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_start) {
+		wpa_printf(MSG_ERROR, "%s: nan_start operation not supported",
+			   __func__);
+		return -1;
+	}
+
+	ret = dev_ops->nan_start(if_ctx->dev_priv, conf);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: nan_start operation failed: %d",
+			   __func__, ret);
+	}
+
+	return ret;
+}
+
+static int wpa_drv_zep_nan_change_config(
+	void *priv, const struct nan_cluster_config *conf)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret;
+
+	if (!priv || !conf) {
+		wpa_printf(MSG_ERROR, "%s: Invalid parameters", __func__);
+		return -1;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_change_config) {
+		wpa_printf(MSG_ERROR,
+			   "%s: nan_change_config operation not supported",
+			   __func__);
+		return -1;
+	}
+
+	ret = dev_ops->nan_change_config(if_ctx->dev_priv, conf);
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "%s: nan_change_config operation failed: %d",
+			   __func__, ret);
+	}
+
+	return ret;
+}
+
+static void wpa_drv_zep_nan_stop(void *priv)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		return;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_stop) {
+		wpa_printf(MSG_ERROR, "%s: nan_stop operation not supported",
+			   __func__);
+		return;
+	}
+
+	dev_ops->nan_stop(if_ctx->dev_priv);
+}
+
+static int wpa_drv_zep_nan_config_schedule(
+	void *priv, u8 map_id, struct nan_schedule_config *conf)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret;
+
+	if (!priv) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		return -1;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_config_schedule) {
+		wpa_printf(MSG_ERROR,
+			   "%s: nan_config_schedule operation not supported",
+			   __func__);
+		return -1;
+	}
+
+	/* conf == NULL is valid and clears the current schedule. */
+	ret = dev_ops->nan_config_schedule(if_ctx->dev_priv, map_id, conf);
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "%s: nan_config_schedule operation failed: %d",
+			   __func__, ret);
+	}
+
+	return ret;
+}
+
+static int wpa_drv_zep_nan_config_peer_schedule(
+	void *priv, const u8 *peer, u16 cdw, u8 sequence_id,
+	u16 max_chan_switch_time, const struct wpabuf *ulw,
+	struct nan_peer_schedule_config *sched)
+{
+	struct zep_drv_if_ctx *if_ctx;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret;
+
+	if (!priv || !peer || !sched) {
+		wpa_printf(MSG_ERROR, "%s: Invalid parameters", __func__);
+		return -1;
+	}
+
+	if_ctx = priv;
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->nan_config_peer_schedule) {
+		wpa_printf(MSG_ERROR,
+			   "%s: nan_config_peer_schedule operation not supported",
+			   __func__);
+		return -1;
+	}
+
+	ret = dev_ops->nan_config_peer_schedule(if_ctx->dev_priv, peer, cdw,
+						sequence_id,
+						max_chan_switch_time, ulw,
+						sched);
+	if (ret) {
+		wpa_printf(MSG_ERROR,
+			   "%s: nan_config_peer_schedule operation failed: %d",
+			   __func__, ret);
+	}
+
+	return ret;
+}
+#endif /* CONFIG_NAN */
+
 #ifdef CONFIG_AP
 #ifndef CONFIG_WIFI_NM_HOSTAPD_AP
 static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
@@ -3287,6 +3438,13 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.get_conn_info = wpa_drv_zep_get_conn_info,
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
+#ifdef CONFIG_NAN
+	.nan_start = wpa_drv_zep_nan_start,
+	.nan_change_config = wpa_drv_zep_nan_change_config,
+	.nan_stop = wpa_drv_zep_nan_stop,
+	.nan_config_schedule = wpa_drv_zep_nan_config_schedule,
+	.nan_config_peer_schedule = wpa_drv_zep_nan_config_peer_schedule,
+#endif /* CONFIG_NAN */
 #ifdef CONFIG_AP
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	.hapd_init = wpa_drv_zep_hapd_init,
