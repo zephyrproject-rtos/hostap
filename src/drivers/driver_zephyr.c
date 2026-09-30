@@ -2152,7 +2152,9 @@ static int _wpa_drv_zep_set_key(void *priv,
 			       key,
 			       key_len,
 			       key_flag);
-	if (ret) {
+	if (ret &&
+	    /* key set early (step 3 of 4) for RX-only installation */
+	    !((key_flag & KEY_FLAG_NEXT) && ret == -ENOTSUP)) {
 		wpa_printf(MSG_ERROR, "%s: set_key op failed", __func__);
 		goto out;
 	}
