@@ -1110,6 +1110,14 @@ static int wpa_drv_mgmt_subscribe_non_ap(struct zep_drv_if_ctx *if_ctx)
 	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x0a\x07", 2) < 0)
 		ret = -1;
 
+	/* WNM-Sleep Mode Response. Without this registration the RPU's
+	 * cfg80211_rx_mgmt() finds no match, does not deliver the frame, and
+	 * ieee80211_rx_h_action_return() bounces it back to the AP with the
+	 * category MSB set (802.11-2012 9.24.4) instead.
+	 */
+	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x0a\x11", 2) < 0)
+		ret = -1;
+
 	/* Radio Measurement - Neighbor Report Response */
 	if (wpa_drv_register_action_frame(if_ctx, (u8 *)"\x05\x05", 2) < 0)
 		ret = -1;
