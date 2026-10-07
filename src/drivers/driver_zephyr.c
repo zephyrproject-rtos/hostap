@@ -2044,6 +2044,13 @@ static int wpa_drv_zep_associate(void *priv,
 
 	if_ctx = priv;
 
+	if (!params->ssid || params->ssid_len > sizeof(if_ctx->ssid)) {
+		wpa_printf(MSG_ERROR, "%s: Invalid SSID", __func__);
+		goto out;
+	}
+	os_memcpy(if_ctx->ssid, params->ssid, params->ssid_len);
+	if_ctx->ssid_len = params->ssid_len;
+
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops) {
 		wpa_printf(MSG_ERROR, "%s: get_dev_ops failed", __func__);
