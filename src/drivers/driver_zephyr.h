@@ -233,6 +233,10 @@ struct zep_wpa_supp_dev_callbk_fns {
 			     int freq, u64 cookie);
 
 	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 host_cookie, u64 cookie);
+
+	/* NAN lifecycle notification: a cluster was started or joined. */
+	void (*nan_cluster_join)(struct zep_drv_if_ctx *if_ctx,
+				const u8 *cluster_id, bool new_cluster);
 };
 
 struct zep_hostapd_dev_callbk_fns

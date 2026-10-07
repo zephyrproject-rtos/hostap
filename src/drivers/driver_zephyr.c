@@ -377,6 +377,25 @@ void wpa_supplicant_event_wrapper(void *ctx,
 			data_tmp->unprot_disassoc.sa = sa;
 			os_memcpy(da, data->unprot_disassoc.da, ETH_ALEN);
 			data_tmp->unprot_disassoc.da = da;
+		} else if (event == EVENT_NAN_CLUSTER_JOIN) {
+			union wpa_event_data *data_tmp = msg.data;
+			char *cluster_id;
+
+			if (data->nan_cluster_join_info.bssid != NULL) {
+				cluster_id = os_zalloc(ETH_ALEN);
+				if (cluster_id == NULL) {
+					wpa_printf(MSG_ERROR,
+						   "%s: event %u failed to allocate cluster ID",
+						   __func__, event);
+					os_free(msg.data);
+					return;
+				}
+				os_memcpy(cluster_id,
+					  data->nan_cluster_join_info.bssid,
+					  ETH_ALEN);
+				data_tmp->nan_cluster_join_info.bssid =
+					cluster_id;
+			}
 		}
 	}
 
@@ -670,6 +689,26 @@ void wpa_drv_zep_event_proc_disassoc(struct zep_drv_if_ctx *if_ctx,
 }
 
 #if CONFIG_WIFI_NM_WPA_SUPPLICANT_NAN
+static void wpa_drv_zep_event_proc_nan_cluster_join(
+		struct zep_drv_if_ctx *if_ctx, const u8 *cluster_id,
+		bool new_cluster)
+{
+	union wpa_event_data event;
+
+	if ((if_ctx == NULL) || (cluster_id == NULL)) {
+		wpa_printf(MSG_WARNING,
+			   "%s: Missing NAN cluster event context/data",
+			   __func__);
+		return;
+	}
+
+	os_memset(&event, 0, sizeof(event));
+	event.nan_cluster_join_info.bssid = cluster_id;
+	event.nan_cluster_join_info.new_cluster = new_cluster;
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
+				     EVENT_NAN_CLUSTER_JOIN, &event);
+}
+
 /**
  * is_nan_sdf_frame - Check if frame is a NAN Service Discovery Frame
  * @frame: Frame data
@@ -1493,6 +1532,9 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.roc_complete = wpa_drv_zep_event_roc_complete;
 	callbk_fns.roc_cancel_complete = wpa_drv_zep_event_roc_cancel_complete;
 	callbk_fns.cookie_event = wpa_drv_zep_event_cookie_event;
+#if CONFIG_WIFI_NM_WPA_SUPPLICANT_NAN
+	callbk_fns.nan_cluster_join = wpa_drv_zep_event_proc_nan_cluster_join;
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_NAN */
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
