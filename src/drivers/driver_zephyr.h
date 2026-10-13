@@ -137,6 +137,11 @@ struct zep_drv_if_ctx {
 	void *dev_priv;
 #if defined(__ZEPHYR__)
 	struct k_sem drv_resp_sem;
+	/* Serializes phy_info_arg and the get_wiphy drv_resp_sem give between
+	 * the requester and the driver event context, which can deliver band
+	 * info after the request timed out.
+	 */
+	struct k_mutex phy_info_lock;
 #endif
 
 	struct wpa_scan_results *scan_res2;
