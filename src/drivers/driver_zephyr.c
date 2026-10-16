@@ -2275,19 +2275,26 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 
 #ifdef CONFIG_WIFI_STA_AUTO_DHCPV4
 	if (authorized) {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_SKIP_DHCP_ON_ROAMING
+#ifdef CONFIG_WIFI_MGMT_ROAMING_DHCP
 		if (if_ctx->ft_roaming == true || if_ctx->roaming == true) {
 			if_ctx->roaming = false;
 			if_ctx->ft_roaming = false;
-		} else {
+
+			ret = net_mgmt(NET_REQUEST_WIFI_ROAMING_DHCP, iface, NULL, 0);
+			if (ret) {
+				wpa_printf(MSG_WARNING,
+					   "%s: roaming DHCP request failed (%d), restart DHCPv4",
+					   __func__, ret);
+				net_dhcpv4_restart(iface);
+			}
+		} else
+#endif /* CONFIG_WIFI_MGMT_ROAMING_DHCP */
+		{
 			net_dhcpv4_restart(iface);
 		}
-#else
-		net_dhcpv4_restart(iface);
-#endif
 	}
 
-#endif
+#endif /* CONFIG_WIFI_STA_AUTO_DHCPV4 */
 out:
 	return ret;
 }
