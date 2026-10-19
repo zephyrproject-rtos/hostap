@@ -999,7 +999,7 @@ static int wpa_supplicant_ctrl_iface_set(struct wpa_supplicant *wpa_s,
 			wpa_s->conf, cmd, -1,
 			wpa_s->global->params.show_details);
 		if (ret == 0)
-			wpa_supplicant_update_config(wpa_s);
+			ret = wpa_supplicant_update_config(wpa_s);
 		else if (ret == 1)
 			ret = 0;
 	}

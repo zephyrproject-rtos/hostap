@@ -1908,7 +1908,7 @@ void wpa_supplicant_terminate_proc(struct wpa_global *global);
 void wpa_supplicant_rx_eapol(void *ctx, const u8 *own_addr,
 			     const u8 *buf, size_t len,
 			     enum frame_encryption encrypted);
-void wpa_supplicant_update_config(struct wpa_supplicant *wpa_s);
+int wpa_supplicant_update_config(struct wpa_supplicant *wpa_s);
 void wpa_supplicant_clear_status(struct wpa_supplicant *wpa_s);
 void wpas_connection_failed(struct wpa_supplicant *wpa_s, const u8 *bssid,
 			    const u8 **link_bssids);
