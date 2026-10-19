@@ -8917,8 +8917,10 @@ int wpa_supplicant_parse_config(const char *fname)
 }
 
 
-void wpa_supplicant_update_config(struct wpa_supplicant *wpa_s)
+int wpa_supplicant_update_config(struct wpa_supplicant *wpa_s)
 {
+	int ret = 0;
+
 	if ((wpa_s->conf->changed_parameters & CFG_CHANGED_COUNTRY) &&
 	    wpa_s->conf->country[0] && wpa_s->conf->country[1]) {
 		char country[3];
@@ -8928,6 +8930,7 @@ void wpa_supplicant_update_config(struct wpa_supplicant *wpa_s)
 		if (wpa_drv_set_country(wpa_s, country) < 0) {
 			wpa_printf(MSG_ERROR, "Failed to set country code "
 				   "'%s'", country);
+			ret = -1;
 		}
 	}
 
@@ -8976,6 +8979,8 @@ void wpa_supplicant_update_config(struct wpa_supplicant *wpa_s)
 #endif /* CONFIG_WPS */
 	wpas_p2p_update_config(wpa_s);
 	wpa_s->conf->changed_parameters = 0;
+
+	return ret;
 }
 
 
