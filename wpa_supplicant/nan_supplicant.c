@@ -252,7 +252,7 @@ static int wpas_nan_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr,
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	struct nan_peer_schedule_config peer_sched;
-	int i, j, ret;
+	int i, j, ret = 0;
 
 	wpa_printf(MSG_DEBUG, "NAN: Set peer schedule - nmi_addr=" MACSTR
 		   " new_sta=%d cdw=%u seq_id=%u max_chan_switch_time=%u",
