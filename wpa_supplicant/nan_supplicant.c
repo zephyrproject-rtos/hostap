@@ -291,9 +291,10 @@ static int wpas_nan_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr,
 			for (j = 0; j < sched->maps[i].n_chans &&
 				     sched_cfg->num_channels <
 				     MAX_NUM_NAN_SCHEDULE_CHANNELS; j++) {
-				if (wpas_nan_set_peer_sched_chan(wpa_s, sched,
-								 i, j,
-								 sched_cfg) < 0)
+				ret = wpas_nan_set_peer_sched_chan(wpa_s, sched,
+								   i, j,
+								   sched_cfg);
+				if (ret < 0)
 					goto out;
 			}
 
