@@ -3026,7 +3026,7 @@ static void nan_peer_set_sched(struct nan_data *nan, struct nan_peer *peer,
 	 * schedule and store the copy of the time bitmap.
 	 */
 	dl_list_for_each(cur, &sched_entries, struct nan_avail_entry, list) {
-		struct nan_map *map;
+		struct nan_map *map = NULL;
 		unsigned int i;
 
 		for (i = 0; i < sched->n_maps; i++) {
@@ -3034,9 +3034,11 @@ static void nan_peer_set_sched(struct nan_data *nan, struct nan_peer *peer,
 
 			if (map->map_id == cur->map_id)
 				break;
+
+			map = NULL;
 		}
 
-		if (i == sched->n_maps) {
+		if (!map) {
 			wpa_printf(MSG_DEBUG,
 				   "NAN: No map entry found for map_id=%u in peer schedule",
 				   cur->map_id);
