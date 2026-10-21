@@ -836,9 +836,35 @@ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 /* sha1-pbkdf2.c */
 int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len, int iterations, u8 *buf, size_t buflen)
 {
-    return pbkdf2_sha1_psa(MBEDTLS_MD_SHA1, (const u8 *)passphrase,
-                           os_strlen(passphrase), ssid, ssid_len,
-                           iterations, 32, buf) ? -1: 0;
+    psa_key_derivation_operation_t op = PSA_KEY_DERIVATION_OPERATION_INIT;
+    psa_status_t status;
+    int ret = -1;
+
+    status = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_1));
+    if (status != PSA_SUCCESS)
+        goto out;
+
+    status = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, (uint64_t)iterations);
+    if (status != PSA_SUCCESS)
+        goto out;
+
+    status = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, ssid, ssid_len);
+    if (status != PSA_SUCCESS)
+        goto out;
+
+    status = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD,
+                                            (const u8 *)passphrase, os_strlen(passphrase));
+    if (status != PSA_SUCCESS)
+        goto out;
+
+    status = psa_key_derivation_output_bytes(&op, buf, buflen);
+    if (status != PSA_SUCCESS)
+        goto out;
+
+    ret = 0;
+out:
+    psa_key_derivation_abort(&op);
+    return ret;
 }
 #endif
 
