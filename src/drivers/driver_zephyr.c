@@ -1091,6 +1091,19 @@ static int wpa_drv_mgmt_subscribe_non_ap(struct zep_drv_if_ctx *if_ctx)
 	return ret;
 }
 
+static void wpa_drv_zep_event_external_auth(struct zep_drv_if_ctx *if_ctx,
+					    union wpa_event_data *event)
+{
+	if (!if_ctx) {
+		wpa_printf(MSG_WARNING, "%s: Missing interface context", __func__);
+		return;
+	}
+
+	wpa_supplicant_event_wrapper(if_ctx->supp_if_ctx,
+				     EVENT_EXTERNAL_AUTH,
+				     event);
+}
+
 static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 		char *frame, int frame_len,
 		int frequency, int rx_signal_dbm)
@@ -1493,6 +1506,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	callbk_fns.roc_complete = wpa_drv_zep_event_roc_complete;
 	callbk_fns.roc_cancel_complete = wpa_drv_zep_event_roc_cancel_complete;
 	callbk_fns.cookie_event = wpa_drv_zep_event_cookie_event;
+	callbk_fns.external_auth = wpa_drv_zep_event_external_auth;
 
 	if_ctx->dev_priv = dev_ops->init(if_ctx,
 					 ifname,
@@ -2571,6 +2585,31 @@ out:
 	return ret;
 }
 
+static int wpa_drv_zep_send_external_auth_status(void *priv,
+		struct external_auth *params)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	const struct zep_wpa_supp_dev_ops *dev_ops;
+	int ret = -1;
+
+	dev_ops = get_dev_ops(if_ctx->dev_ctx);
+	if (!dev_ops || !dev_ops->send_external_auth_status) {
+		wpa_printf(MSG_ERROR, "%s: send_external_auth_status op not supported",
+			   __func__);
+		goto out;
+	}
+
+	ret = dev_ops->send_external_auth_status(if_ctx->dev_priv, params);
+	if (ret) {
+		wpa_printf(MSG_ERROR, "%s: send_external_auth_status op failed: %d",
+			   __func__, ret);
+		goto out;
+	}
+	ret = 0;
+out:
+	return ret;
+}
+
 #ifdef CONFIG_AP
 #ifndef CONFIG_WIFI_NM_HOSTAPD_AP
 static int register_mgmt_frames_ap(struct zep_drv_if_ctx *if_ctx)
@@ -3297,6 +3336,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
 	.send_mlme = wpa_drv_zep_send_mlme,
+	.send_external_auth_status = wpa_drv_zep_send_external_auth_status,
 #ifdef CONFIG_AP
 #ifdef CONFIG_WIFI_NM_HOSTAPD_AP
 	.hapd_init = wpa_drv_zep_hapd_init,

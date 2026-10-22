@@ -233,6 +233,9 @@ struct zep_wpa_supp_dev_callbk_fns {
 			     int freq, u64 cookie);
 
 	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 host_cookie, u64 cookie);
+
+	void (*external_auth)(struct zep_drv_if_ctx *if_ctx,
+			      union wpa_event_data *event);
 };
 
 struct zep_hostapd_dev_callbk_fns
@@ -382,6 +385,8 @@ struct zep_wpa_supp_dev_ops {
 	int (*get_inact_sec)(void *if_priv, const u8 *addr);
 	void (*send_action_cancel_wait)(void *priv);
 	int (*signal_monitor)(void *if_priv, int threshold, int hysteresis);
+	int (*send_external_auth_status)(void *if_priv,
+					 struct external_auth *params);
 };
 
 #endif /* DRIVER_ZEPHYR_H */
