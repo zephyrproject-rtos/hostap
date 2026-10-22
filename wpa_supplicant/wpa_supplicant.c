@@ -4366,11 +4366,11 @@ pfs_fail:
 		wpa_ie_len += wpa_s->rsnxe_len;
 	}
 
+#if !defined(CONFIG_NO_RRM) && !defined(CONFIG_NO_ROBUST_AV)
 #ifdef CONFIG_TESTING_OPTIONS
 	if (wpa_s->disable_mscs_support)
 		goto mscs_end;
 #endif /* CONFIG_TESTING_OPTIONS */
-#ifndef CONFIG_NO_RRM
 	if (wpa_bss_ext_capab(bss, WLAN_EXT_CAPAB_MSCS) &&
 	    wpa_s->robust_av.valid_config) {
 		struct wpabuf *mscs_ie;
@@ -4401,7 +4401,7 @@ pfs_fail:
 		wpabuf_free(mscs_ie);
 	}
 mscs_end:
-#endif /* ! CONFIG_NO_RRM */
+#endif /* !CONFIG_NO_RRM && !CONFIG_NO_ROBUST_AV */
 	wpa_ie_len = wpas_populate_wfa_capa(wpa_s, bss, wpa_ie, wpa_ie_len,
 					    max_wpa_ie_len);
 
