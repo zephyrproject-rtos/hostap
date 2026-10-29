@@ -1878,18 +1878,8 @@ struct wpabuf *crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 
     prime_len = (pubkey_len - 1) / 2;
 
-    if (inc_y) {
-        /* Uncompressed: copy entire key */
-        buf = wpabuf_alloc_copy(pubkey_buf, pubkey_len);
-    } else {
-        /* Compressed: convert format */
-        buf = wpabuf_alloc(1 + prime_len);
-        if (buf) {
-            uint8_t y_is_odd = pubkey_buf[pubkey_len - 1] & 0x01;
-            wpabuf_put_u8(buf, y_is_odd ? 0x03 : 0x02);
-            wpabuf_put_data(buf, pubkey_buf + 1, prime_len);
-        }
-    }
+    /* Skip the 0x04 prefix: inc_y=1 returns X || Y, inc_y=0 returns X only */
+    buf = wpabuf_alloc_copy(pubkey_buf + 1, inc_y ? 2 * prime_len : prime_len);
 
     return buf;
 }
@@ -1943,14 +1933,12 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
     } else {
         mbedtls_ecp_group_id grp_id;
         size_t written_len = 0;
+        u8 comp_buf[1 + PSA_BITS_TO_BYTES(PSA_VENDOR_ECC_MAX_CURVE_BITS)];
 
-        /* Compressed format: 0x02/0x03 + X coordinate only */
-        if (key[0] == 0x02 || key[0] == 0x03) {
-            /* Compressed format with prefix */
-            if (len != 1 + prime_len) {
-                wpa_printf(MSG_ERROR, "%s: Invalid compressed key length %zu", __FUNCTION__, len);
-                return NULL;
-            }
+        /* Bare x-coordinate (OWE, DPP PFS, PASN): assume even y */
+        if (len == prime_len) {
+            comp_buf[0] = 0x02;
+            os_memcpy(comp_buf + 1, key, len);
 
             peer_key_len = 1 + 2 * prime_len;
             peer_key_buf = os_malloc(peer_key_len);
@@ -1962,7 +1950,7 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
             peer_key_buf[0] = 0x04;
 
             /* Copy X coordinate */
-            os_memcpy(peer_key_buf + 1, key + 1, prime_len);
+            os_memcpy(peer_key_buf + 1, key, prime_len);
 
             mbedtls_ecp_group grp;
             mbedtls_ecp_point point;
@@ -1991,7 +1979,7 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
             }
 
             /* Read the compressed point and decompress it */
-            status = mbedtls_ecp_point_read_binary(&grp, &point, key, len);
+            status = mbedtls_ecp_point_read_binary(&grp, &point, comp_buf, 1 + prime_len);
             if (status != 0) {
                 wpa_printf(MSG_ERROR, "%s: Failed to read compressed point: %d", __FUNCTION__, status);
                 mbedtls_ecp_point_free(&point);
@@ -2017,7 +2005,7 @@ struct wpabuf *crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y, cons
 
             peer_key_len = written_len;
         } else {
-            wpa_printf(MSG_ERROR, "%s: Invalid compressed key format", __FUNCTION__);
+            wpa_printf(MSG_ERROR, "%s: Invalid x-only key length %zu", __FUNCTION__, len);
             return NULL;
         }
     }
