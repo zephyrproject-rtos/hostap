@@ -1026,7 +1026,13 @@ static void wpa_drv_zep_event_get_wiphy(struct zep_drv_if_ctx *if_ctx, void *ban
 		return;
 	}
 
-	phy_info_band_cfg(if_ctx->phy_info_arg, band_info);
+	k_mutex_lock(&if_ctx->phy_info_lock, K_FOREVER);
+	if (if_ctx->phy_info_arg) {
+		phy_info_band_cfg(if_ctx->phy_info_arg, band_info);
+	} else {
+		wpa_printf(MSG_DEBUG, "%s: Dropping band info, no request pending", __func__);
+	}
+	k_mutex_unlock(&if_ctx->phy_info_lock);
 }
 
 static int wpa_drv_register_frame(struct zep_drv_if_ctx *if_ctx,
@@ -1374,16 +1380,26 @@ struct hostapd_hw_modes *wpa_drv_zep_get_hw_feature_data(void *priv,
 	*flags = 0;
 	*dfs_domain = 0;
 
+	k_mutex_lock(&if_ctx->phy_info_lock, K_FOREVER);
 	if_ctx->phy_info_arg = &result;
+	k_mutex_unlock(&if_ctx->phy_info_lock);
 
 	k_sem_reset(&if_ctx->drv_resp_sem);
 
 	ret = dev_ops->get_wiphy(if_ctx->dev_priv);
+	if (ret == 0 &&
+	    k_sem_take(&if_ctx->drv_resp_sem, K_SECONDS(GET_WIPHY_TIMEOUT)) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Timed out waiting for wiphy info", __func__);
+	}
+
+	/* result lives on this stack frame, so a late band event must not see it */
+	k_mutex_lock(&if_ctx->phy_info_lock, K_FOREVER);
+	if_ctx->phy_info_arg = NULL;
+	k_mutex_unlock(&if_ctx->phy_info_lock);
+
 	if (ret < 0) {
 		return NULL;
 	}
-
-	k_sem_take(&if_ctx->drv_resp_sem, K_SECONDS(GET_WIPHY_TIMEOUT));
 
 	if (!result.modes) {
 		return NULL;
@@ -1507,6 +1523,7 @@ static void *wpa_drv_zep_init(void *ctx,
 	}
 
 	k_sem_init(&if_ctx->drv_resp_sem, 0, 1);
+	k_mutex_init(&if_ctx->phy_info_lock);
 	if_ctx->remain_on_channel_cookie = 0;
 	if_ctx->pending_remain_on_channel = false;
 	if_ctx->probe_req_set = false;
@@ -1614,6 +1631,7 @@ static void *wpa_drv_zep_hapd_init(struct hostapd_data *hapd, struct wpa_init_pa
 	}
 
 	k_sem_init(&if_ctx->drv_resp_sem, 0, 1);
+	k_mutex_init(&if_ctx->phy_info_lock);
 out:
 	return if_ctx;
 }
