@@ -233,6 +233,10 @@ struct zep_wpa_supp_dev_callbk_fns {
 			     int freq, u64 cookie);
 
 	void (*cookie_event)(struct zep_drv_if_ctx *if_ctx, u64 host_cookie, u64 cookie);
+
+	/* NAN lifecycle notification: a cluster was started or joined. */
+	void (*nan_cluster_join)(struct zep_drv_if_ctx *if_ctx,
+				const u8 *cluster_id, bool new_cluster);
 };
 
 struct zep_hostapd_dev_callbk_fns
@@ -336,6 +340,24 @@ struct zep_wpa_supp_dev_ops {
 	int (*set_country)(void *priv, const char *alpha2);
 
 	int (*get_country)(void *priv, char *alpha2);
+
+	/** Start or join a NAN cluster. */
+	int (*nan_start)(void *if_priv,
+			const struct nan_cluster_config *conf);
+	/** Update the NAN cluster configuration. */
+	int (*nan_change_config)(void *if_priv,
+			const struct nan_cluster_config *conf);
+	/** Stop NAN operation. */
+	void (*nan_stop)(void *if_priv);
+	/** Configure the local NAN schedule. */
+	int (*nan_config_schedule)(void *if_priv, u8 map_id,
+				   struct nan_schedule_config *conf);
+	/** Configure a peer's NAN schedule. */
+	int (*nan_config_peer_schedule)(void *if_priv, const u8 *peer,
+					 u16 cdw, u8 sequence_id,
+					 u16 max_chan_switch_time,
+					 const struct wpabuf *ulw,
+					 struct nan_peer_schedule_config *cfg);
 
 	/* AP mode (shared headers, so, skip compile time flags protection)*/
 	void *(*hapd_init)(void *hapd_drv_if_ctx, const char *iface_name,
