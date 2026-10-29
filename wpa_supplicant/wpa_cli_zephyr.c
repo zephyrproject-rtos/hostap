@@ -391,7 +391,7 @@ int z_wpa_ctrl_signal_poll(struct wpa_ctrl *ctrl, struct signal_poll_resp *resp)
 	}
 
 	ret = sscanf((const char *)buf, "RSSI=%d\nLINKSPEED=%f\n", &resp->rssi, &resp->current_txrate);
-	if (ret < 0) {
+	if (ret != 2) {
 		wpa_printf(MSG_INFO, "Failed to parse SIGNAL_POLL response: %s",
 			strerror(errno));
 		return -1;
