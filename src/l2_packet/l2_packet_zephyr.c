@@ -54,7 +54,7 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 				   strerror(errno));
 		}
 	} else {
-		struct sockaddr_ll ll;
+		struct net_sockaddr_ll ll;
 
 		os_memset(&ll, 0, sizeof(ll));
 		ll.sll_family = AF_PACKET;
@@ -78,7 +78,7 @@ static void l2_packet_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	struct l2_packet_data *l2 = eloop_ctx;
 	u8 buf[2300];
 	int res;
-	struct sockaddr_ll ll;
+	struct net_sockaddr_ll ll;
 	socklen_t fromlen;
 	const struct ieee802_1x_hdr *hdr;
 
@@ -110,7 +110,7 @@ l2_packet_init(const char *ifname, const u8 *own_addr, unsigned short protocol,
 	       void *rx_callback_ctx, int l2_hdr)
 {
 	struct l2_packet_data *l2;
-	struct sockaddr_ll ll;
+	struct net_sockaddr_ll ll;
 	int ret = 0;
 	struct net_linkaddr *link_addr = NULL;
 	struct net_if *iface;
