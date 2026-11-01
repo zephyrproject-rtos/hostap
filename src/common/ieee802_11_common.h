@@ -322,9 +322,21 @@ int oper_class_bw_to_int(const struct oper_class_map *map);
 bool is_24ghz_freq(int freq);
 bool is_5ghz_freq(int freq);
 int center_idx_to_bw_6ghz(u8 idx);
+#ifdef CONFIG_NO_6GHZ
+static inline bool is_6ghz_freq(int freq)
+{
+	return false;
+}
+
+static inline bool is_6ghz_psc_frequency(int freq)
+{
+	return false;
+}
+#else /* CONFIG_NO_6GHZ */
 bool is_6ghz_freq(int freq);
-bool is_6ghz_op_class(u8 op_class);
 bool is_6ghz_psc_frequency(int freq);
+#endif /* CONFIG_NO_6GHZ */
+bool is_6ghz_op_class(u8 op_class);
 int get_6ghz_sec_channel(int channel);
 
 bool is_same_band(int freq1, int freq2);

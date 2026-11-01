@@ -10127,6 +10127,7 @@ int wpa_drv_send_action(struct wpa_supplicant *wpa_s, unsigned int freq,
 }
 
 
+#ifndef CONFIG_NO_6GHZ
 bool wpas_is_6ghz_supported(struct wpa_supplicant *wpa_s, bool only_enabled)
 {
 	struct hostapd_channel_data *chnl;
@@ -10147,6 +10148,7 @@ bool wpas_is_6ghz_supported(struct wpa_supplicant *wpa_s, bool only_enabled)
 
 	return false;
 }
+#endif /* CONFIG_NO_6GHZ */
 
 
 bool wpas_ap_supports_rsn_overriding(struct wpa_supplicant *wpa_s,
