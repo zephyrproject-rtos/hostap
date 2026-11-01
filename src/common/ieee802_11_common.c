@@ -3059,6 +3059,7 @@ int center_idx_to_bw_6ghz(u8 idx)
 }
 
 
+#ifndef CONFIG_NO_6GHZ
 bool is_6ghz_freq(int freq)
 {
 	if (freq < 5935 || freq > 7115)
@@ -3072,6 +3073,7 @@ bool is_6ghz_freq(int freq)
 
 	return true;
 }
+#endif /* CONFIG_NO_6GHZ */
 
 
 bool is_6ghz_op_class(u8 op_class)
@@ -3080,6 +3082,7 @@ bool is_6ghz_op_class(u8 op_class)
 }
 
 
+#ifndef CONFIG_NO_6GHZ
 bool is_6ghz_psc_frequency(int freq)
 {
 	int i;
@@ -3098,6 +3101,7 @@ bool is_6ghz_psc_frequency(int freq)
 
 	return false;
 }
+#endif /* CONFIG_NO_6GHZ */
 
 
 /**

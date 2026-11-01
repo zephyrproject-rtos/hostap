@@ -2524,8 +2524,12 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		ap = 1;
 #endif /* CONFIG_AP */
 
+#ifdef CONFIG_NO_6GHZ
+	trigger_6ghz_scan = false;
+#else /* CONFIG_NO_6GHZ */
 	trigger_6ghz_scan = wpa_s->crossed_6ghz_dom &&
 		wpa_s->last_scan_all_chan;
+#endif /* CONFIG_NO_6GHZ */
 	wpa_s->crossed_6ghz_dom = false;
 	wpa_s->last_scan_all_chan = false;
 

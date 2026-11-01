@@ -543,6 +543,10 @@ else
 OBJS += wmm_ac.o
 endif
 
+ifdef CONFIG_NO_6GHZ
+CFLAGS += -DCONFIG_NO_6GHZ
+endif
+
 ifdef CONFIG_NO_ROBUST_AV
 CFLAGS += -DCONFIG_NO_ROBUST_AV
 else
