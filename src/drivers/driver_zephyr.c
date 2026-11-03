@@ -1141,6 +1141,51 @@ static int wpa_drv_mgmt_subscribe_non_ap(struct zep_drv_if_ctx *if_ctx)
 	return ret;
 }
 
+#ifdef CONFIG_WNM
+/* If @frame is a WNM-Sleep Mode Response that accepts a request to enter
+ * WNM-Sleep, return its WNM Sleep Interval through @intval and 0; otherwise -1.
+ * Upstream wpa_supplicant does not pass the granted interval to wnm_oper(), so
+ * the driver reads it from the frame on the way in.
+ */
+static int wnm_sleep_resp_intval(const u8 *frame, size_t len, u16 *intval)
+{
+	const u8 *pos, *end = frame + len, *elem = NULL;
+	u16 key_len;
+
+	/* header, category, action, dialog token, key data length */
+	if (len < 24 + 5 || frame[24] != WLAN_ACTION_WNM ||
+	    frame[25] != WNM_SLEEP_MODE_RESP) {
+		return -1;
+	}
+
+	key_len = WPA_GET_LE16(frame + 27);
+	pos = frame + 29;
+	if (end - pos < key_len) {
+		return -1;
+	}
+	pos += key_len;
+
+	while (end - pos >= 2 && end - pos >= 2 + pos[1]) {
+		/* WNM-Sleep Mode element: action type, response status,
+		 * WNM Sleep Interval.
+		 */
+		if (pos[0] == WLAN_EID_WNMSLEEP && pos[1] >= 4) {
+			/* wnm_sta.c acts on the last such element */
+			elem = pos;
+		}
+		pos += 2 + pos[1];
+	}
+
+	if (!elem || elem[2] != WNM_SLEEP_MODE_ENTER ||
+	    elem[3] != WNM_STATUS_SLEEP_ACCEPT) {
+		return -1;
+	}
+
+	*intval = WPA_GET_LE16(elem + 4);
+	return 0;
+}
+#endif /* CONFIG_WNM */
+
 static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 		char *frame, int frame_len,
 		int frequency, int rx_signal_dbm)
@@ -1167,6 +1212,18 @@ static void wpa_drv_zep_event_mgmt_rx(struct zep_drv_if_ctx *if_ctx,
 
 	fc = le_to_host16(mgmt->frame_control);
 	stype = WLAN_FC_GET_STYPE(fc);
+
+#ifdef CONFIG_WNM
+	if (stype == WLAN_FC_STYPE_ACTION && if_ctx->wnm_sleep_enter_pending &&
+	    if_ctx->associated && ether_addr_equal(mgmt->sa, if_ctx->bssid)) {
+		u16 intval;
+
+		if (!wnm_sleep_resp_intval((const u8 *)frame, frame_len,
+					   &intval)) {
+			if_ctx->wnm_sleep_intval = intval;
+		}
+	}
+#endif /* CONFIG_WNM */
 
 	if (stype == WLAN_FC_STYPE_PROBE_REQ && !if_ctx->probe_req_listen && !if_ctx->ap_probe_req_listen) {
 		wpa_printf(MSG_MSGDUMP, "wpa_supp: Device not in probe req listen mode - ignore frame");
@@ -2094,6 +2151,9 @@ static int wpa_drv_zep_authenticate(void *priv,
 	os_memset(if_ctx->auth_bssid, 0, ETH_ALEN);
 
 	if_ctx->associated = false;
+#ifdef CONFIG_WNM
+	if_ctx->wnm_sleep_enter_pending = false;
+#endif
 
 	ret = dev_ops->authenticate(if_ctx->dev_priv, params, curr_bss);
 	if (ret) {
@@ -2501,6 +2561,17 @@ static int wpa_drv_zep_send_action(void *priv, unsigned int freq,
 	if (ret) {
 		wpa_printf(MSG_ERROR, "wpa_supp: Failed to send Action frame: %d", ret);
 	}
+#ifdef CONFIG_WNM
+	/* WNM-Sleep Mode Request: category, action, dialog token, then the
+	 * WNM-Sleep element (id, len, action type).
+	 */
+	if (data_len >= 6 && data[0] == WLAN_ACTION_WNM &&
+	    data[1] == WNM_SLEEP_MODE_REQ && data[3] == WLAN_EID_WNMSLEEP) {
+		if_ctx->wnm_sleep_enter_pending =
+			!ret && data[5] == WNM_SLEEP_MODE_ENTER;
+		if_ctx->wnm_sleep_intval = 0;
+	}
+#endif /* CONFIG_WNM */
 
 	os_free(buf);
 out:
@@ -3445,6 +3516,82 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_WNM
+/* WNM-Sleep Mode outcome reporting.
+ *
+ * The supplicant calls wnm_oper once the AP's WNM-Sleep Mode Response has been
+ * processed. The driver only reports the outcome, as NET_EVENT_WIFI_WNM_SLEEP
+ * on the interface: whoever requested WNM-Sleep configures power save and
+ * extended sleep, both on entry and on exit.
+ */
+static void wnm_sleep_notify(struct zep_drv_if_ctx *if_ctx,
+			     enum wifi_wnm_sleep_result result, u16 intval)
+{
+	struct wifi_wnm_sleep_info info = {
+		.result = result,
+		.interval = intval,
+	};
+
+	wifi_mgmt_raise_wnm_sleep_event(if_ctx->iface, &info);
+}
+
+static int wpa_drv_zep_wnm_oper(void *priv, enum wnm_oper oper, const u8 *peer,
+				u8 *buf, u16 *buf_len)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+
+	if (!if_ctx || !if_ctx->iface) {
+		wpa_printf(MSG_ERROR, "%s: Invalid handle", __func__);
+		return -1;
+	}
+
+	switch (oper) {
+	case WNM_SLEEP_ENTER_CONFIRM:
+		/* if_ctx->wnm_sleep_intval is the WNM Sleep Interval granted by
+		 * the AP, in DTIM intervals, captured from the WNM-Sleep Mode
+		 * Response in wpa_drv_zep_event_mgmt_rx(). Consume it so a
+		 * later confirm cannot report a stale value.
+		 */
+		wpa_printf(MSG_DEBUG,
+			   "%s: WNM-Sleep accepted by " MACSTR " - interval %u DTIMs",
+			   __func__, MAC2STR(peer), if_ctx->wnm_sleep_intval);
+		wnm_sleep_notify(if_ctx, WIFI_WNM_SLEEP_ENTER_CONFIRM,
+				 if_ctx->wnm_sleep_intval);
+		if_ctx->wnm_sleep_intval = 0;
+		if_ctx->wnm_sleep_enter_pending = false;
+		return 0;
+
+	case WNM_SLEEP_ENTER_FAIL:
+	case WNM_SLEEP_EXIT_FAIL:
+		wpa_printf(MSG_DEBUG, "%s: WNM-Sleep %s rejected by " MACSTR,
+			   __func__,
+			   oper == WNM_SLEEP_ENTER_FAIL ? "enter" : "exit",
+			   MAC2STR(peer));
+		wnm_sleep_notify(if_ctx, oper == WNM_SLEEP_ENTER_FAIL ?
+				 WIFI_WNM_SLEEP_ENTER_FAIL :
+				 WIFI_WNM_SLEEP_EXIT_FAIL, 0);
+		if_ctx->wnm_sleep_intval = 0;
+		if_ctx->wnm_sleep_enter_pending = false;
+		return 0;
+
+	case WNM_SLEEP_EXIT_CONFIRM:
+		/* Extended sleep and power save are undone by whoever requested
+		 * the exit, before it sends the Request.
+		 */
+		wpa_printf(MSG_DEBUG, "%s: WNM-Sleep exit confirmed by " MACSTR,
+			   __func__, MAC2STR(peer));
+		wnm_sleep_notify(if_ctx, WIFI_WNM_SLEEP_EXIT_CONFIRM, 0);
+		return 0;
+
+	default:
+		/* TFS is not negotiated here. */
+		wpa_printf(MSG_DEBUG, "%s: WNM oper %d not handled", __func__,
+			   oper);
+		return -1;
+	}
+}
+#endif /* CONFIG_WNM */
+
 void wpa_drv_zep_send_action_cancel_wait(void *priv)
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
@@ -3559,4 +3706,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.probe_req_report = wpa_drv_zep_probe_req_report,
 	.send_action_cancel_wait = wpa_drv_zep_send_action_cancel_wait,
 	.set_p2p_powersave = wpa_drv_zep_set_p2p_powersave,
+#ifdef CONFIG_WNM
+	.wnm_oper = wpa_drv_zep_wnm_oper,
+#endif
 };
