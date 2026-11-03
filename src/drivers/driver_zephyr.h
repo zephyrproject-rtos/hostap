@@ -135,6 +135,10 @@ struct zep_drv_if_ctx {
 	struct net_if *iface;
 	const struct device *dev_ctx;
 	void *dev_priv;
+	/* WNM Sleep Interval from the last WNM-Sleep Mode Response received,
+	 * consumed by wnm_oper(WNM_SLEEP_ENTER_CONFIRM).
+	 */
+	u16 wnm_sleep_intval;
 #if defined(__ZEPHYR__)
 	struct k_sem drv_resp_sem;
 #endif
@@ -405,5 +409,24 @@ struct zep_wpa_supp_dev_ops {
 	void (*send_action_cancel_wait)(void *priv);
 	int (*signal_monitor)(void *if_priv, int threshold, int hysteresis);
 };
+
+/**
+ * Outcome of a WNM-Sleep Mode request, reported when the AP's response is
+ * processed.
+ *
+ * @oper: WNM_SLEEP_ENTER_CONFIRM, WNM_SLEEP_ENTER_FAIL, WNM_SLEEP_EXIT_CONFIRM
+ *	or WNM_SLEEP_EXIT_FAIL
+ * @intval: for WNM_SLEEP_ENTER_CONFIRM, the WNM Sleep Interval granted by the
+ *	AP in DTIM intervals; 0 otherwise
+ * @user_data: as passed to wpa_drv_zep_set_wnm_sleep_cb()
+ *
+ * Called from the supplicant thread, so it must not block. On enter confirm
+ * the driver leaves power save untouched - configuring it is up to the caller.
+ */
+typedef void (*wpa_drv_zep_wnm_sleep_cb_t)(enum wnm_oper oper, u16 intval,
+					   void *user_data);
+
+/* Register (or, with NULL, clear) the WNM-Sleep outcome callback. */
+void wpa_drv_zep_set_wnm_sleep_cb(wpa_drv_zep_wnm_sleep_cb_t cb, void *user_data);
 
 #endif /* DRIVER_ZEPHYR_H */
