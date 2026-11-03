@@ -1586,6 +1586,11 @@ static void wpa_drv_zep_deinit(void *priv)
 
 	if_ctx = priv;
 
+	/* Scan done may never arrive if the device is torn down mid-scan, so
+	 * drop the pending timeout before if_ctx is freed.
+	 */
+	eloop_cancel_timeout(wpa_drv_zep_scan_timeout, if_ctx, ELOOP_ALL_CTX);
+
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops || !dev_ops->deinit) {
 		wpa_printf(MSG_ERROR, "%s: deinit op not supported", __func__);
@@ -1690,6 +1695,8 @@ static void wpa_drv_zep_hapd_deinit(void *priv)
 	}
 
 	if_ctx = priv;
+
+	eloop_cancel_timeout(wpa_drv_zep_scan_timeout, if_ctx, ELOOP_ALL_CTX);
 
 	if (!if_ctx->dev_ctx) {
 		wpa_printf(MSG_ERROR, "%s: dev_ctx is NULL", __func__);
