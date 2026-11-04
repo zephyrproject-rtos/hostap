@@ -239,8 +239,6 @@ void os_free(void *ptr)
 
 void *os_realloc(void *ptr, size_t newsize)
 {
-	void *p;
-
 	if (newsize == 0) {
 		os_free(ptr);
 		return NULL;
@@ -250,16 +248,11 @@ void *os_realloc(void *ptr, size_t newsize)
 		return os_malloc(newsize);
 	}
 
-	p = os_zalloc(newsize);
-
-	if (p) {
-		if (ptr != NULL) {
-			memcpy(p, ptr, newsize);
-			os_free(ptr);
-		}
-	}
-
-	return p;
+#if defined(CONFIG_WIFI_NM_WPA_SUPPLICANT_GLOBAL_HEAP)
+	return k_realloc(ptr, newsize);
+#else
+	return k_heap_realloc(&wifi_nm_wpa_supplicant_mem_pool, ptr, newsize, K_NO_WAIT);
+#endif /* CONFIG_WIFI_NM_WPA_SUPPLICANT_GLOBAL_HEAP */
 }
 
 void *os_zalloc(size_t size)
