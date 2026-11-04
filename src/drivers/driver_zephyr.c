@@ -1594,11 +1594,12 @@ static void wpa_drv_zep_deinit(void *priv)
 	dev_ops = get_dev_ops(if_ctx->dev_ctx);
 	if (!dev_ops || !dev_ops->deinit) {
 		wpa_printf(MSG_ERROR, "%s: deinit op not supported", __func__);
-		return;
+		goto out;
 	}
 
 	dev_ops->deinit(if_ctx->dev_priv);
 
+out:
 	os_free(if_ctx);
 }
 
