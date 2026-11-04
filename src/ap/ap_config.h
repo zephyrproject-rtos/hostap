@@ -9,6 +9,7 @@
 #ifndef HOSTAPD_CONFIG_H
 #define HOSTAPD_CONFIG_H
 
+#include <net/if.h>
 #include "common/defs.h"
 #include "utils/list.h"
 #include "ip_addr.h"

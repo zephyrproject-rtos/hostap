@@ -9,6 +9,7 @@
 #ifndef WPA_SUPPLICANT_I_H
 #define WPA_SUPPLICANT_I_H
 
+#include <netinet/in.h>
 #include "utils/bitfield.h"
 #include "utils/list.h"
 #include "common/defs.h"
