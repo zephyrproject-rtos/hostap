@@ -492,6 +492,10 @@ else
 OBJS += wmm_ac.c
 endif
 
+ifdef CONFIG_NO_6GHZ
+L_CFLAGS += -DCONFIG_NO_6GHZ
+endif
+
 ifdef CONFIG_NO_ROBUST_AV
 L_CFLAGS += -DCONFIG_NO_ROBUST_AV
 else
