@@ -17,6 +17,10 @@
 #include "bss.h"
 #include "config.h"
 
+static const u8 center_channels_80mhz_5ghz[] = {
+	42, 58, 106, 122, 138, 155, 171
+};
+
 
 static enum chan_allowed allow_channel(struct hostapd_hw_modes *mode,
 				       u8 op_class, u8 chan,
@@ -77,7 +81,6 @@ static enum chan_allowed verify_80mhz(struct hostapd_hw_modes *mode,
 	unsigned int no_ir = 0;
 	const u8 *center_channels;
 	size_t num_chan;
-	const u8 center_channels_5ghz[] = { 42, 58, 106, 122, 138, 155, 171 };
 	const u8 center_channels_6ghz[] = { 7, 23, 39, 55, 71, 87, 103, 119,
 					    135, 151, 167, 183, 199, 215 };
 
@@ -85,8 +88,8 @@ static enum chan_allowed verify_80mhz(struct hostapd_hw_modes *mode,
 		center_channels = center_channels_6ghz;
 		num_chan = ARRAY_SIZE(center_channels_6ghz);
 	} else {
-		center_channels = center_channels_5ghz;
-		num_chan = ARRAY_SIZE(center_channels_5ghz);
+		center_channels = center_channels_80mhz_5ghz;
+		num_chan = ARRAY_SIZE(center_channels_80mhz_5ghz);
 	}
 
 	center_chan = get_center_80mhz(mode, channel, center_channels,
@@ -392,12 +395,10 @@ static int wpas_op_class_supported(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_VHT_OVERRIDES */
 
 	if (op_class->op_class == 128) {
-		u8 channels[] = { 42, 58, 106, 122, 138, 155, 171 };
-
-		for (i = 0; i < ARRAY_SIZE(channels); i++) {
+		for (i = 0; i < ARRAY_SIZE(center_channels_80mhz_5ghz); i++) {
 			if (verify_channel(mode, op_class->op_class,
-					   channels[i], op_class->bw) !=
-			    NOT_ALLOWED)
+					   center_channels_80mhz_5ghz[i],
+					   op_class->bw) != NOT_ALLOWED)
 				return 1;
 		}
 
@@ -415,43 +416,34 @@ static int wpas_op_class_supported(struct wpa_supplicant *wpa_s,
 	}
 
 	if (op_class->op_class == 130) {
-		/* Need at least two non-contiguous 80 MHz segments */
-		found = 0;
+		bool usable[ARRAY_SIZE(center_channels_80mhz_5ghz)] = { false };
+		size_t j;
 
-		if (verify_channel(mode, op_class->op_class, 42,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 58,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 106,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 122,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 138,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 155,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 171,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 106,
-				   op_class->bw) != NOT_ALLOWED &&
-		    verify_channel(mode, op_class->op_class, 138,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 122,
-				   op_class->bw) != NOT_ALLOWED &&
-		    verify_channel(mode, op_class->op_class, 155,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 138,
-				   op_class->bw) != NOT_ALLOWED &&
-		    verify_channel(mode, op_class->op_class, 171,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
+		/* Check which 80 MHz segments are available */
+		for (i = 0; i < ARRAY_SIZE(center_channels_80mhz_5ghz); i++) {
+			usable[i] =
+				verify_channel(mode, op_class->op_class,
+					       center_channels_80mhz_5ghz[i],
+					       op_class->bw) != NOT_ALLOWED;
+		}
 
-		if (found >= 2)
-			return 1;
+		/* Need at least two non-contiguous 80 MHz segments. */
+		for (i = 0; i < ARRAY_SIZE(center_channels_80mhz_5ghz); i++) {
+			if (!usable[i])
+				continue;
+
+			for (j = i + 1;
+			     j < ARRAY_SIZE(center_channels_80mhz_5ghz); j++) {
+				/*
+				 * Centers 16 apart are adjacent 80 MHz segments.
+				 * 80+80 needs a gap between them.
+				 */
+				if (usable[j] &&
+				    center_channels_80mhz_5ghz[j] -
+				    center_channels_80mhz_5ghz[i] > 16)
+					return 1;
+			}
+		}
 
 		return 0;
 	}
