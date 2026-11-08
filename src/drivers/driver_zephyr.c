@@ -2318,7 +2318,6 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
-	struct net_if *iface = NULL;
 
 	int ret = -1;
 
@@ -2330,27 +2329,10 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 		goto out;
 	}
 
-	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
-
 	ret = dev_ops->set_supp_port(if_ctx->dev_priv,
 				     authorized,
 				     if_ctx->bssid);
-
-#ifdef CONFIG_WIFI_STA_AUTO_DHCPV4
-	if (authorized) {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_SKIP_DHCP_ON_ROAMING
-		if (if_ctx->ft_roaming == true || if_ctx->roaming == true) {
-			if_ctx->roaming = false;
-			if_ctx->ft_roaming = false;
-		} else {
-			net_dhcpv4_restart(iface);
-		}
-#else
-		net_dhcpv4_restart(iface);
-#endif
-	}
-
-#endif
+	/* Zephyr's Wi-Fi management layer owns automatic DHCPv4 startup. */
 out:
 	return ret;
 }
