@@ -2332,7 +2332,33 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 	ret = dev_ops->set_supp_port(if_ctx->dev_priv,
 				     authorized,
 				     if_ctx->bssid);
-	/* Zephyr's Wi-Fi management layer owns automatic DHCPv4 startup. */
+#ifdef CONFIG_WIFI_STA_AUTO_DHCPV4
+	if (authorized) {
+		struct net_if *iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
+		bool roaming = if_ctx->roaming || if_ctx->ft_roaming;
+		bool keep_lease =
+			IS_ENABLED(CONFIG_WIFI_NM_WPA_SUPPLICANT_SKIP_DHCP_ON_ROAMING);
+
+#ifdef ZEPHYR_WIFI_MGMT_HANDLES_DHCPV4
+		if (ret)
+			goto out;
+#endif
+		if (!iface)
+			goto out;
+
+		if_ctx->roaming = false;
+		if_ctx->ft_roaming = false;
+
+#ifdef ZEPHYR_WIFI_MGMT_HANDLES_DHCPV4
+		if (roaming)
+			wifi_mgmt_handle_sta_roam(iface, keep_lease);
+#else
+		/* Preserve DHCP behavior with Zephyr versions without the roam hook. */
+		if (!roaming || !keep_lease)
+			net_dhcpv4_restart(iface);
+#endif
+	}
+#endif
 out:
 	return ret;
 }
