@@ -340,6 +340,9 @@ int eapol_sm_rx_eapol(struct eapol_sm *sm, const u8 *src, const u8 *buf,
 void eapol_sm_notify_tx_eapol_key(struct eapol_sm *sm);
 void eapol_sm_notify_portEnabled(struct eapol_sm *sm, bool enabled);
 void eapol_sm_notify_portValid(struct eapol_sm *sm, bool valid);
+#ifdef __ZEPHYR__
+void eapol_sm_reapply_port_authorization(struct eapol_sm *sm);
+#endif /* __ZEPHYR__ */
 void eapol_sm_notify_eap_success(struct eapol_sm *sm, bool success);
 void eapol_sm_notify_eap_fail(struct eapol_sm *sm, bool fail);
 void eapol_sm_notify_config(struct eapol_sm *sm,

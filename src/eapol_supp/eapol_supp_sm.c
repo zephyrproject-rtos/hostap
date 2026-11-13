@@ -1509,6 +1509,18 @@ void eapol_sm_notify_portEnabled(struct eapol_sm *sm, bool enabled)
 }
 
 
+#ifdef __ZEPHYR__
+/* A new peer needs the current authorization even if it did not change. */
+void eapol_sm_reapply_port_authorization(struct eapol_sm *sm)
+{
+	if (sm && sm->suppPortStatus == Authorized) {
+		sm->force_authorized_update = true;
+		eapol_sm_set_port_authorized(sm);
+	}
+}
+#endif /* __ZEPHYR__ */
+
+
 /**
  * eapol_sm_notify_portValid - Notification about portValid change
  * @sm: Pointer to EAPOL state machine allocated with eapol_sm_init()

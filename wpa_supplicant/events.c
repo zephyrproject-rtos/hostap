@@ -4985,6 +4985,10 @@ static int wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 		 * up in authenticated.
 		 */
 		wpa_supplicant_cancel_auth_timeout(wpa_s);
+#if defined(__ZEPHYR__) && defined(IEEE8021X_EAPOL)
+		if (new_bss && !already_authorized && wpa_ft_is_completed(wpa_s->wpa))
+			eapol_sm_reapply_port_authorization(wpa_s->eapol);
+#endif /* __ZEPHYR__ && IEEE8021X_EAPOL */
 		wpa_supplicant_set_state(wpa_s, WPA_COMPLETED);
 		eapol_sm_notify_portValid(wpa_s->eapol, true);
 		eapol_sm_notify_eap_success(wpa_s->eapol, true);
