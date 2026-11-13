@@ -415,43 +415,28 @@ static int wpas_op_class_supported(struct wpa_supplicant *wpa_s,
 	}
 
 	if (op_class->op_class == 130) {
-		/* Need at least two non-contiguous 80 MHz segments */
-		found = 0;
+		u8 channels[] = { 42, 58, 106, 122, 138, 155, 171 };
+		bool usable[ARRAY_SIZE(channels)] = { false };
+		size_t j;
 
-		if (verify_channel(mode, op_class->op_class, 42,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 58,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 106,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 122,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 138,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 155,
-				   op_class->bw) != NOT_ALLOWED ||
-		    verify_channel(mode, op_class->op_class, 171,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 106,
-				   op_class->bw) != NOT_ALLOWED &&
-		    verify_channel(mode, op_class->op_class, 138,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 122,
-				   op_class->bw) != NOT_ALLOWED &&
-		    verify_channel(mode, op_class->op_class, 155,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
-		if (verify_channel(mode, op_class->op_class, 138,
-				   op_class->bw) != NOT_ALLOWED &&
-		    verify_channel(mode, op_class->op_class, 171,
-				   op_class->bw) != NOT_ALLOWED)
-			found++;
+		/* Check which 80 MHz segments are available */
+		for (i = 0; i < ARRAY_SIZE(channels); i++) {
+			usable[i] =
+				verify_channel(mode, op_class->op_class,
+					       channels[i],
+					       op_class->bw) != NOT_ALLOWED;
+		}
 
-		if (found >= 2)
-			return 1;
+		/* Need at least two non-contiguous 80 MHz segments. */
+		for (i = 0; i < ARRAY_SIZE(channels); i++) {
+			if (!usable[i])
+				continue;
+
+			for (j = i + 1; j < ARRAY_SIZE(channels); j++) {
+				if (usable[j] && channels[j] - channels[i] > 16)
+					return 1;
+			}
+		}
 
 		return 0;
 	}
