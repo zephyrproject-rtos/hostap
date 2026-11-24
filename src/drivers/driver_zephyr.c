@@ -864,6 +864,23 @@ static void phy_info_freq_cfg(struct hostapd_hw_modes *mode,
 	if (chnl_info->wpa_supp_flags & WPA_SUPP_CHAN_FLAG_FREQUENCY_ATTR_NO_160MHZ)
 		chan->allowed_bw &= ~HOSTAPD_CHAN_WIDTH_160;
 
+	if (mode->ht_capab & HT_CAP_INFO_SUPP_CHANNEL_WIDTH_SET) {
+		if (chan->allowed_bw & HOSTAPD_CHAN_WIDTH_40P)
+			chan->flag |= HOSTAPD_CHAN_HT40 | HOSTAPD_CHAN_HT40PLUS;
+		if (chan->allowed_bw & HOSTAPD_CHAN_WIDTH_40M)
+			chan->flag |= HOSTAPD_CHAN_HT40 | HOSTAPD_CHAN_HT40MINUS;
+	}
+
+	/* mode->mode is set later during postprocessing. */
+	if (is_6ghz_freq(chan->freq) ||
+	    (chan->freq > 4000 && mode->vht_capab)) {
+		if (chan->allowed_bw & HOSTAPD_CHAN_WIDTH_80)
+			chan->flag |= HOSTAPD_CHAN_VHT_80MHZ_SUBCHANNEL;
+		if (chan->allowed_bw & HOSTAPD_CHAN_WIDTH_160)
+			chan->flag |= HOSTAPD_CHAN_VHT_80MHZ_SUBCHANNEL |
+				      HOSTAPD_CHAN_VHT_160MHZ_SUBCHANNEL;
+	}
+
 	if (chnl_info->wpa_supp_flags & WPA_SUPP_CHAN_DFS_CAC_TIME_VALID) {
 		chan->dfs_cac_ms = (chnl_info->wpa_supp_time);
 	}
