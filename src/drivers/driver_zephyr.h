@@ -135,6 +135,17 @@ struct zep_drv_if_ctx {
 	struct net_if *iface;
 	const struct device *dev_ctx;
 	void *dev_priv;
+#ifdef CONFIG_WNM
+	/* A WNM-Sleep Mode Request to enter WNM-Sleep has been sent and its
+	 * Response is outstanding. The granted interval is captured only
+	 * while this is set.
+	 */
+	bool wnm_sleep_enter_pending;
+	/* WNM Sleep Interval from the Response to that Request, consumed by
+	 * wnm_oper(WNM_SLEEP_ENTER_CONFIRM).
+	 */
+	u16 wnm_sleep_intval;
+#endif
 #if defined(__ZEPHYR__)
 	struct k_sem drv_resp_sem;
 	/* Serializes phy_info_arg and the get_wiphy drv_resp_sem give between
