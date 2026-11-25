@@ -2326,7 +2326,6 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 {
 	struct zep_drv_if_ctx *if_ctx = NULL;
 	const struct zep_wpa_supp_dev_ops *dev_ops;
-	struct net_if *iface = NULL;
 
 	int ret = -1;
 
@@ -2338,26 +2337,35 @@ static int wpa_drv_zep_set_supp_port(void *priv,
 		goto out;
 	}
 
-	iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
-
 	ret = dev_ops->set_supp_port(if_ctx->dev_priv,
 				     authorized,
 				     if_ctx->bssid);
-
 #ifdef CONFIG_WIFI_STA_AUTO_DHCPV4
 	if (authorized) {
-#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_SKIP_DHCP_ON_ROAMING
-		if (if_ctx->ft_roaming == true || if_ctx->roaming == true) {
-			if_ctx->roaming = false;
-			if_ctx->ft_roaming = false;
-		} else {
-			net_dhcpv4_restart(iface);
-		}
+		struct net_if *iface = net_if_lookup_by_dev(if_ctx->dev_ctx);
+		bool roaming = if_ctx->roaming || if_ctx->ft_roaming;
+		bool keep_lease =
+			IS_ENABLED(CONFIG_WIFI_NM_WPA_SUPPLICANT_SKIP_DHCP_ON_ROAMING);
+
+#ifdef ZEPHYR_WIFI_MGMT_HANDLES_DHCPV4
+		if (ret)
+			goto out;
+#endif
+		if (!iface)
+			goto out;
+
+		if_ctx->roaming = false;
+		if_ctx->ft_roaming = false;
+
+#ifdef ZEPHYR_WIFI_MGMT_HANDLES_DHCPV4
+		if (roaming)
+			wifi_mgmt_handle_sta_roam(iface, keep_lease);
 #else
-		net_dhcpv4_restart(iface);
+		/* Preserve DHCP behavior with Zephyr versions without the roam hook. */
+		if (!roaming || !keep_lease)
+			net_dhcpv4_restart(iface);
 #endif
 	}
-
 #endif
 out:
 	return ret;
