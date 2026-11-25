@@ -730,7 +730,7 @@ static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 	if (remove_sta) {
 		if (wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi,
 					  WPA_STA_AUTHORIZED, 0,
-					  ~WPA_STA_AUTHORIZED))
+					  (int) (~WPA_STA_AUTHORIZED)))
 			wpa_printf(MSG_DEBUG,
 				   "NAN: Failed to clear authorized flag for NDI station");
 

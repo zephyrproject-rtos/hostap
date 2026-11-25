@@ -2606,6 +2606,19 @@ out:
 }
 
 #ifdef CONFIG_NAN
+static const u8 *wpa_drv_zep_get_mac_addr(void *priv)
+{
+	struct zep_drv_if_ctx *if_ctx = priv;
+	struct wpa_supplicant *wpa_s = if_ctx->supp_if_ctx;
+
+	/* STA obtains its address through l2_packet; NAN has no such handle. */
+	if (!wpa_s->nan_mgmt) {
+		return NULL;
+	}
+
+	return net_if_get_link_addr(if_ctx->iface)->addr;
+}
+
 static int wpa_drv_zep_nan_start(void *priv,
 				 const struct nan_cluster_config *conf)
 {
@@ -3519,6 +3532,7 @@ const struct wpa_driver_ops wpa_driver_zep_ops = {
 	.set_country = wpa_drv_zep_set_country,
 	.get_country = wpa_drv_zep_get_country,
 #ifdef CONFIG_NAN
+	.get_mac_addr = wpa_drv_zep_get_mac_addr,
 	.nan_start = wpa_drv_zep_nan_start,
 	.nan_change_config = wpa_drv_zep_nan_change_config,
 	.nan_stop = wpa_drv_zep_nan_stop,
