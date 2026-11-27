@@ -377,6 +377,34 @@ void wpa_supplicant_event_wrapper(void *ctx,
 			data_tmp->unprot_disassoc.sa = sa;
 			os_memcpy(da, data->unprot_disassoc.da, ETH_ALEN);
 			data_tmp->unprot_disassoc.da = da;
+		} else if (event == EVENT_EXTERNAL_AUTH) {
+			union wpa_event_data *data_tmp = msg.data;
+
+			data_tmp->external_auth.bssid = NULL;
+			data_tmp->external_auth.ssid = NULL;
+			data_tmp->external_auth.mld_addr = NULL;
+			if (data->external_auth.bssid)
+				data_tmp->external_auth.bssid =
+					os_memdup(data->external_auth.bssid, ETH_ALEN);
+			if (data->external_auth.ssid)
+				data_tmp->external_auth.ssid =
+					os_memdup(data->external_auth.ssid,
+						  data->external_auth.ssid_len);
+			if (data->external_auth.mld_addr)
+				data_tmp->external_auth.mld_addr =
+					os_memdup(data->external_auth.mld_addr, ETH_ALEN);
+			if ((data->external_auth.bssid && !data_tmp->external_auth.bssid) ||
+			    (data->external_auth.ssid && !data_tmp->external_auth.ssid) ||
+			    (data->external_auth.mld_addr && !data_tmp->external_auth.mld_addr)) {
+				wpa_printf(MSG_ERROR,
+				  "%s:%d event %u Failed to alloc external auth data\n",
+				  __func__, __LINE__, event);
+				os_free((char *)data_tmp->external_auth.bssid);
+				os_free((char *)data_tmp->external_auth.ssid);
+				os_free((char *)data_tmp->external_auth.mld_addr);
+				os_free(msg.data);
+				return;
+			}
 		}
 	}
 
