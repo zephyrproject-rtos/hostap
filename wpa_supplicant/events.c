@@ -2829,11 +2829,7 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		wpa_dbg(wpa_s, MSG_DEBUG, "No suitable network found");
 #ifdef __ZEPHYR__
 		if (own_request && wpa_s->wpa_state == WPA_SCANNING) {
-			int conn_result = WIFI_STATUS_CONN_AP_NOT_FOUND;
-
-			supplicant_send_wifi_mgmt_event(wpa_s->ifname,
-							NET_EVENT_WIFI_CMD_CONNECT_RESULT,
-							&conn_result, sizeof(conn_result));
+			supplicant_notify_ap_not_found(wpa_s);
 		}
 #endif /* __ZEPHYR__ */
 		ssid = wpa_supplicant_pick_new_network(wpa_s);
